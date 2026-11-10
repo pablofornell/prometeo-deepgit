@@ -1,5 +1,6 @@
 import { type JSX, createSignal } from "solid-js";
 import { loadPersisted, savePersisted } from "../../state/persist";
+import { dragSize } from "./splitterMath";
 
 export interface SplitterProps {
   /** "vertical" = a vertical bar between left/right panes (drag changes a width);
@@ -37,12 +38,7 @@ export function loadSplitSize(key: string, fallback: number): number {
 export function Splitter(props: SplitterProps): JSX.Element {
   const [dragging, setDragging] = createSignal(false);
   const vertical = () => props.orientation === "vertical";
-  const clamp = (s: number) => {
-    const max = typeof props.max === "function" ? props.max() : props.max;
-    let v = s;
-    if (max !== undefined) v = Math.min(v, max);
-    return Math.round(Math.max(v, props.min ?? 0));
-  };
+  const maxSize = () => (typeof props.max === "function" ? props.max() : props.max);
 
   const onDown = (e: PointerEvent) => {
     if (e.button !== 0) return;
@@ -51,12 +47,12 @@ export function Splitter(props: SplitterProps): JSX.Element {
     el.setPointerCapture(e.pointerId);
     const start = vertical() ? e.clientX : e.clientY;
     const startSize = props.size;
-    let last = startSize;
+    let last = dragSize(startSize, 0, false, props.min, maxSize());
     setDragging(true);
     document.body.classList.add(vertical() ? "dg-resizing-col" : "dg-resizing-row");
     const move = (ev: PointerEvent) => {
       const d = (vertical() ? ev.clientX : ev.clientY) - start;
-      last = clamp(startSize + (props.reverse ? -d : d));
+      last = dragSize(startSize, d, !!props.reverse, props.min, maxSize());
       props.onSize(last);
     };
     const up = () => {
@@ -78,7 +74,7 @@ export function Splitter(props: SplitterProps): JSX.Element {
     const shrink = vertical() ? (props.reverse ? "ArrowRight" : "ArrowLeft") : props.reverse ? "ArrowDown" : "ArrowUp";
     if (e.key !== grow && e.key !== shrink) return;
     e.preventDefault();
-    const v = clamp(props.size + (e.key === grow ? step : -step));
+    const v = dragSize(props.size, e.key === grow ? step : -step, false, props.min, maxSize());
     props.onSize(v);
     if (props.persistKey) savePersisted("split." + props.persistKey, v);
   };

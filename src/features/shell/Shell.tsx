@@ -22,7 +22,7 @@ import { activeProject, selectedRepos } from "../../state/workspace";
 import { keysFor, formatKeys, register } from "../../state/keymap";
 import { loadPersisted, savePersisted } from "../../state/persist";
 import { DEFAULT_RATIOS, allocate, maxBottom, ratioFor, sanitizeRatios, type Mins, type Ratios } from "./heights";
-import { clampDetails, defaultDetails, maxDetails, maximizedDetails } from "./widths";
+import { MIN_DETAILS, clampDetails, defaultDetails, maxDetails, maximizedDetails } from "./widths";
 import "./shell.css";
 
 const SPLIT = 6;
@@ -195,7 +195,7 @@ export function Shell(): JSX.Element {
                   <ChangesView />
                 </div>
               </section>
-              <Splitter orientation="vertical" reverse size={detailsW()} onSize={resizeDetails} min={320} max={() => maxDetails(rowWidth(), SPLIT)} defaultSize={defaultDetails(rowWidth(), SPLIT)} persistKey="details" />
+              <Splitter orientation="vertical" reverse size={detailsW()} onSize={resizeDetails} min={MIN_DETAILS} max={() => maxDetails(rowWidth(), SPLIT)} defaultSize={defaultDetails(rowWidth(), SPLIT)} persistKey="details" />
               <aside class="dg-shell-island dg-shell-details" style={{ width: detailsW() + "px" }} aria-label="Details">
                 <div class="dg-shell-head" role="tablist" aria-label="Details tabs">
                   <button type="button" role="tab" aria-selected={detailsTab() === "files"} class="dg-shell-tab" classList={{ "is-on": detailsTab() === "files" }} onClick={() => setDetailsTab("files")}>
