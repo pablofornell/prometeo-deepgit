@@ -1,6 +1,6 @@
 /** Small form parts shared by the dialogs. Styled in `dialogs.css` (prefix `dg-dialogs-`). */
 import { type JSX, For, Show } from "solid-js";
-import { Checkbox, Icon, RepoSquare } from "../../components/ui";
+import { Checkbox, Icon, RepoIcon } from "../../components/ui";
 import type { IconName } from "../../components/ui";
 import { repoById } from "../../state/workspace";
 import "./dialogs.css";
@@ -109,7 +109,7 @@ export function RepoChecklist(props: { repoIds: string[]; picked: string[]; onCh
                     onChange={(on) => toggle(id, on)}
                     label={
                       <span class="dg-dialogs-repo">
-                        <RepoSquare repo={r()} />
+                        <RepoIcon />
                         <span class="dg-dialogs-repo-name">{r().name}</span>
                         <Show when={props.detail?.(id)}>{(d) => <span class="dg-dialogs-repo-detail">{d()}</span>}</Show>
                       </span>
@@ -134,7 +134,7 @@ export function RepoRows(props: { rows: { repoId: string; detail: JSX.Element; t
           <Show when={repoById(row.repoId)}>
             {(r) => (
               <div class="dg-dialogs-row">
-                <RepoSquare repo={r()} />
+                <RepoIcon />
                 <span class="dg-dialogs-repo-name">{r().name}</span>
                 <span class="dg-dialogs-row-detail">{row.detail}</span>
                 <Show when={row.trailing}>{(t) => <span class="dg-dialogs-row-trailing">{t()}</span>}</Show>

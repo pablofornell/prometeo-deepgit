@@ -34,7 +34,7 @@ fn finds_nested_repos_and_skips_ignored_dirs() {
 }
 
 #[test]
-fn make_project_assigns_names_ids_and_colors() {
+fn make_project_assigns_names_and_ids() {
     let root = tempfile::tempdir().unwrap();
     let r = root.path();
     init_at(r);
@@ -54,9 +54,6 @@ fn make_project_assigns_names_ids_and_colors() {
     assert_eq!(project.repos[0].name, root_name);
     assert_eq!(project.repos[1].name, "pkg0");
     assert_eq!(project.repos[9].name, "pkg8");
-    let colors: Vec<u8> = project.repos.iter().map(|r| r.color).collect();
-    // all 12 palette colours are used before one repeats
-    assert_eq!(colors, vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
     assert_eq!(project.repos[0].id.len(), 12);
     assert!(project.repos[0].id.chars().all(|c| c.is_ascii_hexdigit()));
     // Ids are stable and unique.

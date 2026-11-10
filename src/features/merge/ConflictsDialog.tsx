@@ -279,7 +279,7 @@ export function ConflictsDialog(props: ConflictsProps & DialogComponentProps<Con
               <For each={opRepos()}>
                 {(id) => (
                   <div class="dg-cf-continue">
-                    <RepoChip name={repoById(id)?.name ?? id} repo={repoById(id)} />
+                    <RepoChip name={repoById(id)?.name ?? id} />
                     <span>{OP[summary(id)?.state ?? ""] ?? "operation"} in progress</span>
                     <span class="dg-grow" />
                     <Button variant="primary" disabled={busy() !== null} onClick={() => void proceed(id)}>
@@ -318,7 +318,7 @@ export function ConflictsDialog(props: ConflictsProps & DialogComponentProps<Con
               {(item) =>
                 item.kind === "repo" ? (
                   <div class="dg-cf-group" role="presentation">
-                    <RepoChip name={repoById(item.repoId)?.name ?? item.repoId} repo={repoById(item.repoId)} />
+                    <RepoChip name={repoById(item.repoId)?.name ?? item.repoId} />
                     <span class="dg-cf-group-label" title={headerLabel(item.repoId)}>{headerLabel(item.repoId)}</span>
                   </div>
                 ) : (

@@ -4,7 +4,7 @@
  */
 import { For, type JSX, Show, createEffect, createMemo, createSignal, on } from "solid-js";
 import {
-  AheadBehind, Button, Checkbox, EmptyState, Icon, IconButton, RepoSquare, SearchField, openMenu, plural,
+  AheadBehind, Button, Checkbox, EmptyState, Icon, IconButton, RepoIcon, SearchField, openMenu, plural,
   type MenuItem,
 } from "../../components/ui";
 import * as actions from "../../state/actions";
@@ -12,7 +12,7 @@ import { branchTable, matrixBranch, setMatrixBranch, type BranchCell, type Branc
 import { confirmAction } from "../../state/dialogs";
 import { notifyRepoChanged } from "../../state/events";
 import { cachedRefs, refreshRefs } from "../../state/refs";
-import { focusedRepoIdSignal, projectRepos, isMultiRepo, refreshSummaries, repoVars, setFocusedRepoId, summary } from "../../state/workspace";
+import { focusedRepoIdSignal, projectRepos, refreshSummaries, setFocusedRepoId, summary } from "../../state/workspace";
 import "./matrix.css";
 
 /** Columns drawn at most; the filter narrows the rest. */
@@ -287,11 +287,10 @@ export function BranchMatrix(): JSX.Element {
                       type="button"
                       role="rowheader"
                       class="dg-matrix-rowhead"
-                      classList={{ "is-focused": r.id === focusedRepoIdSignal(), "dg-tint-strong": isMultiRepo() }}
-                      style={repoVars(r)}
+                      classList={{ "is-focused": r.id === focusedRepoIdSignal() }}
                       onClick={() => setFocusedRepoId(r.id)}
                     >
-                      <RepoSquare repo={r} />
+                      <RepoIcon />
                       <span class="dg-matrix-rname">{r.name}</span>
                       <span class="dg-matrix-rbranch">{summary(r.id)?.branch ?? ""}</span>
                     </button>
@@ -303,8 +302,7 @@ export function BranchMatrix(): JSX.Element {
                             type="button"
                             role="gridcell"
                             class="dg-matrix-cell"
-                            classList={{ "is-selected": c.name === matrixBranch(), "dg-tint": isMultiRepo() }}
-                            style={repoVars(r)}
+                            classList={{ "is-selected": c.name === matrixBranch() }}
                             data-tip={cellTip(r.id, c, cell())}
                             onClick={() => {
                               setFocusedRepoId(r.id);

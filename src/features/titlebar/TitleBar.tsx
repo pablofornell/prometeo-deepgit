@@ -75,7 +75,6 @@ export function TitleBar(): JSX.Element {
       { separator: true },
       { label: "Log", heading: true },
       { label: "Show commit graph", checked: settings.showGraph, onSelect: () => setSetting("showGraph", !settings.showGraph) },
-      { label: "Colour lanes by repository", checked: settings.laneColors === "repo", onSelect: () => setSetting("laneColors", settings.laneColors === "repo" ? "branch" : "repo") },
       { label: "Comfortable rows", checked: settings.comfortableRows, onSelect: () => setSetting("comfortableRows", !settings.comfortableRows) },
       { separator: true },
       { label: "Show background commands in the console", checked: settings.showBackgroundCommands, onSelect: () => setSetting("showBackgroundCommands", !settings.showBackgroundCommands) },

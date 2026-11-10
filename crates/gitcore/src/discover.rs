@@ -4,7 +4,6 @@ use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 use crate::model::{Project, RepoInfo};
-use crate::palette::next_color;
 use crate::paths::canonicalize;
 
 const SKIP_DIRS: [&str; 5] = ["node_modules", "target", "dist", "build", ".venv"];
@@ -121,18 +120,13 @@ fn folder_name(p: &Path) -> String {
         .unwrap_or_else(|| p.display().to_string())
 }
 
-/// Builds a project for `root` with its repos discovered (depth <= `MAX_DEPTH`). Each repo gets the palette
-/// colour that is least used in the project so far (lowest index on a tie). The caller (the
-/// workspace) replaces these with colours balanced across all projects.
+/// Builds a project for `root` with its repos discovered (depth <= `MAX_DEPTH`).
 pub fn make_project(root: &Path) -> Project {
     let root = canonicalize(root).unwrap_or_else(|_| root.to_path_buf());
-    let mut used: Vec<u8> = Vec::new();
     let repos = find_repos(&root, MAX_DEPTH)
         .iter()
         .map(|p| {
             let rel = rel_name(&root, p);
-            let color = next_color(used.iter().copied());
-            used.push(color);
             RepoInfo {
                 id: repo_id(p),
                 name: if rel.is_empty() {
@@ -141,8 +135,6 @@ pub fn make_project(root: &Path) -> Project {
                     rel
                 },
                 path: p.to_string_lossy().into_owned(),
-                color,
-                custom_color: None,
             }
         })
         .collect();
@@ -151,7 +143,5 @@ pub fn make_project(root: &Path) -> Project {
         name: folder_name(&root),
         path: root.to_string_lossy().into_owned(),
         repos,
-        color: 0,
-        custom_color: None,
     }
 }

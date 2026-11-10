@@ -3,10 +3,10 @@
  * An active chip looks pressed; "Clear" resets everything.
  */
 import { For, type JSX, Show, createMemo, createSignal, onMount } from "solid-js";
-import { Avatar, Checkbox, Icon, Popup, RepoSquare, SearchField, plural } from "../../components/ui";
+import { Avatar, Checkbox, Icon, Popup, RepoIcon, SearchField, plural } from "../../components/ui";
 import type { IconName } from "../../components/ui";
 import { repoRefs } from "../../state/refs";
-import { isRepoFilterActive, projectRepos, repoColor, selectAllRepos, selectOnlyRepo, selectedRepoIds, selectedRepos, summary, toggleRepo } from "../../state/workspace";
+import { isRepoFilterActive, projectRepos, selectAllRepos, selectOnlyRepo, selectedRepoIds, summary, toggleRepo } from "../../state/workspace";
 import { knownAuthors } from "./authors";
 import {
   activeFilters, author, clearAllFilters, commitText, datePreset, path, refs, setAuthor, setDateRange, setPath, setRefs, since, textInput, typeText, until,
@@ -90,17 +90,12 @@ function ReposChip(): JSX.Element {
   const [open, setOpen] = createSignal(false);
   let anchor: HTMLButtonElement | undefined;
   const repos = projectRepos;
-  const dots = () => selectedRepos().slice(0, 3);
   return (
     <>
       <Chip
         ref={(el) => (anchor = el)}
         label={`Repos: ${selectedRepoIds().length} of ${repos().length}`}
-        leading={
-          <span class="dg-log-dots">
-            <For each={dots()}>{(r) => <i style={{ background: repoColor(r) }} />}</For>
-          </span>
-        }
+        leading={<Icon name="repo" size={14} />}
         active={isRepoFilterActive()}
         open={open()}
         title="Repositories shown in the log"
@@ -117,7 +112,7 @@ function ReposChip(): JSX.Element {
             {(r) => (
               <div class="dg-log-pop-item has-only" classList={{ "is-selected": selectedRepoIds().includes(r.id) }} onClick={() => toggleRepo(r.id)}>
                 <Checkbox checked={selectedRepoIds().includes(r.id)} onChange={noop} ariaLabel={r.name} />
-                <RepoSquare repo={r} />
+                <RepoIcon />
                 <span class="dg-log-pop-text">{r.name}</span>
                 <span class="dg-log-pop-meta">{summary(r.id)?.branch ?? ""}</span>
                 <button

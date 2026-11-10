@@ -12,7 +12,6 @@ import {
   DEEPGIT_ROOT, PAYMENTS_ROOT, PEOPLE, SCENARIOS, genericScenario, generateRepo, hashStr, hex40, repoId,
   type MockCommit, type MockRepo, type Scenario,
 } from "./mockData";
-import { addColoredProject, colorizeRepos, parseColorChoice, setProjectColor, setRepoColor } from "./mockColors";
 import { buildFileDiff, fileText, toFileChange } from "./mockDiff";
 import { entryOf, genericConflicts, currentOids, hasStage, isTextConflict, sideStages, versionsOf, type MockConflict } from "./mockConflicts";
 import type {
@@ -98,22 +97,20 @@ function registerRepo(info: RepoInfo, scenario: Scenario): void {
   metas.set(info.id, { info, url, scenario });
 }
 
-/** Colours come from the same assignment as the Rust backend (`mockColors.ts`). */
 function buildInitialProjects(): Workspace["projects"] {
   const ws: Workspace = { projects: [], activeProjectId: null, ui: {} };
-  const payments: Project = { id: "p-payments", name: "payments-platform", path: PAYMENTS_ROOT, repos: [], color: 0, customColor: null };
+  const payments: Project = { id: "p-payments", name: "payments-platform", path: PAYMENTS_ROOT, repos: [] };
   const scenarios = new Map<string, Scenario>();
   for (const sc of SCENARIOS.filter((s) => s.name !== "deepgit")) {
     const path = `${PAYMENTS_ROOT}/${sc.name}`;
-    payments.repos.push({ id: repoId(path), name: sc.name, path, color: 0, customColor: null });
+    payments.repos.push({ id: repoId(path), name: sc.name, path });
     scenarios.set(repoId(path), sc);
   }
-  addColoredProject(ws, payments);
+  ws.projects.push(payments);
   const dg = SCENARIOS.find((s) => s.name === "deepgit") as Scenario;
-  const dgInfo: RepoInfo = { id: repoId(DEEPGIT_ROOT), name: "deepgit", path: DEEPGIT_ROOT, color: 0, customColor: null };
+  const dgInfo: RepoInfo = { id: repoId(DEEPGIT_ROOT), name: "deepgit", path: DEEPGIT_ROOT };
   scenarios.set(dgInfo.id, dg);
-  addColoredProject(ws, { id: "p-deepgit", name: "deepgit", path: DEEPGIT_ROOT, repos: [dgInfo], color: 0, customColor: null });
-  // the registry holds the live objects of the workspace, so a colour change shows in every later read
+  ws.projects.push({ id: "p-deepgit", name: "deepgit", path: DEEPGIT_ROOT, repos: [dgInfo] });
   for (const r of ws.projects.flatMap((p) => p.repos)) registerRepo(r, scenarios.get(r.id) as Scenario);
   return ws.projects;
 }
@@ -567,23 +564,7 @@ interface Ctx {
 
 type Handler = (a: Args, c: Ctx) => unknown;
 
-/** `Option<u8>` argument: a missing or null value is None; anything else that is not an integer 0..255 is rejected like serde does. */
-function colorArg(a: Args, key: string, cmd: string): number | null {
-  const v = a[key];
-  if (v === undefined || v === null) return null;
-  if (typeof v === "number" && Number.isInteger(v) && v >= 0 && v <= 255) return v;
-  fail(`invalid args \`${key}\` for command \`${cmd}\`: invalid value`);
-}
-
-/** `Option<String>` argument. */
-function customArg(a: Args, cmd: string): string | null {
-  const v = a.custom;
-  if (v === undefined || v === null) return null;
-  if (typeof v === "string") return v;
-  fail(`invalid args \`custom\` for command \`${cmd}\`: invalid type`);
-}
-
-const READ_FAST = new Set(["log_rows", "log_find", "log_close", "workspace_load", "workspace_save_ui", "project_set_active", "project_remove", "repo_set_color", "project_set_color", "auth_reply", "set_auth_prefs", "credentials_clear"]);
+const READ_FAST = new Set(["log_rows", "log_find", "log_close", "workspace_load", "workspace_save_ui", "project_set_active", "project_remove", "auth_reply", "set_auth_prefs", "credentials_clear"]);
 
 const handlers: Record<string, Handler> = {
   // ---- workspace
@@ -597,10 +578,10 @@ const handlers: Record<string, Handler> = {
     const existing = workspace.projects.find((p) => p.path === path);
     if (existing) return structuredClone(existing);
     const defs: [string, string][] = [[path, name], [`${path}/api`, "api"], [`${path}/web`, "web"]];
-    const project: Project = { id: "p-" + hex40(path).slice(0, 8), name, path, repos: [], color: 0, customColor: null };
-    for (const [p, n] of defs) project.repos.push({ id: repoId(p), name: n, path: p, color: 0, customColor: null });
-    addColoredProject(workspace, project);
-    for (const info of project.repos) registerRepo(info, genericScenario(info.name, info.color));
+    const project: Project = { id: "p-" + hex40(path).slice(0, 8), name, path, repos: [] };
+    for (const [p, n] of defs) project.repos.push({ id: repoId(p), name: n, path: p });
+    workspace.projects.push(project);
+    for (const info of project.repos) registerRepo(info, genericScenario(info.name));
     workspace.activeProjectId = project.id;
     return structuredClone(project);
   },
@@ -610,18 +591,8 @@ const handlers: Record<string, Handler> = {
   },
   project_rescan: (a) => {
     const p = workspace.projects.find((x) => x.id === str(a.projectId)) ?? fail("Project not found");
-    // the mock finds the same repos again; a real rescan keeps their colours, so nothing changes
+    // the mock finds the same repos again, so nothing changes
     return structuredClone(p);
-  },
-  repo_set_color: (a) => {
-    const choice = parseColorChoice(colorArg(a, "color", "repo_set_color"), customArg(a, "repo_set_color"));
-    if (typeof choice === "string") fail(choice);
-    return setRepoColor(workspace, str(a.repoId), choice) ?? fail("unknown repository");
-  },
-  project_set_color: (a) => {
-    const choice = parseColorChoice(colorArg(a, "color", "project_set_color"), customArg(a, "project_set_color"));
-    if (typeof choice === "string") fail(choice);
-    return setProjectColor(workspace, str(a.projectId), choice) ?? fail("unknown project");
   },
   project_set_active: (a) => {
     workspace.activeProjectId = str(a.projectId);
@@ -1368,10 +1339,8 @@ async function cloneRepo(a: Args, c: Ctx): Promise<CloneResult> {
         await sleep(60);
       }
     }
-    const info: RepoInfo = { id: repoId(path), name: project ? path.slice(project.path.length + 1) : dirName, path, color: 0, customColor: null };
-    // Same colour rule as Rust: a new repo takes the least-used palette colour of the workspace.
-    colorizeRepos(workspace, null, { id: "", name: "", path: "", color: 0, customColor: null, repos: [info] });
-    registerRepo(info, genericScenario(dirName, info.color));
+    const info: RepoInfo = { id: repoId(path), name: project ? path.slice(project.path.length + 1) : dirName, path };
+    registerRepo(info, genericScenario(dirName));
     const meta = metas.get(info.id);
     if (meta) meta.url = url;
     let created = false;
@@ -1379,8 +1348,8 @@ async function cloneRepo(a: Args, c: Ctx): Promise<CloneResult> {
       project.repos.push(info);
     } else {
       created = true;
-      project = { id: "p-" + hex40(path).slice(0, 8), name: dirName, path, color: 0, customColor: null, repos: [info] };
-      addColoredProject(workspace, project);
+      project = { id: "p-" + hex40(path).slice(0, 8), name: dirName, path, repos: [info] };
+      workspace.projects.push(project);
     }
     c.git(null, gitArgs, { stderr: `Cloning into '${path}'...\nReceiving objects: 100% (350/350), done.\n` });
     auth.commit();

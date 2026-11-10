@@ -292,8 +292,6 @@ impl Fixture {
             id: "client".into(),
             name: "client".into(),
             path: client.display().to_string(),
-            color: 0,
-            custom_color: None,
         };
         Fixture {
             _tmp: tmp,

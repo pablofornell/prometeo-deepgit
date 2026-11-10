@@ -45,14 +45,14 @@ describe("settings store", () => {
     storage.set("deepgit.ui.editorFontSize", "3");
     storage.set("deepgit.ui.theme", '"purple"');
     storage.set("deepgit.ui.showGraph", "42");
-    storage.set("deepgit.ui.laneColors", "{not json");
+    storage.set("deepgit.ui.dateFormat", "{not json");
     const { settings } = await load();
     expect(settings.fontSize).toBe(20);
     expect(settings.uiScale).toBe(100);
     expect(settings.editorFontSize).toBe(10);
     expect(settings.theme).toBe("dark");
     expect(settings.showGraph).toBe(true);
-    expect(settings.laneColors).toBe("repo");
+    expect(settings.dateFormat).toBe("relative");
   });
 
   it("loads valid stored values", async () => {
@@ -80,22 +80,19 @@ describe("settings store", () => {
     expect(settings.theme).toBe("dark");
   });
 
-  it("repoTintStrength is stepped, clamped, written as --dg-repo-tint-k and switches the tints off at 0", async () => {
-    const { settings, setSetting, SETTING_DEFAULTS } = await load();
-    expect(SETTING_DEFAULTS.repoTintStrength).toBe(100);
-    setSetting("repoTintStrength", 150);
-    expect(rootStyle.get("--dg-repo-tint-k")).toBe("1.5");
-    expect(rootAttrs.has("data-repo-tints")).toBe(false);
-    setSetting("repoTintStrength", 160); // steps of 25
-    expect(settings.repoTintStrength).toBe(150);
-    setSetting("repoTintStrength", 999);
-    expect(settings.repoTintStrength).toBe(200);
-    expect(storage.get("deepgit.ui.repoTintStrength")).toBe("200");
-    setSetting("repoTintStrength", 0);
-    expect(rootStyle.get("--dg-repo-tint-k")).toBe("0");
-    expect(rootAttrs.get("data-repo-tints")).toBe("off");
-    setSetting("repoTintStrength", "strong" as never);
-    expect(settings.repoTintStrength).toBe(100);
+  it("drops the stored values of settings that no longer exist (lane colours by repository, repo tint strength)", async () => {
+    storage.set("deepgit.ui.laneColors", '"repo"');
+    storage.set("deepgit.ui.repoTintStrength", "150");
+    storage.set("deepgit.ui.showGraph", "false");
+    const { settings, SETTING_DEFAULTS, RETIRED_KEYS } = await load();
+    expect([...RETIRED_KEYS]).toEqual(["laneColors", "repoTintStrength"]);
+    expect(storage.has("deepgit.ui.laneColors")).toBe(false);
+    expect(storage.has("deepgit.ui.repoTintStrength")).toBe(false);
+    // the store has no such keys, and the settings that still exist are untouched
+    expect(Object.keys(settings).sort()).toEqual(Object.keys(SETTING_DEFAULTS).sort());
+    expect("laneColors" in settings || "repoTintStrength" in settings).toBe(false);
+    expect(settings.showGraph).toBe(false);
+    expect(rootStyle.has("--dg-repo-tint-k")).toBe(false);
     expect(rootAttrs.has("data-repo-tints")).toBe(false);
   });
 

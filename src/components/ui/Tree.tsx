@@ -40,9 +40,9 @@ export interface TreeProps<T> {
   /** Vertical indent guides (default true). */
   guides?: boolean;
   class?: string;
-  /** Extra class names for the row of a node (for example a repo tint class from colors.css). */
+  /** Extra class names for the row of a node. */
   rowClass?: (node: T) => string | undefined;
-  /** Extra inline style for the row of a node (for example `repoVars(repo)`). */
+  /** Extra inline style for the row of a node. */
   rowStyle?: (node: T) => JSX.CSSProperties | undefined;
   ariaLabel?: string;
   apiRef?: (api: TreeApi) => void;

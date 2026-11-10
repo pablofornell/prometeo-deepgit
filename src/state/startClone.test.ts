@@ -31,7 +31,7 @@ vi.mock("../components/ui", () => ({ joinNames: (n: string[]) => n.join(", "), p
 vi.mock("./dialogs", () => ({ confirmAction: vi.fn(), showDialog: vi.fn() }));
 vi.mock("./workspace", async (orig) => ({
   ...(await orig<typeof import("./workspace")>()),
-  activeProject: () => ({ id: "p1", name: "p", path: "/w/p", repos: [], color: 0, customColor: null }),
+  activeProject: () => ({ id: "p1", name: "p", path: "/w/p", repos: [] }),
   adoptClonedProject: vi.fn(),
 }));
 

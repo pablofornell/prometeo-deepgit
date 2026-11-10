@@ -1,6 +1,6 @@
 /**
  * The Log tab (DESIGN.md 5.5, 5.6, 5.7, 11.1, 11.5): filter bar, operation banners, column header and a virtualized
- * commit list with a per-row SVG graph, repo spine, date groups, the "Uncommitted changes" row and the overview ruler.
+ * commit list with a per-row SVG graph, date groups, the "Uncommitted changes" row and the overview ruler.
  * Other features talk to the log only through the selection store (`selectedCommit`, `setSelectedCommit`).
  */
 import { type JSX, Match, Show, Switch, createEffect, createMemo, createSignal, on, onCleanup, onMount, untrack } from "solid-js";
@@ -12,7 +12,7 @@ import { refsVersion } from "../../state/refs";
 import { loadPersisted, savePersisted } from "../../state/persist";
 import { mainTab, selectedCommit, setChangesRepoId, setMainTab, setSelectedCommit } from "../../state/selection";
 import { setSetting, settings } from "../../state/settings";
-import { activeProject, focusedRepo, refreshSummaries, repoById, repoColor, selectOnlyRepo, selectedRepoIds, selectedRepos, summary, toggleRepo } from "../../state/workspace";
+import { activeProject, focusedRepo, refreshSummaries, repoById, selectOnlyRepo, selectedRepoIds, selectedRepos, summary } from "../../state/workspace";
 import { resetAuthors, mergeAuthors } from "./authors";
 import { OperationBanners, SkippedBanner } from "./Banner";
 import { DisplayMap } from "./dateGroups";
@@ -75,7 +75,6 @@ export function LogView(): JSX.Element {
   const persistCols = () => savePersisted("log.cols", cols());
   const [visibleLanes, setVisibleLanes] = createSignal(1);
   const [rootWidth, setRootWidth] = createSignal(0);
-  const spineWidth = () => (multiRepo() ? cssPx("--dg-repo-spine-width", 3) : 0);
   const rulerWidth = () => cssPx("--dg-log-ruler-width", 14);
   const baseGraphWidth = () => (settings.showGraph ? cols().graph ?? autoGraphWidth(visibleLanes(), metrics()) : 0);
 
@@ -85,7 +84,7 @@ export function LogView(): JSX.Element {
     const off = { repo: user.repo || !multiRepo(), author: user.author, date: user.date, hash: user.hash };
     const w = rootWidth();
     if (w <= 0) return off;
-    const budget = w - spineWidth() - rulerWidth() - MIN_SUBJECT;
+    const budget = w - rulerWidth() - MIN_SUBJECT;
     const used = () => baseGraphWidth() + (["repo", "author", "date", "hash"] as const).reduce((n, c) => n + (off[c] ? 0 : cols()[c]), 0);
     for (const c of ["hash", "author", "date", "repo"] as const) {
       if (used() <= budget) break;
@@ -99,14 +98,14 @@ export function LogView(): JSX.Element {
     const w = rootWidth();
     if (w <= 0 || base === 0) return base;
     const others = (["repo", "author", "date", "hash"] as const).reduce((n, c) => n + colWidth(c), 0);
-    return Math.min(base, Math.max(LIMITS.graph[0], w - spineWidth() - rulerWidth() - MIN_SUBJECT - others));
+    return Math.min(base, Math.max(LIMITS.graph[0], w - rulerWidth() - MIN_SUBJECT - others));
   };
   /** Width of the subject column: what the other columns leave (cell padding included). */
   const subjectWidth = () => {
     const w = rootWidth();
     if (w <= 0) return 600;
     const others = (["repo", "author", "date", "hash"] as const).reduce((n, c) => n + colWidth(c), 0);
-    return Math.max(0, w - spineWidth() - rulerWidth() - graphWidth() - others - SUBJECT_PAD);
+    return Math.max(0, w - rulerWidth() - graphWidth() - others - SUBJECT_PAD);
   };
 
   // ---------------------------------------------------------------- derived display model
@@ -504,14 +503,7 @@ export function LogView(): JSX.Element {
     subjectWidth,
     minSubject: () => cssPx("--dg-log-subject-min-width", 120),
     multiRepo,
-    laneColor: (color, owner) => {
-      if (multiRepo() && settings.laneColors === "repo") {
-        const o = owner ?? ctl.colorOwner(color);
-        if (o) return repoColor(repoById(o));
-      }
-      return `var(--dg-lane-${color % 10})`;
-    },
-    repo: (id) => repoById(id),
+    laneColor: (color) => `var(--dg-lane-${color % 10})`,
     repoName: (id) => repoById(id)?.name ?? id,
     isSelected,
     needle,
@@ -532,11 +524,6 @@ export function LogView(): JSX.Element {
       e.stopPropagation();
       if (!multi().has(keyOf(row.repoId, row.oid))) void select(row, ci, "single");
       openContextMenu(e, () => refMenu(row.repoId, ref));
-    },
-    onSpine: (e, repoId) => {
-      e.stopPropagation();
-      if (e.altKey) toggleRepo(repoId);
-      else selectOnlyRepo(repoId);
     },
     onWipClick: () => {
       const repos = wip()?.repos ?? [];
@@ -636,7 +623,6 @@ export function LogView(): JSX.Element {
   const pickMark = (m: Mark) => void selectIndex(m.row, "center");
 
   const cssVars = () => ({
-    "--lg-spine": multiRepo() ? "var(--dg-repo-spine-width)" : "0px",
     "--lg-graph": graphWidth() + "px",
     "--lg-repo": colWidth("repo") + "px",
     "--lg-author": colWidth("author") + "px",
@@ -659,13 +645,6 @@ export function LogView(): JSX.Element {
     >
       <HeaderSlot name="main">
         <Show when={mainTab() === "log"}>
-          <Show when={multiRepo()}>
-            <IconButton
-              icon="palette"
-              label={settings.laneColors === "repo" ? "Lane colours: by repository" : "Lane colours: by branch"}
-              onClick={() => setSetting("laneColors", settings.laneColors === "repo" ? "branch" : "repo")}
-            />
-          </Show>
           <IconButton icon="refresh" label="Refresh" shortcut="Ctrl+R" onClick={refresh} />
         </Show>
       </HeaderSlot>
@@ -675,7 +654,6 @@ export function LogView(): JSX.Element {
       <OperationBanners />
 
       <div class="dg-log-head" role="row" onContextMenu={headerMenu}>
-        <span class="dg-log-spine" />
         <span class="dg-log-h dg-log-h-graph">
           <Handle col="graph" side="right" width={graphWidth} />
         </span>

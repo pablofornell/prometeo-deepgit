@@ -18,7 +18,7 @@
   display: inline-flex; align-items: center; gap: var(--dg-space-3); height: var(--dg-toolbar-dropdown-height); padding: var(--dg-toolbar-dropdown-padding);
   border-radius: var(--dg-toolbar-dropdown-radius); max-width: var(--dg-toolbar-dropdown-max-width); min-width: 0; color: var(--dg-toolbar-fg);
 }
-.dg-titlebar-dd:hover, .dg-titlebar-dd.is-open { background-color: var(--dg-hover-bg); }  /* keeps a project tint (background-image) under the hover */
+.dg-titlebar-dd:hover, .dg-titlebar-dd.is-open { background-color: var(--dg-hover-bg); }
 .dg-titlebar-dd-main { font-weight: var(--dg-weight-semibold); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .dg-titlebar-dd-main.is-mono { font-family: var(--dg-font-mono); font-size: var(--dg-font-size-mono); }
 .dg-titlebar-dd-sub { color: var(--dg-text-secondary); font-size: var(--dg-font-size-medium); white-space: nowrap; flex: none; }
@@ -101,9 +101,9 @@
 .dg-titlebar-match { background: transparent; color: var(--dg-match-fg); font-weight: var(--dg-weight-semibold); }
 .dg-titlebar-gone { font-size: var(--dg-font-size-small); color: var(--dg-text-secondary); border: 1px solid var(--dg-separator); border-radius: 4px; padding: 0 4px; line-height: calc(14 * var(--dg-u)); flex: none; }
 .dg-titlebar-dots { display: inline-flex; align-items: center; gap: 3px; flex: none; }
-.dg-titlebar-rdot { width: 7px; height: 7px; border-radius: 50%; background: var(--rc); flex: none; }
-.dg-titlebar-rdot.is-local { background: color-mix(in srgb, var(--rc) 40%, transparent); box-shadow: inset 0 0 0 1px var(--rc); }
-.dg-titlebar-rdot.is-remote { background: transparent; box-shadow: inset 0 0 0 1px var(--rc); }
+.dg-titlebar-rdot { width: 7px; height: 7px; border-radius: 50%; background: var(--dg-matrix-current); flex: none; }
+.dg-titlebar-rdot.is-local { background: color-mix(in srgb, var(--dg-matrix-current) 40%, transparent); }
+.dg-titlebar-rdot.is-remote { background: transparent; box-shadow: inset 0 0 0 1px var(--dg-matrix-local); }
 .dg-titlebar-pop-foot { display: flex; flex-direction: column; border-top: 1px solid var(--dg-separator); padding: var(--dg-space-2) 0; }
 .dg-titlebar-pop-action {
   display: flex; align-items: center; gap: var(--dg-space-3); height: var(--dg-popup-item-height); margin: 0 var(--dg-space-3); padding: 0 var(--dg-menu-item-padding-x);

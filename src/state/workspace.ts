@@ -32,7 +32,7 @@ export const activeProject = (): Project | undefined => workspace.projects.find(
 /** Repos of the active project, in sidebar order. */
 export const projectRepos = (): RepoInfo[] => activeProject()?.repos ?? [];
 
-/** True when the active project has more than one repo: repo colours are tinted on rows only then (one repo needs no colour to tell it apart). */
+/** True when the active project has more than one repo. */
 export const isMultiRepo = (): boolean => projectRepos().length > 1;
 
 /** Finds a repo of any project by id. */
@@ -43,8 +43,6 @@ export function repoById(repoId: string): RepoInfo | undefined {
   }
   return undefined;
 }
-
-export { repoColor, repoTextColor, repoVars } from "./colors";
 
 /** Loads the workspace from the backend (once at startup) and the summaries of the active project. */
 export async function loadWorkspace(): Promise<void> {
@@ -99,28 +97,6 @@ export async function rescanProject(projectId: string): Promise<void> {
   setWorkspace("projects", (p) => p.id === projectId, reconcile(project));
   restoreRepoFilter();
   await refreshSummaries();
-}
-
-/** Puts the colour of a repo (as the backend returned it) into every project that holds the repo. */
-export function applyRepoColor(updated: Pick<RepoInfo, "id" | "color" | "customColor">): void {
-  setWorkspace(
-    "projects",
-    produce((projects) => {
-      for (const p of projects) {
-        for (const r of p.repos) {
-          if (r.id === updated.id) {
-            r.color = updated.color;
-            r.customColor = updated.customColor;
-          }
-        }
-      }
-    }),
-  );
-}
-
-/** Puts the colour of a project (as the backend returned it) into the store. */
-export function applyProjectColor(updated: Pick<Project, "id" | "color" | "customColor">): void {
-  setWorkspace("projects", (p) => p.id === updated.id, { color: updated.color, customColor: updated.customColor });
 }
 
 /**

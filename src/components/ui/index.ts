@@ -15,7 +15,6 @@ export { Select, type SelectProps, type SelectOption } from "./Select";
 export { MenuHost, openContextMenu, openMenu, closeMenu, isMenuOpen, type MenuItem } from "./Menu";
 export { Popup, type PopupProps, type PopupPlacement } from "./Popup";
 export { Dialog, DialogHost, openDialog, hasOpenDialog, type DialogProps, type DialogAction, type DialogComponentProps } from "./Dialog";
-export { ColorDialog, type ColorDialogProps } from "./ColorDialog";
 export { ConfirmDialog, type ConfirmProps, type ConfirmResult, type ConfirmCheckbox } from "./ConfirmDialog";
 export {
   ToastHost, toast, dismissToast, notifications, unreadCount, markNotificationsRead, clearNotifications,
@@ -32,7 +31,7 @@ export { EmptyState, type EmptyStateProps } from "./EmptyState";
 export { SegmentedControl, type SegmentedControlProps, type SegmentOption } from "./SegmentedControl";
 export { Avatar, type AvatarProps } from "./Avatar";
 export {
-  RepoChip, RepoSquare, RefPill, RefPills, AheadBehind, StatusLetter,
+  RepoChip, RepoIcon, RefPill, RefPills, AheadBehind, StatusLetter,
   type RepoChipProps, type RefPillProps, type RefPillsProps, type AheadBehindProps,
 } from "./GitBits";
 export { WindowControls, dragRegion } from "./WindowControls";

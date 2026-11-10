@@ -91,20 +91,6 @@ export function autoGraphWidth(lanes: number, m: GraphMetrics = DEFAULT_METRICS)
   return Math.min(220, Math.max(30, 16 + Math.max(1, lanes) * m.lane));
 }
 
-/**
- * Records which repo owns each lane colour. Colour indexes are unique per lane chain, and the segments that touch a
- * node always belong to the node's repo, so colouring a pass-through lane by repository (DESIGN.md 11.6) only needs this map.
- */
-export function collectColorOwners(rows: readonly CommitRow[], into: Map<number, string>): void {
-  for (const r of rows) {
-    const g = r.graph;
-    if (!into.has(g.color)) into.set(g.color, r.repoId);
-    for (const s of g.segments) {
-      if ((s.y1 === 1 || s.y2 === 1) && !into.has(s.color)) into.set(s.color, r.repoId);
-    }
-  }
-}
-
 /** Widest row (in lanes) of a list of rows. */
 export function maxLanesOf(rows: readonly (CommitRow | undefined)[]): number {
   let n = 0;

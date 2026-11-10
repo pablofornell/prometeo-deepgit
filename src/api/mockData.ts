@@ -170,7 +170,6 @@ function subjectFor(r: () => number, nouns: string[], issue: string | null): str
 
 export interface Scenario {
   name: string;
-  color: number;
   commits: number;
   /** Checked-out branch (created from main when it is not "main"). */
   head: string;
@@ -468,13 +467,13 @@ export const PAYMENTS_ROOT = "~/work/payments-platform";
 export const DEEPGIT_ROOT = "~/work/deepgit";
 
 export const SCENARIOS: Scenario[] = [
-  { name: "api-gateway", color: 0, commits: 2500, head: "feature/PAY-2318-refunds", curated: true, ahead: 3, dirty: { staged: 2, unstaged: 3, untracked: 1 }, stashes: 2 },
-  { name: "ledger-service", color: 1, commits: 2300, head: "feature/PAY-2318-refunds", curated: true, ahead: 1, state: "rebasing", conflicts: 2, dirty: { staged: 1, unstaged: 2, untracked: 0 } },
-  { name: "refunds-worker", color: 2, commits: 2100, head: "main", behind: 2, remoteOnly: ["feature/PAY-2318-refunds"] },
-  { name: "web-checkout", color: 3, commits: 2400, head: "main", dirty: { staged: 0, unstaged: 3, untracked: 0 }, remoteOnly: ["feature/PAY-2318-refunds"] },
-  { name: "shared-proto", color: 4, commits: 900, head: "main" },
-  { name: "docs-site", color: 5, commits: 1200, head: "main", ahead: 1, stashes: 1, state: "merging", conflicts: 4 },
-  { name: "deepgit", color: 6, commits: 700, head: "main", dirty: { staged: 1, unstaged: 2, untracked: 1 } },
+  { name: "api-gateway", commits: 2500, head: "feature/PAY-2318-refunds", curated: true, ahead: 3, dirty: { staged: 2, unstaged: 3, untracked: 1 }, stashes: 2 },
+  { name: "ledger-service", commits: 2300, head: "feature/PAY-2318-refunds", curated: true, ahead: 1, state: "rebasing", conflicts: 2, dirty: { staged: 1, unstaged: 2, untracked: 0 } },
+  { name: "refunds-worker", commits: 2100, head: "main", behind: 2, remoteOnly: ["feature/PAY-2318-refunds"] },
+  { name: "web-checkout", commits: 2400, head: "main", dirty: { staged: 0, unstaged: 3, untracked: 0 }, remoteOnly: ["feature/PAY-2318-refunds"] },
+  { name: "shared-proto", commits: 900, head: "main" },
+  { name: "docs-site", commits: 1200, head: "main", ahead: 1, stashes: 1, state: "merging", conflicts: 4 },
+  { name: "deepgit", commits: 700, head: "main", dirty: { staged: 1, unstaged: 2, untracked: 1 } },
 ];
 
 export function repoId(path: string): string {
@@ -482,6 +481,6 @@ export function repoId(path: string): string {
 }
 
 /** Scenario for a repo created by `project_add` in the browser mock. */
-export function genericScenario(name: string, color: number): Scenario {
-  return { name, color, commits: 350, head: "main", dirty: { staged: 0, unstaged: 1, untracked: 0 } };
+export function genericScenario(name: string): Scenario {
+  return { name, commits: 350, head: "main", dirty: { staged: 0, unstaged: 1, untracked: 0 } };
 }

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { Refs, RepoInfo, RepoSummary } from "../../api/types";
 import { buildTree, expandableIds, filterTree, nestRepos, repoDot, stateLabel, type BuildContext } from "./nodes";
 
-const repo = (id: string, path = `/w/${id}`): RepoInfo => ({ id, name: id, path, color: 0, customColor: null });
+const repo = (id: string, path = `/w/${id}`): RepoInfo => ({ id, name: id, path });
 const branch = (name: string, isHead = false) => ({ name, oid: "a".repeat(40), upstream: null, ahead: 0, behind: 0, isHead, gone: false });
 const remote = (name: string) => ({ remote: "origin", name, fullName: `origin/${name}`, oid: "a".repeat(40) });
 const refs = (over: Partial<Refs> = {}): Refs => ({ local: [], remote: [], tags: [], stashes: [], remotes: [{ name: "origin", url: "" }], submodules: [], ...over });

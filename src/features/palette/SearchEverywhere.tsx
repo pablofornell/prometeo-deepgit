@@ -4,11 +4,11 @@
  */
 import { type JSX, For, Match, Show, Switch, createEffect, createMemo, createSignal, on, onCleanup, untrack } from "solid-js";
 import {
-  AheadBehind, Icon, Kbd, RepoChip, RepoSquare, Spinner, fileIconFor, hasOpenDialog, shortOid, splitPath, StatusLetter,
+  AheadBehind, Icon, Kbd, RepoChip, RepoIcon, Spinner, fileIconFor, hasOpenDialog, shortOid, splitPath, StatusLetter,
 } from "../../components/ui";
 import { keysFor, register, unregister } from "../../state/keymap";
 import { anyRepoVersion } from "../../state/events";
-import { summary, projectRepos, repoById, repoColor, selectedRepoIds } from "../../state/workspace";
+import { summary, projectRepos, repoById, selectedRepoIds } from "../../state/workspace";
 import { segments } from "./fuzzy";
 import { TABS, type Scope, cycleTab, parseQuery, placeholderFor } from "./query";
 import { loadRecent, saveRecent, withRecent } from "./recent";
@@ -386,7 +386,7 @@ function RepoChips(props: { repoIds: string[] }): JSX.Element {
   const repos = () => props.repoIds.map((id) => repoById(id)).filter((r): r is NonNullable<typeof r> => !!r);
   return (
     <span class="dg-palette-chips">
-      <For each={repos().slice(0, 2)}>{(r) => <RepoChip name={r.name} repo={r} />}</For>
+      <For each={repos().slice(0, 2)}>{(r) => <RepoChip name={r.name} />}</For>
       <Show when={repos().length > 2}>
         <span class="dg-palette-sub" title={repos().slice(2).map((r) => r.name).join("\n")}>+{repos().length - 2}</span>
       </Show>
@@ -410,10 +410,10 @@ function CommitRow(props: { item: CommitItem; positions: number[] }): JSX.Elemen
   const repo = () => repoById(props.item.repoId);
   return (
     <>
-      <span class="dg-palette-dot-cell"><span class="dg-palette-dot" style={{ background: repoColor(repo()) }} /></span>
+      <Icon name="commit" class="dg-palette-icon" />
       <span class="dg-palette-text"><Hl text={props.item.subject} positions={props.positions} /></span>
       <span class="dg-palette-sub dg-palette-author">{props.item.authorName}</span>
-      <Show when={repo()}>{(r) => <RepoChip name={r().name} repo={r()} />}</Show>
+      <Show when={repo()}>{(r) => <RepoChip name={r().name} />}</Show>
       <span class="dg-palette-hash">{shortOid(props.item.oid)}</span>
     </>
   );
@@ -433,7 +433,7 @@ function FileRow(props: { item: FileItem; positions: number[] }): JSX.Element {
         </Show>
       </span>
       <StatusLetter status={props.item.status} />
-      <Show when={repo()}>{(r) => <RepoChip name={r().name} repo={r()} />}</Show>
+      <Show when={repo()}>{(r) => <RepoChip name={r().name} />}</Show>
     </>
   );
 }
@@ -452,7 +452,7 @@ function RepoRow(props: { item: RepoItem; positions: number[] }): JSX.Element {
     <Show when={repo()}>
       {(r) => (
         <>
-          <span class="dg-palette-square-cell"><RepoSquare repo={r()} /></span>
+          <span class="dg-palette-square-cell"><RepoIcon /></span>
           <span class="dg-palette-text"><Hl text={r().name} positions={props.positions} /></span>
           <Show when={s()?.branch}>
             {(b) => <span class="dg-palette-sub dg-palette-branch"><Icon name="branch" size={12} />{b()}</span>}

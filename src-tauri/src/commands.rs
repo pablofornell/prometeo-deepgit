@@ -97,30 +97,6 @@ pub async fn project_set_active(state: St<'_>, project_id: String) -> Res<()> {
     blocking(move || st.set_active_project(&project_id)).await
 }
 
-/// Sets a repo colour: `color` is a palette index, `custom` a `#RRGGBB` string; neither means Auto.
-#[tauri::command]
-pub async fn repo_set_color(
-    state: St<'_>,
-    repo_id: String,
-    color: Option<u8>,
-    custom: Option<String>,
-) -> Res<RepoInfo> {
-    let st = state.inner().clone();
-    blocking(move || st.set_repo_color(&repo_id, color, custom.as_deref())).await
-}
-
-/// Same as `repo_set_color` for a project.
-#[tauri::command]
-pub async fn project_set_color(
-    state: St<'_>,
-    project_id: String,
-    color: Option<u8>,
-    custom: Option<String>,
-) -> Res<Project> {
-    let st = state.inner().clone();
-    blocking(move || st.set_project_color(&project_id, color, custom.as_deref())).await
-}
-
 /// Summaries of the given repos, computed in parallel. A repo whose summary fails (for example
 /// its folder was deleted) is left out and logged, so one broken repo does not blank the UI.
 #[tauri::command]

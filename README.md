@@ -13,13 +13,13 @@ The backend is written in Rust and runs the `git` command-line program. The inte
 
 - Add one folder. DeepGit finds every Git repository inside it, up to four levels deep, including nested repositories.
 - A project with one repository works the same way. It is a project with a list of one.
-- Each repository has its own colour. The colour appears in the sidebar, the log, the graph, the console and the branch matrix.
+- Repositories are told apart by name. Colour is kept for state: added, modified, deleted, ahead, behind, errors.
 - Show or hide single repositories in the log.
 
 ### Commit log and graph
 
-- One merged log for all repositories of the project, with a graph that you can colour by repository or by branch.
-- Repo spine: a coloured bar at the left edge of each row shows which repository owns the commit.
+- One merged log for all repositories of the project, with a graph coloured by lane.
+- A repository column shows which repository owns each commit.
 - Filters for text, hash, repository, branch, author, date and path.
 - Branch and tag labels on the commits ("ref pills"), date groups and an "Uncommitted changes" row.
 - Overview ruler: a map of the whole history that shows HEAD, branch tips, tags and the selected commit.

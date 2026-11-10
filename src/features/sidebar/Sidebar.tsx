@@ -1,15 +1,14 @@
 /** Sidebar island (DESIGN.md 5.3): project header and card, sync strip, repository tree with branches, tags, stashes and submodules. */
 import { type JSX, Show, createEffect, createMemo, createSignal, on } from "solid-js";
 import {
-  AheadBehind, EmptyState, Icon, IconButton, RepoSquare, Tree, createExpanded, formatRelative, initials, openContextMenu, openMenu, plural,
+  AheadBehind, EmptyState, Icon, IconButton, RepoIcon, Tree, createExpanded, formatRelative, initials, openContextMenu, openMenu, plural,
   type IconName, type MenuItem,
 } from "../../components/ui";
 import * as actions from "../../state/actions";
 import { setSidebarVisible } from "../../state/layout";
-import { projectColorMenu } from "../../state/colorActions";
 import { repoRefs } from "../../state/refs";
 import {
-  activeProject, addProject, focusedRepoIdSignal, isRepoFilterActive, projectRepos, repoById, repoVars, rescanProject, selectAllRepos, selectOnlyRepo, selectedRepoIds,
+  activeProject, addProject, focusedRepoIdSignal, isRepoFilterActive, projectRepos, rescanProject, selectAllRepos, selectOnlyRepo, selectedRepoIds,
   setFocusedRepoId, summary, toggleRepo,
 } from "../../state/workspace";
 import { nodeMenu } from "./menus";
@@ -194,7 +193,6 @@ export function Sidebar(): JSX.Element {
       { label: "Show all repositories in the log", icon: "eye", disabled: !isRepoFilterActive(), onSelect: selectAllRepos },
       { separator: true },
       { label: "Rescan project", icon: "refresh", disabled: !p, onSelect: () => p && void rescanProject(p.id) },
-      ...(p ? [projectColorMenu(p)] : []),
       { separator: true },
       { label: "Hide sidebar", shortcut: "Alt+1", onSelect: () => setSidebarVisible(false) },
     ];
@@ -207,7 +205,6 @@ export function Sidebar(): JSX.Element {
         const s = () => summary(n.repoId);
         const hidden = () => !selectedRepoIds().includes(n.repoId);
         const dot = () => repoDot(s());
-        const repo = () => projectRepos().find((r) => r.id === n.repoId);
         return (
           <span class="dg-sidebar-repo" classList={{ "is-filtered": hidden() }}>
             <button
@@ -223,7 +220,7 @@ export function Sidebar(): JSX.Element {
               }}
               onDblClick={(e) => e.stopPropagation()}
             >
-              <RepoSquare repo={repo()} />
+              <RepoIcon />
             </button>
             <span class="dg-sidebar-name"><Hl text={n.label} query={q()} /></span>
             <RepoBranch repoId={n.repoId} query={q()} />
@@ -315,7 +312,7 @@ export function Sidebar(): JSX.Element {
 
       <Show when={project()}>
         {(p) => (
-          <div class="dg-sidebar-card dg-tint-strong" style={repoVars(p())}>
+          <div class="dg-sidebar-card">
             <span class="dg-sidebar-badge" aria-hidden="true">{initials(p().name)}</span>
             <span class="dg-sidebar-card-text">
               <b title={p().name}>{p().name}</b>
@@ -356,8 +353,7 @@ export function Sidebar(): JSX.Element {
           expanded={effectiveExpanded()}
           onExpandedChange={onExpandedChange}
           selectedId={selected()}
-          rowClass={(n) => (single() ? undefined : n.kind === "repo" ? "dg-tint-strong" : "dg-tint-soft")}
-          rowStyle={(n) => (single() ? undefined : repoVars(repoById(n.repoId)))}
+          rowClass={(n) => (!single() && n.kind === "repo" ? "is-repo" : undefined)}
           onSelect={select}
           onActivate={activate}
           onContextMenu={(n, e) => {

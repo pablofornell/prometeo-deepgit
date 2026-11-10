@@ -35,8 +35,7 @@
 .dg-palette-author { max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
 .dg-palette-chips { display: inline-flex; align-items: center; gap: var(--dg-space-2); flex: none; }
 .dg-palette-hash { flex: none; width: 56px; text-align: right; font-family: var(--dg-font-mono); font-size: var(--dg-font-size-mono); color: var(--dg-text-secondary); }
-.dg-palette-dot-cell, .dg-palette-square-cell { flex: none; display: inline-grid; place-items: center; width: 16px; height: 16px; }
-.dg-palette-dot { width: calc(var(--dg-log-node-radius) * 2); height: calc(var(--dg-log-node-radius) * 2); border-radius: 50%; }
+.dg-palette-square-cell { flex: none; display: inline-grid; place-items: center; width: 16px; height: 16px; }
 .dg-palette-branch { display: inline-flex; align-items: center; gap: var(--dg-space-2); }
 .dg-palette-state { flex: none; width: 6px; height: 6px; border-radius: 50%; }
 .dg-palette-state.is-clean { background: var(--dg-success); }

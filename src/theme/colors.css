@@ -1,21 +1,10 @@
 /*
  * Electric colour layer. Loaded after tokens.css and extra.css; overrides the accent, ref pills and lane
- * colours with a more vivid set and owns the repo palette and the repo tints.
+ * colours with a more vivid set.
  *
- * The calm Islands base (backgrounds, text) stays in tokens.css. Colour comes from accents, lanes and tints.
- * src/theme/colors.test.ts reads this file and checks WCAG contrast of every palette colour on every
- * tinted surface in both themes, at tint multiplier k = 1 and k = 2. Change a value, run `npx vitest run`.
- *
- * Repo palette (12): palette index = RepoInfo.color. Index order spreads similar hues apart so the first
- * colours handed out look different; names are in palette.ts.
- *   --dg-repo-N      fill: spine, square, swatch, tint source
- *   --dg-repo-N-fg   text: chip text, repo names (contrast >= 4.5:1 on its own tint)
+ * The calm Islands base (backgrounds, text) stays in tokens.css. Colour comes from accents and lanes.
+ * src/theme/colors.test.ts reads this file and checks WCAG contrast in both themes. Change a value, run `npx vitest run`.
  */
-
-:root {
-  /* Tint multiplier. 0 turns every repo tint off, 1 is the default, 2 is the maximum the contrast test covers. */
-  --dg-repo-tint-k: 1;
-}
 
 :root[data-theme="dark"] {
   /* ---- Accent: electric blue (white text on it >= 4.5:1) ---- */
@@ -39,44 +28,6 @@
   --dg-lane-7: #FF8A33;  /* orange    */
   --dg-lane-8: #8F8CFF;  /* indigo    */
   --dg-lane-9: #FF63B4;  /* pink      */
-
-  /* ---- Repo palette: fill ---- */
-  --dg-repo-0: #3D8BFF;   /* electric blue */
-  --dg-repo-1: #FF8A2B;   /* orange */
-  --dg-repo-2: #33D96B;   /* green */
-  --dg-repo-3: #E558FF;   /* magenta */
-  --dg-repo-4: #22D3EE;   /* cyan */
-  --dg-repo-5: #FFC21A;   /* amber */
-  --dg-repo-6: #9F7BFF;   /* violet */
-  --dg-repo-7: #FF5D73;   /* coral */
-  --dg-repo-8: #B6F03A;   /* lime */
-  --dg-repo-9: #1FD1B2;   /* teal */
-  --dg-repo-10: #FF5CAD;  /* pink */
-  --dg-repo-11: #7081FF;  /* indigo */
-  /* ---- Repo palette: text ---- */
-  --dg-repo-0-fg: #83B5FF;
-  --dg-repo-1-fg: #FFA862;
-  --dg-repo-2-fg: #50DE80;
-  --dg-repo-3-fg: #EE91FF;
-  --dg-repo-4-fg: #38D7F0;
-  --dg-repo-5-fg: #FFC21A;
-  --dg-repo-6-fg: #C0A8FF;
-  --dg-repo-7-fg: #FF94A3;
-  --dg-repo-8-fg: #B6F03A;
-  --dg-repo-9-fg: #43D8BE;
-  --dg-repo-10-fg: #FF90C7;
-  --dg-repo-11-fg: #A1ACFF;
-
-  /* ---- Repo tint alphas at k = 1 (see "Tint surfaces" below) ---- */
-  --dg-swatch-edge: #FFFFFF33;  /* hairline around a colour swatch so a dark colour is visible on a dark menu */
-  --dg-repo-tint-row: 10%;
-  --dg-repo-tint-strong: 14%;
-  --dg-repo-tint-soft: 5%;
-  --dg-repo-chip-tint: 16%;
-  /* Secondary and muted text inside a tinted element (a tint lowers their contrast; see .dg-tint below) */
-  --dg-text-muted-on-tint: #C6C8CE;
-  --dg-text-secondary-on-tint: #C6C8CE;
-  --dg-console-prompt-on-tint: #86CF91;
 
   /* ---- Ref pills ---- */
   --dg-ref-local-bg: #1B3F2C;
@@ -110,42 +61,6 @@
   --dg-lane-8: #5B57E8;
   --dg-lane-9: #E0287F;
 
-  /* ---- Repo palette: fill ---- */
-  --dg-repo-0: #2D6BFF;
-  --dg-repo-1: #FF7A00;
-  --dg-repo-2: #1DB954;
-  --dg-repo-3: #D61FE8;
-  --dg-repo-4: #00B8D9;
-  --dg-repo-5: #FFB300;
-  --dg-repo-6: #7C4DFF;
-  --dg-repo-7: #FF4D5E;
-  --dg-repo-8: #8BC800;
-  --dg-repo-9: #00B39B;
-  --dg-repo-10: #F0287E;
-  --dg-repo-11: #4457FF;
-  /* ---- Repo palette: text ---- */
-  --dg-repo-0-fg: #1E47A8;
-  --dg-repo-1-fg: #8A4200;
-  --dg-repo-2-fg: #10642D;
-  --dg-repo-3-fg: #80138B;
-  --dg-repo-4-fg: #006071;
-  --dg-repo-5-fg: #7A5600;
-  --dg-repo-6-fg: #5434AD;
-  --dg-repo-7-fg: #8F2B35;
-  --dg-repo-8-fg: #456400;
-  --dg-repo-9-fg: #006154;
-  --dg-repo-10-fg: #90184C;
-  --dg-repo-11-fg: #303DB3;
-
-  --dg-swatch-edge: #00000026;
-  --dg-repo-tint-row: 12%;
-  --dg-repo-tint-strong: 16%;
-  --dg-repo-tint-soft: 6%;
-  --dg-repo-chip-tint: 14%;
-  --dg-text-muted-on-tint: #4A4C52;
-  --dg-text-secondary-on-tint: #4A4C52;
-  --dg-console-prompt-on-tint: #05630F;
-
   --dg-ref-local-bg: #D8F5E3;
   --dg-ref-local-border: #8EDBAE;
   --dg-ref-local-fg: #0D6B35;
@@ -153,33 +68,4 @@
   --dg-ref-remote-bg: #E6DEFF;
   --dg-ref-remote-border: #B9A5F5;
   --dg-ref-remote-fg: #4B2FB0;
-}
-
-/*
- * Tint surfaces. Put `--rc` (the repo fill colour) on the element or an ancestor, then add one class:
- *   .dg-tint         log rows, changes rows, matrix rows, console lines
- *   .dg-tint-strong  sidebar repo row, group headers, details header, diff file header
- *   .dg-tint-soft    child rows under a tinted repo row
- * The tint is a background-image, so a hover or selected rule that sets `background` wins over it
- * (selection and hover stay clearly visible). `--dg-repo-tint-k` scales every tint.
- */
-.dg-tint { --dg-tint-a: var(--dg-repo-tint-row); }
-.dg-tint-strong { --dg-tint-a: var(--dg-repo-tint-strong); }
-.dg-tint-soft { --dg-tint-a: var(--dg-repo-tint-soft); }
-.dg-tint,
-.dg-tint-strong,
-.dg-tint-soft {
-  --dg-tint-fill: color-mix(in srgb, var(--rc-tint, var(--rc)) calc(var(--dg-tint-a) * var(--dg-repo-tint-k)), transparent);
-  background-image: linear-gradient(var(--dg-tint-fill), var(--dg-tint-fill));
-  --dg-text-muted: var(--dg-text-muted-on-tint);
-  --dg-text-secondary: var(--dg-text-secondary-on-tint);
-  --dg-console-duration: var(--dg-text-muted-on-tint);
-  --dg-console-prompt: var(--dg-console-prompt-on-tint);
-}
-/* a header that is already tinted does not need a tinted chip inside it */
-.dg-tint-strong .dg-repochip { background: transparent; padding-inline: 0; }
-:root[data-repo-tints="off"] .dg-tint,
-:root[data-repo-tints="off"] .dg-tint-strong,
-:root[data-repo-tints="off"] .dg-tint-soft {
-  background-image: none;
 }

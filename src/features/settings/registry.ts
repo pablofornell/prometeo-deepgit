@@ -22,7 +22,7 @@ export interface SettingsSection {
   id: string;
   /** Shown in the left list and as the page heading. */
   title: string;
-  /** Position in the list, ascending (Appearance 10, Log 20, Console 30, Git 40, Colors 50; leave gaps). */
+  /** Position in the list, ascending (Appearance 10, Log 20, Console 30, Git 40; leave gaps). */
   order: number;
   /** Extra words the filter field matches (names of the controls inside). */
   keywords?: string[];

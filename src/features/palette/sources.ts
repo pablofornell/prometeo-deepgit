@@ -5,9 +5,8 @@
  */
 import * as api from "../../api/tauri";
 import type { DiffSpec, FileStatus } from "../../api/types";
-import { type IconName, type MenuItem, openContextMenu, toast } from "../../components/ui";
+import { type IconName, toast } from "../../components/ui";
 import * as actions from "../../state/actions";
-import { projectColorMenu, repoColorMenu } from "../../state/colorActions";
 import { bindings, runBinding } from "../../state/keymap";
 import { repoRefs } from "../../state/refs";
 import { selectFile, selectedCommit, setChangesRepoId, setMainTab, setSelectedCommit } from "../../state/selection";
@@ -31,15 +30,7 @@ export type PaletteItem = ActionItem | BranchItem | CommitItem | FileItem | Repo
 interface ExtraAction { key: string; title: string; icon: IconName; group: string; run: () => void }
 
 /** Palette-only actions: things without a keyboard binding. Keys start with "x.". */
-/** Opens the colour swatches of `menu` (a "Set Color" item) in the upper middle of the window, after the palette has closed. */
-function showColorMenu(title: string, menu: MenuItem): void {
-  const items: MenuItem[] = [{ label: title, heading: true }, ...(menu.submenu ?? [])];
-  window.setTimeout(() => openContextMenu({ x: Math.round(window.innerWidth / 2) - 100, y: Math.round(window.innerHeight / 4) }, items), 0);
-}
-
 const EXTRAS: ExtraAction[] = [
-  { key: "x.repoColor", title: "Set repository color…", icon: "palette", group: "Project", run: () => { const r = focusedRepo(); if (r) showColorMenu(`Color of ${r.name}`, repoColorMenu(r)); } },
-  { key: "x.projectColor", title: "Set project color…", icon: "palette", group: "Project", run: () => { const p = activeProject(); if (p) showColorMenu(`Color of ${p.name}`, projectColorMenu(p)); } },
   { key: "x.addProject", title: "Add project…", icon: "plus", group: "Project", run: () => void addProject() },
   { key: "x.clone", title: "Clone repository…", icon: "repo", group: "Project", run: () => void actions.cloneRepository() },
   { key: "x.rescan", title: "Rescan project for repositories", icon: "refresh", group: "Project", run: () => { const p = activeProject(); if (p) void rescanProject(p.id); } },

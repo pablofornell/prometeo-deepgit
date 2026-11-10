@@ -2,7 +2,7 @@
  * DeepGit design tokens.
  * Base: JetBrains New UI "Islands" Dark / Light, shared with Prometeo DataGrip
  * (prometeo-datagrip/src/theme/dark.css, light.css, metrics.css). Shared names and values are kept identical.
- * DeepGit-specific groups: graph lanes, repo palette, ref pills, file status, diff, avatars, sync matrix, console.
+ * DeepGit-specific groups: graph lanes, ref pills, file status, diff, avatars, sync matrix, console.
  * Hex with 8 digits = #RRGGBBAA. Prefix: --dg-* (DeepGit and DataGrip share it on purpose).
  * Spec: docs/design/DESIGN.md
  */
@@ -82,7 +82,6 @@
   --dg-log-head-node-radius: round(calc(5 * var(--dg-u)), 1px);  /* HEAD dot radius incl. ring */
   --dg-log-edge-width: 2px;
   --dg-log-graph-pad-left: 10px;   /* left padding before lane 0 centre minus half lane */
-  --dg-repo-spine-width: 3px;
   --dg-filter-bar-height: round(calc(32 * var(--dg-u)), 1px);   /* 24 px controls + 8 px bottom padding */
   --dg-file-row-height: round(calc(24 * var(--dg-u)), 1px);
   --dg-diff-gutter-width: round(calc(var(--dg-editor-font-base) * 11 / 3), 1px);    /* one line-number column */
@@ -311,7 +310,7 @@
   --dg-graph-head-ring: #D1D3D9;   /* outer ring of HEAD node */
   --dg-graph-wip-stroke: #9FA2A8;  /* dashed hollow node of the "Uncommitted changes" row */
 
-  /* ---- Repo palette (12), repo tints, accent and ref pill overrides: see colors.css (loaded after this file). ---- */
+  /* ---- Accent and ref pill overrides: see colors.css (loaded after this file). ---- */
 
   /* ---- Ref pills ---- */
   --dg-ref-head-bg: #3871E1;       /* "HEAD" pill and current branch pill outline */
@@ -430,7 +429,7 @@
   --dg-console-bg: #191A1C;
   --dg-console-fg: #BCBEC4;
   --dg-console-prompt: #6AAB73;      /* "$" and the command */
-  --dg-console-repo: #9FA2A8;        /* "[api-gateway]" prefix (also tinted with repo colour) */
+  --dg-console-repo: #9FA2A8;        /* "[api-gateway]" prefix */
   --dg-console-stderr: #D59637;      /* git writes progress to stderr: not an error */
   --dg-console-error: #F75464;       /* non-zero exit */
   --dg-console-duration: #73767C;

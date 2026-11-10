@@ -2,7 +2,7 @@
 .dg-log {
   display: flex; flex-direction: column; height: 100%; min-height: 0; min-width: 0;
   --lg-ruler: var(--dg-log-ruler-width);
-  --lg-cols: var(--lg-spine) var(--lg-graph) minmax(0, 1fr) var(--lg-repo) var(--lg-author) var(--lg-date) var(--lg-hash) var(--lg-ruler);
+  --lg-cols: var(--lg-graph) minmax(0, 1fr) var(--lg-repo) var(--lg-author) var(--lg-date) var(--lg-hash) var(--lg-ruler);
 }
 
 /* ---------------------------------------------------------------- filter bar */
@@ -23,11 +23,6 @@
 .dg-log-chip-clear:hover { background: var(--dg-hover-bg); color: var(--dg-text); }
 .dg-log-chip.is-on:hover .dg-log-chip-chev { display: none; }
 .dg-log-chip.is-on:hover .dg-log-chip-clear { display: inline-grid; }
-.dg-log-dots { display: inline-flex; margin-right: 4px; }
-.dg-log-dots i { width: 8px; height: 8px; border-radius: 50%; margin-right: -2px; box-shadow: 0 0 0 1.5px var(--dg-chip-bg); }
-.dg-log-chip.is-on .dg-log-dots i { box-shadow: 0 0 0 1.5px var(--dg-chip-active-bg); }
-.dg-log-dots.is-row { margin-right: 8px; }
-.dg-log-dots.is-row i { box-shadow: 0 0 0 1.5px var(--dg-island-bg); }
 .dg-log-clear {
   display: inline-flex; align-items: center; gap: 4px; flex: none; height: var(--dg-control-height-small); padding: 0 8px; border-radius: 4px;
   font-size: var(--dg-font-size-medium); color: var(--dg-text-muted);
@@ -93,7 +88,7 @@
 }
 .dg-log-head > span, .dg-log-row > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; padding: 0 8px; }
 .dg-log-h { position: relative; align-self: stretch; display: flex; align-items: center; }
-.dg-log-head > .dg-log-spine, .dg-log-head > .dg-log-h-graph { padding: 0; }
+.dg-log-head > .dg-log-h-graph { padding: 0; }
 .dg-log-resize { position: absolute; top: 0; bottom: 0; width: 7px; cursor: col-resize; z-index: 1; }
 .dg-log-resize.is-left { left: 0; }
 .dg-log-resize.is-right { right: 0; }
@@ -114,14 +109,12 @@
 .dg-log-vlist::-webkit-scrollbar { display: none; }
 
 .dg-log-row { display: grid; grid-template-columns: var(--lg-cols); align-items: center; height: 100%; white-space: nowrap; position: relative; user-select: none; cursor: default; }
-.dg-log-row:hover { background-color: var(--dg-row-hover-bg); }  /* keeps the repo tint (a background-image) under the hover */
+.dg-log-row:hover { background-color: var(--dg-row-hover-bg); }
 .dg-log-row.is-date:hover, .dg-log-row.is-loading:hover { background: transparent; }
 .dg-log-row.is-selected { background: var(--dg-selection-inactive-bg); }
 .dg-log-vlist:focus-within .dg-log-row.is-selected { background: var(--dg-selection-bg); }
 .dg-log-row.is-selected .dg-log-author, .dg-log-row.is-selected .dg-log-date, .dg-log-row.is-selected .dg-log-hash { color: var(--dg-text); }
-.dg-log-row > .dg-log-spine, .dg-log-row > .dg-log-gcell { padding: 0; }
-.dg-log-spine { align-self: stretch; }
-.dg-log-spine.is-on { cursor: pointer; }
+.dg-log-row > .dg-log-gcell { padding: 0; }
 .dg-log-gcell { align-self: stretch; display: block; line-height: 0; }
 .dg-log-graph { display: block; overflow: hidden; }
 
@@ -140,12 +133,12 @@
 
 /* date group row */
 .dg-log-datelabel {
-  grid-column: 3 / -2; display: flex; align-items: center; gap: 10px; padding-left: 4px !important; overflow: visible !important;
+  grid-column: 2 / -2; display: flex; align-items: center; gap: 10px; padding-left: 4px !important; overflow: visible !important;
   color: var(--dg-log-date-header-fg); font-size: var(--dg-font-size-small); font-weight: var(--dg-weight-semibold);
 }
 .dg-log-datelabel::after { content: ""; flex: 1; height: 1px; background: var(--dg-separator); }
 .dg-log-sticky {
-  position: absolute; top: 0; left: calc(var(--lg-spine) + var(--lg-graph)); right: var(--lg-ruler); height: var(--lg-row); z-index: 2; pointer-events: none;
+  position: absolute; top: 0; left: var(--lg-graph); right: var(--lg-ruler); height: var(--lg-row); z-index: 2; pointer-events: none;
   display: flex; align-items: center; gap: 10px; padding-left: 12px; background: var(--dg-log-date-header-bg);
   color: var(--dg-log-date-header-fg); font-size: var(--dg-font-size-small); font-weight: var(--dg-weight-semibold);
 }

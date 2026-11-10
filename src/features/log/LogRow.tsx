@@ -5,7 +5,6 @@
 import { For, type JSX, Show, createMemo } from "solid-js";
 import type { CommitRow, GraphRow, RepoInfo } from "../../api/types";
 import { Avatar, RefPills, RepoChip, formatDateTime, formatLogDate, plural, shortOid } from "../../components/ui";
-import { repoColor, repoVars } from "../../state/colors";
 import { type GraphMetrics, type NodeKind, passThroughShape, rowGraphShape } from "./graph";
 import type { DisplayMap } from "./dateGroups";
 import { splitMatches } from "./query";
@@ -30,12 +29,10 @@ export interface RowCtx {
   subjectWidth: () => number;
   /** Smallest width the subject text keeps next to the pills, in px. */
   minSubject: () => number;
-  /** Combined log: spine, repository column and by-repository lane colours. */
+  /** Combined log: the repository column is shown. */
   multiRepo: () => boolean;
-  /** CSS colour of a lane colour index; `owner` is the repo of the node when it is known (by-repository colours). */
-  laneColor: (color: number, owner?: string) => string;
-  /** The repo of a row: its colour (spine, chip, tint) and name. Undefined for an unknown id. */
-  repo: (repoId: string) => RepoInfo | undefined;
+  /** CSS colour of a lane colour index. */
+  laneColor: (color: number) => string;
   repoName: (repoId: string) => string;
   isSelected: (key: string) => boolean;
   needle: () => string;
@@ -44,7 +41,6 @@ export interface RowCtx {
   onRowMenu: (e: MouseEvent, ci: number, row: CommitRow) => void;
   onRowOpen: (row: CommitRow) => void;
   onRefMenu: (e: MouseEvent, ci: number, row: CommitRow) => void;
-  onSpine: (e: MouseEvent, repoId: string) => void;
   onWipClick: () => void;
 }
 
@@ -68,7 +64,7 @@ function Node(props: { x: number; y: number; color: string; kind: NodeKind; m: G
   );
 }
 
-function GraphSvg(props: { ctx: RowCtx; graph: GraphRow; kind: NodeKind; repoId: string; dashedTop?: { x: number } | null }): JSX.Element {
+function GraphSvg(props: { ctx: RowCtx; graph: GraphRow; kind: NodeKind; dashedTop?: { x: number } | null }): JSX.Element {
   const shape = createMemo(() => rowGraphShape(props.graph, props.kind, props.ctx.metrics()));
   const w = () => props.ctx.graphWidth();
   const h = () => props.ctx.metrics().rowHeight;
@@ -80,7 +76,7 @@ function GraphSvg(props: { ctx: RowCtx; graph: GraphRow; kind: NodeKind; repoId:
         </Show>
         <For each={shape().edges}>{(e) => <path d={e.d} stroke={props.ctx.laneColor(e.color)} />}</For>
       </g>
-      <Node x={shape().node.x} y={shape().node.y} color={props.ctx.laneColor(shape().node.color, props.repoId)} kind={props.kind} m={props.ctx.metrics()} />
+      <Node x={shape().node.x} y={shape().node.y} color={props.ctx.laneColor(shape().node.color)} kind={props.kind} m={props.ctx.metrics()} />
     </svg>
   );
 }
@@ -114,8 +110,7 @@ function CommitRowBody(props: { ctx: RowCtx; ci: number; row: CommitRow }): JSX.
   return (
     <div
       class="dg-log-row"
-      classList={{ "is-selected": ctx.isSelected(key), "is-head": head, "is-merge": kind === "merge", "dg-tint": ctx.multiRepo() }}
-      style={ctx.multiRepo() ? repoVars(ctx.repo(r.repoId)) : undefined}
+      classList={{ "is-selected": ctx.isSelected(key), "is-head": head, "is-merge": kind === "merge" }}
       role="row"
       aria-selected={ctx.isSelected(key)}
       aria-label={accessibleName(r, ctx.repoName(r.repoId))}
@@ -123,15 +118,8 @@ function CommitRowBody(props: { ctx: RowCtx; ci: number; row: CommitRow }): JSX.
       onDblClick={() => ctx.onRowOpen(r)}
       onContextMenu={(e) => ctx.onRowMenu(e, props.ci, r)}
     >
-      <span
-        class="dg-log-spine"
-        classList={{ "is-on": ctx.multiRepo() }}
-        style={{ background: ctx.multiRepo() ? repoColor(ctx.repo(r.repoId)) : undefined }}
-        data-tip={ctx.multiRepo() ? ctx.repoName(r.repoId) : undefined}
-        onClick={(e) => ctx.multiRepo() && ctx.onSpine(e, r.repoId)}
-      />
       <span class="dg-log-gcell" data-tip={graphTip()} role="gridcell">
-        <GraphSvg ctx={ctx} graph={r.graph} kind={kind} repoId={r.repoId} dashedTop={dashedTop()} />
+        <GraphSvg ctx={ctx} graph={r.graph} kind={kind} dashedTop={dashedTop()} />
       </span>
       <span class="dg-log-subject" role="gridcell">
         <span class="dg-log-subj">
@@ -147,7 +135,7 @@ function CommitRowBody(props: { ctx: RowCtx; ci: number; row: CommitRow }): JSX.
       </span>
       <span class="dg-log-repo" role="gridcell">
         <Show when={ctx.multiRepo()}>
-          <RepoChip name={ctx.repoName(r.repoId)} repo={ctx.repo(r.repoId)} />
+          <RepoChip name={ctx.repoName(r.repoId)} />
         </Show>
       </span>
       <span class="dg-log-author" role="gridcell">
@@ -187,7 +175,6 @@ export function DateRowView(props: { ctx: RowCtx; display: number; group: number
   };
   return (
     <div class="dg-log-row is-date" role="row" aria-label={props.label}>
-      <span class="dg-log-spine" />
       <span class="dg-log-gcell">
         <svg class="dg-log-graph" width={ctx.graphWidth()} height={ctx.metrics().rowHeight} aria-hidden="true">
           <g class="dg-log-edges">
@@ -203,17 +190,13 @@ export function DateRowView(props: { ctx: RowCtx; display: number; group: number
 
 // ---------------------------------------------------------------- uncommitted changes row
 
-const stripes = (colors: string[]): string => `repeating-linear-gradient(180deg, ${colors.map((c, i) => `${c} calc(${i} * var(--dg-log-stripe)) calc(${i + 1} * var(--dg-log-stripe))`).join(", ")})`;
-
 export function WipRowView(props: { ctx: RowCtx; wip: WipInfo }): JSX.Element {
   const ctx = props.ctx;
-  const colors = () => props.wip.repos.map((r) => repoColor(r));
   const w = () => ctx.graphWidth();
   const h = () => ctx.metrics().rowHeight;
   const x = () => (props.wip.lane + 1) * ctx.metrics().lane;
   return (
     <div class="dg-log-row is-wip" role="row" tabindex={-1} aria-label="Uncommitted changes" onClick={() => ctx.onWipClick()}>
-      <span class="dg-log-spine" classList={{ "is-on": ctx.multiRepo() }} style={{ background: ctx.multiRepo() ? stripes(colors()) : undefined }} />
       <span class="dg-log-gcell">
         <svg class="dg-log-graph" width={w()} height={h()} aria-hidden="true">
           <path class="dg-log-wip-edge" d={`M${x()} ${h() / 2}V${h()}`} />
@@ -229,9 +212,6 @@ export function WipRowView(props: { ctx: RowCtx; wip: WipInfo }): JSX.Element {
       </span>
       <span class="dg-log-repo">
         <Show when={ctx.multiRepo()}>
-          <span class="dg-log-dots is-row">
-            <For each={props.wip.repos.slice(0, 4)}>{(r) => <i style={{ background: repoColor(r) }} />}</For>
-          </span>
           <span class="dg-log-wip-n">{props.wip.repos.length === 1 ? props.wip.repos[0].name : plural(props.wip.repos.length, "repo")}</span>
         </Show>
       </span>

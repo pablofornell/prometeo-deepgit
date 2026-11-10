@@ -352,9 +352,6 @@ export function ChangesView(): JSX.Element {
     sectionUnstage: (row: SectionRow) => void unstageItems(allItems(row.repoId, row.section)),
     sectionDiscard: (row: SectionRow) => void discardItems(allItems(row.repoId, row.section)),
     tree: (id) => trees()[id],
-    get spine() {
-      return grouped();
-    },
   };
 
   // ------------------------------------------------------------ keyboard

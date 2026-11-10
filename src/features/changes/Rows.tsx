@@ -5,8 +5,8 @@
  */
 import { type JSX, Show } from "solid-js";
 import type { FileChange, WorkingTree } from "../../api/types";
-import { Badge, Icon, IconButton, RepoSquare, StatusLetter, fileIconFor, plural, splitPath, statusColorVar, tip } from "../../components/ui";
-import { repoById, repoColor, repoVars, summary } from "../../state/workspace";
+import { Badge, Icon, IconButton, RepoIcon, StatusLetter, fileIconFor, plural, splitPath, statusColorVar, tip } from "../../components/ui";
+import { repoById, summary } from "../../state/workspace";
 import { SECTION_TITLE, type Row, type Section } from "./model";
 
 type Of<K extends Row["kind"]> = Extract<Row, { kind: K }>;
@@ -39,8 +39,6 @@ export interface RowCtl {
   sectionDiscard: (row: SectionRow) => void;
   /** Working tree of a repo (counts in the repo row). */
   tree: (repoId: string) => WorkingTree | undefined;
-  /** Repos have a colour spine when the project has more than one repo. */
-  spine: boolean;
 }
 
 const keep = (e: MouseEvent) => e.preventDefault();
@@ -134,9 +132,9 @@ function Counts(props: { file: FileChange }): JSX.Element {
   );
 }
 
-const rowAttrs = (ctl: RowCtl, row: Row) => ({
+const rowAttrs = (row: Row) => ({
   "data-key": row.key,
-  "style": { "--d": row.depth, ...(ctl.spine ? { "--spine": repoColor(repoById(row.repoId)), ...repoVars(repoById(row.repoId)) } : {}) } as JSX.CSSProperties,
+  "style": { "--d": row.depth } as JSX.CSSProperties,
 });
 
 // ---------------------------------------------------------------- repo
@@ -147,16 +145,16 @@ export function RepoRowView(props: { row: RepoRow; ctl: RowCtl; open: boolean })
   return (
     <div
       class="dg-changes-row dg-changes-repo"
-      classList={{ "is-cursor": props.ctl.isCursor(props.row.key), "dg-tint-strong": props.ctl.spine }}
+      classList={{ "is-cursor": props.ctl.isCursor(props.row.key) }}
       role="treeitem"
       aria-level={1}
       aria-expanded={props.open}
-      {...rowAttrs(props.ctl, props.row)}
+      {...rowAttrs(props.row)}
       onClick={(e) => props.ctl.click(props.row, e)}
       onContextMenu={(e) => props.ctl.context(props.row, e)}
     >
       <Chevron open={props.open} />
-      <RepoSquare repo={repo()} />
+      <RepoIcon />
       <span class="dg-changes-repo-name">{repo()?.name ?? props.row.repoId}</span>
       <Show when={summary(props.row.repoId)?.branch ?? "detached HEAD"}>
         {(b) => (
@@ -194,11 +192,11 @@ export function SectionRowView(props: { row: SectionRow; ctl: RowCtl }): JSX.Ele
   return (
     <div
       class="dg-changes-row dg-changes-section"
-      classList={{ "is-cursor": props.ctl.isCursor(props.row.key), "is-conflicts": props.row.section === "conflicts", "dg-tint": props.ctl.spine }}
+      classList={{ "is-cursor": props.ctl.isCursor(props.row.key), "is-conflicts": props.row.section === "conflicts" }}
       role="treeitem"
       aria-level={props.row.depth + 1}
       aria-expanded={props.row.open}
-      {...rowAttrs(props.ctl, props.row)}
+      {...rowAttrs(props.row)}
       onClick={(e) => props.ctl.click(props.row, e)}
       onContextMenu={(e) => props.ctl.context(props.row, e)}
     >
@@ -229,12 +227,12 @@ export function DirRowView(props: { row: DirRow; ctl: RowCtl }): JSX.Element {
   return (
     <div
       class="dg-changes-row dg-changes-dir"
-      classList={{ "is-selected": props.ctl.isSelected(props.row.key), "is-cursor": props.ctl.isCursor(props.row.key), "dg-tint": props.ctl.spine }}
+      classList={{ "is-selected": props.ctl.isSelected(props.row.key), "is-cursor": props.ctl.isCursor(props.row.key) }}
       role="treeitem"
       aria-level={props.row.depth + 1}
       aria-expanded={props.row.open}
       aria-selected={props.ctl.isSelected(props.row.key)}
-      {...rowAttrs(props.ctl, props.row)}
+      {...rowAttrs(props.row)}
       onClick={(e) => props.ctl.click(props.row, e)}
       onDblClick={() => props.ctl.doubleClick(props.row)}
       onContextMenu={(e) => props.ctl.context(props.row, e)}
@@ -275,12 +273,12 @@ export function FileRowView(props: { row: FileRow; ctl: RowCtl }): JSX.Element {
   return (
     <div
       class="dg-changes-row dg-changes-file"
-      classList={{ "is-selected": props.ctl.isSelected(props.row.key), "is-cursor": props.ctl.isCursor(props.row.key), "dg-tint": props.ctl.spine }}
+      classList={{ "is-selected": props.ctl.isSelected(props.row.key), "is-cursor": props.ctl.isCursor(props.row.key) }}
       role="treeitem"
       aria-level={props.row.depth + 1}
       aria-selected={props.ctl.isSelected(props.row.key)}
       title={`${file().path}${file().oldPath ? ` (renamed from ${file().oldPath})` : ""}`}
-      {...rowAttrs(props.ctl, props.row)}
+      {...rowAttrs(props.row)}
       onClick={(e) => props.ctl.click(props.row, e)}
       onDblClick={() => props.ctl.doubleClick(props.row)}
       onContextMenu={(e) => props.ctl.context(props.row, e)}

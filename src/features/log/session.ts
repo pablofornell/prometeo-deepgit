@@ -1,6 +1,6 @@
 /**
  * Log session controller: opens a session per query, pages rows in blocks of 200 with an LRU page cache and scans the
- * whole session in the background (ruler marks, date groups, lane owners, authors). All state is per call of
+ * whole session in the background (ruler marks, date groups, authors). All state is per call of
  * `createLogSession()`, which must run inside a component.
  *
  * Rows are read with `rowAt(commitIndex)`, which is reactive per page (no per-row stores). A session swap replaces the
@@ -13,7 +13,6 @@ import { ensureRefs, cachedRefs } from "../../state/refs";
 import { summary } from "../../state/workspace";
 import { fnv1a } from "../../components/ui";
 import { type Mark, type ScanResult, emptyScan, scanPage, assembleScan } from "./scan";
-import { collectColorOwners } from "./graph";
 import { PageCache } from "./pageCache";
 
 export const PAGE = 200;
@@ -32,7 +31,6 @@ interface Sess {
   cache: PageCache<CommitRow[]>;
   inflight: Map<number, Promise<CommitRow[]>>;
   pending: Set<number>;
-  owners: Map<number, string>;
   scan: ScanResult;
   signature: string;
   closed: boolean;
@@ -75,7 +73,6 @@ export function createLogSession() {
   const [sess, setSess] = createSignal<Sess | null>(null);
   const [loading, setLoading] = createSignal(false);
   const [error, setError] = createSignal<ApiErrorShape | null>(null);
-  const [ownersTick, setOwnersTick] = createSignal(0);
   const [pageTick, setPageTick] = createSignal(0);
   const [scanTick, setScanTick] = createSignal(0);
   const pageSignals = new Map<number, ReturnType<typeof createSignal<number>>>();
@@ -105,12 +102,6 @@ export function createLogSession() {
     return s.cache.get(p)?.[ci % PAGE];
   }
 
-  /** Repo that owns lane colour `c` (combined graph coloured by repository). Reactive on scan completion. */
-  function colorOwner(c: number): string | undefined {
-    ownersTick();
-    return sess()?.owners.get(c);
-  }
-
   function loadPage(s: Sess, p: number): Promise<CommitRow[]> {
     let pr = s.inflight.get(p);
     if (!pr) {
@@ -122,7 +113,6 @@ export function createLogSession() {
 
   function store(s: Sess, p: number, rows: CommitRow[]): void {
     if (s.closed || s.cache.has(p)) return;
-    collectColorOwners(rows, s.owners);
     const evicted = s.cache.set(p, rows);
     if (s === untrackedSess) {
       bump(p);
@@ -220,7 +210,6 @@ export function createLogSession() {
         const p = next++;
         if (p >= pages) return;
         const rows = await loadPage(s, p);
-        collectColorOwners(rows, s.owners);
         per[p] = scanPage(rows, p * PAGE, now);
         if (p === 0) store(s, 0, rows);
       }
@@ -250,7 +239,7 @@ export function createLogSession() {
       }
       const [inf] = await Promise.all([api.logOpen(q), ensureRefs(q.repoIds)]);
       const s: Sess = {
-        info: inf, gen, cache: new PageCache(CACHE_PAGES), inflight: new Map(), pending: new Set(), owners: new Map(),
+        info: inf, gen, cache: new PageCache(CACHE_PAGES), inflight: new Map(), pending: new Set(),
         scan: emptyScan, signature: logSignature(q.repoIds), closed: false, retried: false,
       };
       const cancelled = () => gen !== openGen;
@@ -278,7 +267,7 @@ export function createLogSession() {
       swap(s);
       if (!wantScan) {
         void scanSession(s, () => s.closed || gen !== openGen).then(() => {
-          if (!s.closed && s === untrackedSess) batch(() => { setScanTick((n) => n + 1); setOwnersTick((n) => n + 1); });
+          if (!s.closed && s === untrackedSess) setScanTick((n) => n + 1);
         });
       }
       return { info: inf, anchorIndex, selectedIndex };
@@ -296,7 +285,6 @@ export function createLogSession() {
     pageSignals.clear();
     batch(() => {
       setSess(next);
-      setOwnersTick((n) => n + 1);
       setScanTick((n) => n + 1);
       setPageTick((n) => n + 1);
     });
@@ -310,8 +298,8 @@ export function createLogSession() {
   });
 
   return {
-    info, total, scan, signature, loading, error, ownersTick, pageTick,
-    rowAt, colorOwner, ensure, getRow, getRows, find, open,
+    info, total, scan, signature, loading, error, pageTick,
+    rowAt, ensure, getRow, getRows, find, open,
     lastQuery: () => lastQuery,
   };
 }

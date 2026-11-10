@@ -16,7 +16,7 @@ import { loadPersisted, savePersisted } from "../../state/persist";
 import { refsVersion, repoRefs } from "../../state/refs";
 import { followFile } from "../../state/fileFollow";
 import { mainTab, selectFile, selectedCommit, selectedFile, setDetailsTab, setSelectedCommit } from "../../state/selection";
-import { isMultiRepo, repoById, repoVars, summary } from "../../state/workspace";
+import { repoById, summary } from "../../state/workspace";
 import { committerDiffers, pushState, whenText, type PushState } from "./commitText";
 import { buildFileTree, dirIds, fileId, flatFiles, totals, type DirNode, type FileNode, type TreeNode } from "./fileTree";
 import { canOpenLinks, openLink } from "./links";
@@ -502,9 +502,9 @@ export function CommitDetails(): JSX.Element {
           {(d) => (
               <>
                 <div class="dg-details-scroll">
-                  <div class="dg-details-pad" classList={{ "dg-tint-strong": !!repo() && isMultiRepo() }} style={repoVars(repo())}>
+                  <div class="dg-details-pad">
                     <div class="dg-details-id">
-                      <Show when={repo()}>{(r) => <RepoChip name={r().name} repo={r()} />}</Show>
+                      <Show when={repo()}>{(r) => <RepoChip name={r().name} />}</Show>
                       <button type="button" class="dg-details-hash" title="Copy hash" onClick={() => void copy(shortOid(d().oid), shortOid(d().oid))}>
                         {d().oid}
                       </button>

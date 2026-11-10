@@ -3,7 +3,7 @@ import { For, type JSX, Show, createMemo } from "solid-js";
 import { Icon } from "../../components/ui";
 import { branchColumn, setMatrixBranch, type CellState } from "../../state/branchTable";
 import { openBottomTool } from "../../state/layout";
-import { focusedRepo, projectRepos, repoColor, setFocusedRepoId, summary } from "../../state/workspace";
+import { focusedRepo, projectRepos, setFocusedRepoId, summary } from "../../state/workspace";
 
 /** Segments get a minimum width above this many repos and the strip scrolls. */
 const SCROLL_ABOVE = 24;
@@ -46,7 +46,6 @@ export function SyncStrip(): JSX.Element {
                       type="button"
                       role="listitem"
                       class={`dg-sidebar-seg is-${state()}`}
-                      style={{ "--rc": repoColor(r) }}
                       aria-label={tipFor(r.name, c().name, state())}
                       data-tip={tipFor(r.name, c().name, state())}
                       onClick={() => setFocusedRepoId(r.id)}

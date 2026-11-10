@@ -8,7 +8,7 @@ import type { ConsoleEntry } from "../../api/types";
 import { Button, Checkbox, EmptyState, RepoChip, SearchField, copyText } from "../../components/ui";
 import { clearConsole, consoleEntries, formatCommand, isBackgroundEntry } from "../../state/console";
 import { setSetting, settings } from "../../state/settings";
-import { isMultiRepo, repoById, repoVars } from "../../state/workspace";
+import { repoById } from "../../state/workspace";
 import "./console.css";
 
 /** Pixels from the bottom that still count as "at the bottom" for auto-scroll. */
@@ -188,14 +188,12 @@ function ConsoleRow(props: ConsoleRowProps): JSX.Element {
       <button
         type="button"
         class="dg-console-row"
-        classList={{ "dg-tint": !!repo() && isMultiRepo() }}
-        style={repoVars(repo())}
         aria-expanded={props.open}
         onClick={() => props.onToggle()}
       >
         <span class="dg-console-time">{clock(props.entry.startedAt)}</span>
         <span class="dg-console-repo">
-          <Show when={repo()}>{(r) => <RepoChip name={r().name} repo={r()} />}</Show>
+          <Show when={repo()}>{(r) => <RepoChip name={r().name} />}</Show>
         </span>
         <span class="dg-console-cmd">$ {commandText(props.entry)}</span>
         <span class="dg-console-dur">{props.entry.durationMs} ms</span>

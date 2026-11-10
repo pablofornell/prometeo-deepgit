@@ -64,7 +64,7 @@ export function MergeFileDialog(props: MergeFileProps & DialogComponentProps<Mer
             Merge <span class="dg-mg-title-name">{split().name}</span>
           </h2>
           <span class="dg-mg-title-dir" title={props.path}>{split().dir}</span>
-          <Show when={repo()}>{(r) => <RepoChip name={r().name} repo={r()} />}</Show>
+          <Show when={repo()}>{(r) => <RepoChip name={r().name} />}</Show>
           <span class="dg-grow" />
           <IconButton icon="close" label="Close" onClick={() => props.close()} />
         </header>

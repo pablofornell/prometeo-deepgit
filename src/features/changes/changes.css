@@ -32,13 +32,10 @@
   padding-left: calc(var(--dg-space-2) + var(--d, 0) * var(--dg-tree-indent)); padding-right: var(--dg-space-3);
   border-radius: var(--dg-tree-selection-radius); white-space: nowrap; user-select: none;
 }
-.dg-changes-row:hover { background-color: var(--dg-row-hover-bg); }  /* keeps the repo tint under the hover */
+.dg-changes-row:hover { background-color: var(--dg-row-hover-bg); }
 .dg-changes-row.is-selected { background: var(--dg-selection-inactive-bg); color: var(--dg-selection-fg); }
 .dg-changes-list:focus-within .dg-changes-row.is-selected { background: var(--dg-selection-bg); }
 .dg-changes-list:focus-visible .dg-changes-row.is-cursor { box-shadow: inset 0 0 0 var(--dg-focus-width) var(--dg-focus-ring); }
-/* repo spine: 3 px bar in the repo colour, continuous over the rows of one repo (DESIGN.md 11.1) */
-.dg-changes-row[style*="--spine"] { padding-left: calc(var(--dg-space-3) + var(--d, 0) * var(--dg-tree-indent)); }
-.dg-changes-row[style*="--spine"]::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: var(--dg-repo-spine-width); background: var(--spine); border-radius: 0; }
 
 .dg-changes-chev { display: inline-grid; place-items: center; width: 14px; height: 14px; flex: none; color: var(--dg-icon-secondary); }
 .dg-changes-chev .dg-icon { color: currentColor; transition: transform var(--dg-dur-fast) var(--dg-ease-out); }
@@ -107,7 +104,6 @@
 .dg-changes-targets-icon { color: var(--dg-icon-secondary); margin-right: calc(var(--dg-space-2) * -1); }
 .dg-changes-targets-branch { color: var(--dg-text); font-weight: var(--dg-weight-medium); }
 .dg-changes-target { display: inline-flex; align-items: center; gap: var(--dg-space-2); height: var(--dg-chip-repo-height); padding: 0 var(--dg-pill-padding-x); border-radius: var(--dg-pill-radius); background: var(--dg-badge-bg); color: var(--dg-text); }
-.dg-changes-target-dot { width: var(--dg-space-3); height: var(--dg-space-3); border-radius: 2px; flex: none; }
 .dg-changes-editor { position: relative; flex: 1 1 0; min-height: calc(3 * var(--dg-line-height-code) + var(--dg-space-3) + var(--dg-space-8) + 2 * var(--dg-border-width)); margin: var(--dg-space-2) var(--dg-space-4) 0; font-family: var(--dg-font-mono); font-size: var(--dg-font-size-mono); line-height: var(--dg-line-height-code); }
 .dg-changes-message {
   display: block; width: 100%; height: 100%; resize: none; padding: var(--dg-space-3) var(--dg-space-5) var(--dg-space-8) var(--dg-space-4);

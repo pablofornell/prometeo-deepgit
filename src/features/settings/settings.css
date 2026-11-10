@@ -83,8 +83,3 @@
 /* ---- notes and actions inside a page ---- */
 .dg-settings-note { padding: var(--dg-space-4) var(--dg-space-5); border-radius: var(--dg-input-radius); background: var(--dg-layer-1-bg); color: var(--dg-text-secondary); }
 .dg-settings-actions { display: flex; justify-content: flex-start; padding-top: var(--dg-space-4); }
-
-/* ---- colors page ---- */
-.dg-settings-color { display: flex; align-items: center; gap: var(--dg-space-4); }
-.dg-settings-swatch { flex: none; width: calc(14 * var(--dg-u)); height: calc(14 * var(--dg-u)); border-radius: var(--dg-space-2); box-shadow: inset 0 0 0 1px var(--dg-separator); }
-.dg-settings-color-name { min-width: calc(88 * var(--dg-u)); color: var(--dg-text-secondary); font-variant-numeric: tabular-nums; }

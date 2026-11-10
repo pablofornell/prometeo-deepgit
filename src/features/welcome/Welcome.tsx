@@ -18,7 +18,7 @@ interface Feature {
 
 const FEATURES: Feature[] = [
   { icon: "repo", title: "Multi-repo projects", body: "Add one folder and DeepGit finds every repository in it, nested ones included." },
-  { icon: "log", title: "Commit graph", body: "Commits from every repository in one graph, coloured by repository or by branch." },
+  { icon: "log", title: "Commit graph", body: "Commits from every repository in one graph, each branch in its own colour." },
   { icon: "console", title: "Every git command is visible", body: "The Git console lists each command DeepGit runs, with its output and exit code." },
 ];
 

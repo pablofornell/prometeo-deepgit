@@ -4,14 +4,14 @@
  * per-repo list, right click opens the branch menu. Sections: Recent, Local, Remote, Tags.
  */
 import { For, type JSX, Show, createEffect, createMemo, createSignal, on, onMount } from "solid-js";
-import { AheadBehind, Icon, Popup, RepoSquare, SearchField, openContextMenu, plural, type MenuItem } from "../../components/ui";
+import { AheadBehind, Icon, Popup, RepoIcon, SearchField, openContextMenu, plural, type MenuItem } from "../../components/ui";
 import * as actions from "../../state/actions";
 import { branchTable, setMatrixBranch, type BranchColumn } from "../../state/branchTable";
 import { showDialog } from "../../state/dialogs";
 import { openBottomTool } from "../../state/layout";
 import { loadPersisted, savePersisted } from "../../state/persist";
 import { repoRefs } from "../../state/refs";
-import { activeProject, focusedRepo, projectRepos, repoColor, repoById } from "../../state/workspace";
+import { activeProject, focusedRepo, projectRepos, repoById } from "../../state/workspace";
 
 type Section = "recent" | "local" | "remote" | "tags";
 
@@ -331,7 +331,7 @@ function PopupBody(props: { onClose: () => void }): JSX.Element {
             >
               <span class="dg-titlebar-dots" title={dots(col).map((r) => `${r.name}: ${cellLabel[col.cells[r.id].state]}`).join("\n")}>
                 <For each={dots(col).slice(0, MAX_DOTS)}>
-                  {(r) => <i class={`dg-titlebar-rdot is-${col.cells[r.id].state}`} style={{ "--rc": repoColor(r) }} />}
+                  {(r) => <i class={`dg-titlebar-rdot is-${col.cells[r.id].state}`} />}
                 </For>
                 <Show when={dots(col).length > MAX_DOTS}>
                   <span class="dg-titlebar-pop-count">+{dots(col).length - MAX_DOTS}</span>
@@ -369,7 +369,7 @@ function PopupBody(props: { onClose: () => void }): JSX.Element {
             onClick={() => activate(row)}
             {...common}
           >
-            <RepoSquare repo={repo()} />
+            <RepoIcon />
             <span class="dg-titlebar-brow-name">{repo()?.name}</span>
             <span class="dg-titlebar-pop-count">{cellLabel[cell().state]}</span>
             <AheadBehind ahead={cell().ahead} behind={cell().behind} />

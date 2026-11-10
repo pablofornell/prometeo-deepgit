@@ -168,7 +168,6 @@
 .dg-menu-item.is-danger .dg-icon { color: var(--dg-text-error); }
 .dg-menu-check { width: 14px; flex: none; display: inline-flex; }
 .dg-menu-icon { width: 16px; flex: none; display: inline-flex; align-items: center; justify-content: center; }
-.dg-menu-swatch { display: block; width: 12px; height: 12px; border-radius: 3px; box-shadow: inset 0 0 0 1px var(--dg-swatch-edge); }
 .dg-menu-label { flex: 1; overflow: hidden; text-overflow: ellipsis; }
 .dg-menu-shortcut { margin-left: 24px; color: var(--dg-menu-accelerator-fg); font-size: var(--dg-font-size-medium); }
 .dg-menu-arrow { margin-right: -4px; color: var(--dg-icon-secondary); }
@@ -254,7 +253,7 @@
   position: relative; display: flex; align-items: center; gap: var(--dg-tree-icon-gap); height: 100%;
   padding-right: var(--dg-tree-padding-x); border-radius: var(--dg-tree-selection-radius); white-space: nowrap; min-width: 0;
 }
-.dg-tree-row:hover { background-color: var(--dg-row-hover-bg); }  /* keeps a repo tint (background-image) under the hover */
+.dg-tree-row:hover { background-color: var(--dg-row-hover-bg); }
 .dg-tree-row.is-selected { background: var(--dg-selection-inactive-bg); color: var(--dg-selection-fg); }
 .dg-tree:focus-within .dg-tree-row.is-selected { background: var(--dg-selection-bg); }
 .dg-tree-chev { display: inline-grid; place-items: center; width: 14px; height: 14px; flex: none; color: var(--dg-icon-secondary); margin-right: -2px; }
@@ -267,19 +266,10 @@
 .dg-repochip {
   display: inline-flex; align-items: center; height: var(--dg-chip-repo-height); padding: 0 6px; border-radius: 4px; max-width: 100%;
   font-size: var(--dg-font-size-small); font-weight: var(--dg-weight-medium); line-height: 1; white-space: nowrap;
-  background: color-mix(in srgb, var(--rc-tint, var(--rc)) var(--dg-repo-chip-tint), transparent);
-  color: var(--rc-fg, var(--rc));
+  background: var(--dg-badge-bg); color: var(--dg-text-muted); box-shadow: inset 0 0 0 1px var(--dg-separator);
   overflow: hidden; text-overflow: ellipsis;
 }
-/* custom colour dialog */
-.dg-colordlg-row { display: flex; align-items: center; gap: 8px; }
-.dg-colordlg-native { width: 36px; height: 28px; padding: 0; border: 0; border-radius: 4px; background: none; cursor: pointer; flex: none; }
-.dg-colordlg-preview { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 10px; border-radius: 6px; box-shadow: inset 0 0 0 1px var(--dg-swatch-edge); }
-.dg-colordlg-dot { width: 10px; height: 10px; border-radius: 3px; flex: none; }
-.dg-colordlg-name { font-weight: var(--dg-weight-medium); color: var(--rc-fg); }
-.dg-colordlg-sample { color: var(--dg-text-secondary); font-size: var(--dg-font-size-small); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dg-colordlg-note { margin: 0; color: var(--dg-text-secondary); font-size: var(--dg-font-size-small); }
-.dg-repo-square { display: inline-block; flex: none; border-radius: 3px; }
+.dg-repo-icon { color: var(--dg-icon-secondary); }
 
 .dg-refs { display: inline-flex; gap: 4px; flex: none; align-items: center; }
 .dg-ref {

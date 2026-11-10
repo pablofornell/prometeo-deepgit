@@ -6,7 +6,6 @@ use std::sync::{Arc, Mutex, MutexGuard, RwLock};
 use std::time::{Duration, Instant};
 
 use gitcore::discover::{make_project, not_found_reason, repo_id};
-use gitcore::palette::ColorChoice;
 use gitcore::{
     ApiError, CancelToken, CloneResult, CloneTarget, Git, GitError, Project, RepoInfo, Workspace,
 };
@@ -177,39 +176,6 @@ impl AppState {
         };
         self.refresh_repos();
         saved.map(|()| updated)
-    }
-
-    /// Sets the colour of a repo (palette index, custom `#RRGGBB`, or neither for Auto) in every
-    /// project that holds it. The file watcher is not touched: no repo was added or removed.
-    pub fn set_repo_color(
-        &self,
-        repo_id: &str,
-        color: Option<u8>,
-        custom: Option<&str>,
-    ) -> Result<RepoInfo, ApiError> {
-        let choice = ColorChoice::parse(color, custom).map_err(api_error)?;
-        let (updated, saved) = {
-            let mut ws = lock(&self.workspace);
-            let updated = workspace::set_repo_color(&mut ws, repo_id, &choice)
-                .ok_or_else(|| api_error("unknown repository"))?;
-            *self.repos.write().unwrap_or_else(|e| e.into_inner()) = repo_map(&ws);
-            (updated, self.persist(&ws))
-        };
-        saved.map(|()| updated)
-    }
-
-    /// Sets the colour of a project (same arguments as `set_repo_color`).
-    pub fn set_project_color(
-        &self,
-        project_id: &str,
-        color: Option<u8>,
-        custom: Option<&str>,
-    ) -> Result<Project, ApiError> {
-        let choice = ColorChoice::parse(color, custom).map_err(api_error)?;
-        let mut ws = lock(&self.workspace);
-        let updated = workspace::set_project_color(&mut ws, project_id, &choice)
-            .ok_or_else(|| api_error("unknown project"))?;
-        self.persist(&ws).map(|()| updated)
     }
 
     /// Registers a clone and returns its cancel token. An id that is running already is refused. An
@@ -599,85 +565,5 @@ mod tests {
         st.remove_project(&added.id).unwrap();
         assert!(st.repo(&added.repos[0].id).is_err());
         assert!(st.remove_project(&added.id).is_err());
-    }
-
-    #[test]
-    fn colors_are_set_validated_persisted_and_survive_a_rescan() {
-        let dir = tempfile::tempdir().unwrap();
-        let st = state(dir.path());
-        let proj = dir.path().join("proj");
-        init_repo(&proj);
-        init_repo(&proj.join("a"));
-        init_repo(&proj.join("b"));
-        let added = st.add_project(proj.to_str().unwrap()).unwrap();
-        let ids: Vec<String> = added.repos.iter().map(|r| r.id.clone()).collect();
-        // discovery gives the three repos the colours 0, 1, 2
-        assert_eq!(
-            added.repos.iter().map(|r| r.color).collect::<Vec<_>>(),
-            vec![0, 1, 2]
-        );
-
-        // bad input is rejected and changes nothing
-        let err = |r: Result<RepoInfo, ApiError>| r.unwrap_err().message;
-        assert_eq!(
-            err(st.set_repo_color(&ids[0], Some(12), None)),
-            "Unknown palette color"
-        );
-        assert_eq!(
-            err(st.set_repo_color(&ids[0], None, Some("blue"))),
-            "Invalid color, expected #RRGGBB"
-        );
-        assert_eq!(
-            err(st.set_repo_color(&ids[0], Some(1), Some("#FFFFFF"))),
-            "Give a palette color or a custom color, not both"
-        );
-        assert_eq!(
-            err(st.set_repo_color("nope", Some(1), None)),
-            "unknown repository"
-        );
-        assert_eq!(st.repo(&ids[0]).unwrap().color, 0);
-
-        // a palette colour and a custom colour
-        let r = st.set_repo_color(&ids[1], Some(9), None).unwrap();
-        assert_eq!((r.color, r.custom_color), (9, None));
-        let r = st.set_repo_color(&ids[2], None, Some("#abcdef")).unwrap();
-        assert_eq!(r.custom_color.as_deref(), Some("#ABCDEF"));
-        // the repo map sees the change at once
-        assert_eq!(st.repo(&ids[1]).unwrap().color, 9);
-
-        // project colour
-        let p = st.set_project_color(&added.id, Some(5), None).unwrap();
-        assert_eq!(p.color, 5);
-        assert!(st.set_project_color("nope", None, None).is_err());
-        assert!(st.set_project_color(&added.id, Some(40), None).is_err());
-
-        // persisted: a new state over the same file sees the colours
-        let st2 = state(dir.path());
-        assert_eq!(st2.repo(&ids[1]).unwrap().color, 9);
-        assert_eq!(
-            st2.repo(&ids[2]).unwrap().custom_color.as_deref(),
-            Some("#ABCDEF")
-        );
-        assert_eq!(st2.workspace_snapshot().projects[0].color, 5);
-
-        // a rescan with a new repo keeps every colour and gives the new repo the least-used one
-        init_repo(&proj.join("c"));
-        let rescanned = st.rescan_project(&added.id).unwrap();
-        for old in &ids {
-            let was = st2.repo(old).unwrap();
-            let now = rescanned.repos.iter().find(|r| &r.id == old).unwrap();
-            assert_eq!(
-                (now.color, &now.custom_color),
-                (was.color, &was.custom_color)
-            );
-        }
-        let new = rescanned
-            .repos
-            .iter()
-            .find(|r| !ids.contains(&r.id))
-            .unwrap();
-        // shown colours: 0 (root), 9 (a); b is custom. Colour 1 is the lowest unused
-        assert_eq!(new.color, 1);
-        assert_eq!(rescanned.color, 5);
     }
 }

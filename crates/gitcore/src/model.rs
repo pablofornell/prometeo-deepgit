@@ -8,11 +8,6 @@ pub struct RepoInfo {
     pub id: String,
     pub name: String,
     pub path: String,
-    /// Palette index (`0..PALETTE_SIZE`), assigned automatically or chosen by the user.
-    pub color: u8,
-    /// `#RRGGBB` (upper case) the user typed in; wins over `color`. Missing in old files.
-    #[serde(default)]
-    pub custom_color: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -22,16 +17,6 @@ pub struct Project {
     pub name: String,
     pub path: String,
     pub repos: Vec<RepoInfo>,
-    /// Palette index of the project. Old files have none: `UNASSIGNED`, replaced when the workspace loads.
-    #[serde(default = "unassigned_color")]
-    pub color: u8,
-    /// `#RRGGBB` (upper case) the user typed in; wins over `color`.
-    #[serde(default)]
-    pub custom_color: Option<String>,
-}
-
-fn unassigned_color() -> u8 {
-    crate::palette::UNASSIGNED
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]

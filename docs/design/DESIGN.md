@@ -34,11 +34,11 @@ Token names and base values are identical to Prometeo DataGrip (`--dg-*`).
 Four principles control every decision:
 
 1. **Multi-repo is the default view, not a special mode.** A project with one repository is a project with a list of one. Every list, filter, toast and dialog must handle N repositories.
-2. **Colour carries identity, not decoration.** Each repository has one colour. The same colour appears in the sidebar, the log spine, the repo chip, the graph lanes (combined mode), the console prefix and the branch matrix. No other element uses repository colours.
+2. **Colour carries state, not identity.** A repository or a project has no colour of its own: a neutral icon and its name identify it. Colour means the same thing in every view: added, modified, deleted, ahead, behind, error, success, the kind of a ref, the selected row.
 3. **Show the git command.** Every operation writes its exact git command to the Git console. The status bar shows the last command. Users trust what they can see.
 4. **Dense and calm.** Rows are 24 px. Text is 13 px. Chrome is quiet grey. Only state uses colour: refs, status letters, diff, ahead/behind, conflicts.
 
-Where DeepGit spends its boldness: the **repo spine**, the **branch matrix** and the **sync strip**. The rest of the UI stays close to JetBrains so that IntelliJ users feel at home on the first day.
+Where DeepGit spends its boldness: the **branch matrix** and the **sync strip**. The rest of the UI stays close to JetBrains so that IntelliJ users feel at home on the first day.
 
 ---
 
@@ -140,12 +140,10 @@ All colours are in `tokens.css`. The tables in section 4.3 are generated from th
 
 ### 4.1 How colour assignment works
 
-1. **Repository colour.** Compute `hash(absoluteRepoPath) % 12`. Use `--dg-repo-{n}`. The user can override the colour in the repo context menu ("Repository colour"). Save the override in the project config.
-2. Inside one project, two repositories must not get the same colour while a free colour exists. On a collision, take the next free index.
-3. **Lane colour (single-repo log).** Use `--dg-lane-{laneIndex % 10}`. Lane 0 is always the lane of the first-parent chain of HEAD, so HEAD is always blue.
-4. **Lane colour (combined log).** Default mode is "by repository": all lanes of one repository use its repository colour. The user can switch to "by branch" with the palette button in the log header.
-5. **Avatar colour.** Compute `hash(lowercase(email)) % 12`. Use `--dg-avatar-{n}`. Use FNV-1a 32-bit as the hash for all three cases, so the colour is stable between sessions and machines.
-6. **Repo chip.** Background is `color-mix(in srgb, <repo colour> var(--dg-repo-chip-tint), transparent)`. Text is the text-safe repo colour `--rc-fg` (`--dg-repo-N-fg`, or a readable version of a custom colour).
+1. **Repositories and projects have no colour.** Do not derive a colour from a repository or project. Show the name on a neutral repo chip, or a neutral repository icon next to the name.
+2. **Lane colour.** Use `--dg-lane-{laneIndex % 10}` in the single-repo log and in the combined log. Lane 0 is always the lane of the first-parent chain of HEAD, so HEAD is always blue.
+3. **Avatar colour.** Compute `hash(lowercase(email)) % 12`. Use `--dg-avatar-{n}`. Use FNV-1a 32-bit as the hash, so the colour is stable between sessions and machines.
+4. **Repo chip.** Neutral badge: `--dg-badge-bg` background, `--dg-text-muted` text, a 1 px `--dg-separator` edge. The same for every repository.
 
 ### 4.2 Contrast rules
 
@@ -334,29 +332,9 @@ Values are `#RRGGBB` or `#RRGGBBAA`. Metrics, motion and font tokens are in the 
 | `--dg-graph-head-ring` | `#D1D3D9` | `#000000` | outer ring of HEAD node |
 | `--dg-graph-wip-stroke` | `#9FA2A8` | `#73767C` | dashed hollow node of the "Uncommitted changes" row |
 
-#### Repo palette (12). Repo colour = user choice, else the least-used palette index (see PLAN.md 4).
+#### Repo palette
 
-> The values in this table are the original calm palette. The shipped values are the electric palette in
-> `src/theme/colors.css` (fill `--dg-repo-N` and text `--dg-repo-N-fg`), with contrast checked by
-> `src/theme/colors.test.ts`. Repo tints (`.dg-tint`, `.dg-tint-strong`, `.dg-tint-soft`) and the intensity
-> variable `--dg-repo-tint-k` are described in that file.
-
-| Token | Dark | Light | Use |
-|---|---|---|---|
-| `--dg-repo-0` | `#E06C75` | `#C94A55` | coral |
-| `--dg-repo-1` | `#D19A4A` | `#B07617` | ochre |
-| `--dg-repo-2` | `#98C379` | `#4F8F2F` | moss |
-| `--dg-repo-3` | `#3EB8A8` | `#13897A` | teal |
-| `--dg-repo-4` | `#61AFEF` | `#2C7FCC` | sky |
-| `--dg-repo-5` | `#9D8CF0` | `#6A57D6` | iris |
-| `--dg-repo-6` | `#C678DD` | `#9C45B8` | plum |
-| `--dg-repo-7` | `#E5A3C0` | `#C2557F` | blush |
-| `--dg-repo-8` | `#B8B26A` | `#888217` | olive |
-| `--dg-repo-9` | `#7FA3C8` | `#4F7398` | steel |
-| `--dg-repo-10` | `#E8875F` | `#C25A2C` | clay |
-| `--dg-repo-11` | `#6FC3DF` | `#208FB3` | glacier |
-| `--dg-repo-tint-mix` | `14%` | `12%` | chip background = color-mix(in srgb, repoColor 14%, transparent) |
-| `--dg-repo-chip-fg-mix` | `85%` | `90%` | chip text = color-mix(in srgb, repoColor 85%, var(--dg-text)) |
+> Removed. Repositories and projects have no colour (4.1 rule 1). There are no `--dg-repo-*` tokens.
 
 #### Ref pills
 
@@ -487,7 +465,7 @@ Values are `#RRGGBB` or `#RRGGBBAA`. Metrics, motion and font tokens are in the 
 | `--dg-console-bg` | `#191A1C` | `#FFFFFF` |  |
 | `--dg-console-fg` | `#BCBEC4` | `#080808` |  |
 | `--dg-console-prompt` | `#6AAB73` | `#067D17` | "$" and the command |
-| `--dg-console-repo` | `#9FA2A8` | `#5F6269` | "[api-gateway]" prefix (also tinted with repo colour) |
+| `--dg-console-repo` | `#9FA2A8` | `#5F6269` | "[api-gateway]" prefix |
 | `--dg-console-stderr` | `#D59637` | `#A56906` | git writes progress to stderr: not an error |
 | `--dg-console-error` | `#F75464` | `#C94A55` | non-zero exit |
 | `--dg-console-duration` | `#73767C` | `#9FA2A8` |  |
@@ -556,7 +534,7 @@ Repository row (26 px):
 | Part | Spec |
 |---|---|
 | Chevron | 14 px, `--dg-icon-secondary`. |
-| Colour square | 10 × 10, radius 3, repository colour. |
+| Repository icon | 14 px, `--dg-icon-secondary`. The same for every repository. Click it to show or hide the repository in the log. |
 | Name | 13/500, no shrink. |
 | Branch | 12 secondary, flex, ellipsis. In a merge/rebase/cherry-pick state, show the state ("rebasing 3/7") in `--dg-text-error`. Detached HEAD shows the short hash in mono. |
 | Ahead/behind capsule | See 5.4. Hidden when both are 0. |
@@ -589,14 +567,14 @@ Rules:
 1. The island header holds segmented tabs: "Log" and "Local changes" (with file count). Tab height 28, radius 6, padding 0 10.
 2. The selected tab has `--dg-selection-muted-bg` and a 1 px inset ring `--dg-chip-active-border`.
 3. The Log tab shows a secondary text: "combined · N repos" in multi-repo mode, or the repo name in single-repo mode.
-4. Right side icon buttons: Lane colours (by repository / by branch), Highlight path (toggle), Refresh.
+4. Right side icon buttons: Highlight path (toggle), Refresh.
 
 #### Filter bar (height 32 incl. 8 bottom padding)
 
 | Control | Spec |
 |---|---|
 | Text filter | 220 × 26, radius 4, input style. Placeholder "Filter by text or hash". Keycap `Ctrl+F`. Matches subject, body, hash prefix and author. Supports `author:`, `path:`, `before:`, `after:` prefixes. Debounce 150 ms. |
-| Chip "Repos" | Shows 3 overlapping 8 px colour dots + "Repos: 5 of 12". Popup: checklist of repos with colour squares, "All", "Only this" (on hover per row). |
+| Chip "Repos" | Shows a repository icon + "Repos: 5 of 12". Popup: checklist of repos with a repository icon, "All", "Only this" (on hover per row). |
 | Chip "Branch" | "Branch: all", "Branch: HEAD", or a branch name. Popup: branch list with search; multi-select. In combined mode, a branch name matches in every repo that has it. |
 | Chip "Author" | Popup: author list with avatars, "Me" first. |
 | Chip "Date" | Popup: Last 24 h, Last 7 days, Last 30 days, Custom range. |
@@ -616,10 +594,9 @@ Chip spec: height 24, radius 12, padding 0 6 0 8, 12 text, 1 px inset ring `--dg
 
 | Column | Width | Content |
 |---|---|---|
-| Repo spine | 3 px | Repository colour. Only in multi-repo mode. Signature 11.1. |
 | Graph | `16 + lanesInViewport × 14` px, min 30, max 220 | SVG graph. Recompute width when the visible lane count changes; animate width over `--dg-dur-base`. |
 | Subject | flex, min 200 | Subject text, ref pills right-aligned. |
-| Repository | 104 px | Repo chip. Only in multi-repo mode. |
+| Repository | 104 px | Repo chip (neutral, the repository name). Only in multi-repo mode. |
 | Author | 124 px | 18 px avatar + name 12 muted. |
 | Date | 56 px | 12 muted tabular. See date rules. |
 | Hash | 66 px | Short hash (7 chars), mono 11.5, `--dg-log-hash-fg`. |
@@ -649,7 +626,7 @@ Column header: 26 px, 12 secondary, 1 px top and bottom border `--dg-island-head
 
 1. When any visible repo has a dirty working tree, the first row is "Uncommitted changes" (italic, muted) + "14 files in 3 repos" (12 secondary).
 2. The graph shows a hollow dashed node (`--dg-graph-wip-stroke`, dash 2 / 1.6) and a dashed edge to the HEAD commit (dash 3 / 3, 75 % opacity).
-3. The spine of this row is a striped mix of the colours of the dirty repos (4 px stripes).
+3. The Repository column of this row names the dirty repo, or shows "N repos".
 4. The repository column shows overlapping dots of the dirty repos + "3 repos".
 5. Click the row to open the Local changes tab.
 
@@ -841,7 +818,7 @@ Layout of the tab (top to bottom):
 
 1. **Repo scope bar** (32 px): chips of dirty repos with counts ("api-gateway 6", "ledger-service 5", "web-checkout 3"). Select one or more. Default: all dirty repos.
 2. **Unstaged** section header (24 px): chevron, "Unstaged", count, right: "Stage all" icon button (`Ctrl+Alt+A`), "Discard all" icon button.
-3. File rows (5.9) with a 16 px checkbox at the left. In multi-repo scope, group files by repo with a repo row (colour square + name).
+3. File rows (5.9) with a 16 px checkbox at the left. In multi-repo scope, group files by repo with a repo row (repository icon + name).
 4. **Staged** section header, same structure, with "Unstage all".
 5. **Commit message editor** at the bottom, min height 96, max 50 % of the island. JetBrains Mono 12/20. Subject line ruler at 72 chars (`--dg-editor-indent-guide`). Subject over 72 chars turns the counter warning colour. Placeholder "Commit message".
 6. **Commit bar** (44 px): checkbox "Amend", checkbox "Sign off", flexible space, button "Commit" (primary, `Ctrl+Enter`), split button "Commit and push" (`Ctrl+Alt+K`).
@@ -882,11 +859,11 @@ Open: `Shift Shift` (two presses within 300 ms) or `Ctrl+K`. `Ctrl+Shift+A` open
 
 Result row contents:
 
-- Commit: 16 px graph dot in repo colour, subject, repo chip, short hash at right.
+- Commit: commit icon, subject, repo chip, short hash at right.
 - Branch: branch icon, name, repo chips (all repos that have it), ahead/behind capsule.
 - File: file icon, name, path secondary, repo chip.
 - Action: action icon, name, shortcut keycaps at right.
-- Repo: colour square, name, branch, state dot.
+- Repo: repository icon, name, branch, state dot.
 
 Prefixes: `#` commits, `@` authors, `/` files, `>` actions, `:` repos. Fuzzy match on all.
 Search must return the first results in under 50 ms for 100 000 commits. Rust indexes subjects and hashes at load time.
@@ -912,7 +889,7 @@ Message rules:
 
 1. Long operations show in the status bar as a progress widget: label (12), 96 × 4 bar (radius 2, `--dg-progress-fg` on `--dg-progress-track`), count "7 / 12" (12 secondary), 18 px cancel button.
 2. Multi-repo operations count repos. Single-repo operations show git's percentage when git reports it (`--progress`).
-3. Click the widget to open a popover with one row per running operation and per repo: repo square, name, status (queued / running / done / failed), elapsed time.
+3. Click the widget to open a popover with one row per running operation and per repo: repository icon, name, status (queued / running / done / failed), elapsed time.
 4. Run at most 4 git processes in parallel. Queue the rest.
 
 ### 5.18 Git console tool window (`Alt+9`)
@@ -927,7 +904,7 @@ Message rules:
           =  refs/heads/feature/PAY-2318-refunds  [up to date]
 ```
 
-4. Time in `--dg-console-duration`. Repo prefix in its repo colour. `$` and command in `--dg-console-prompt`. stderr lines in `--dg-console-stderr`. Exit code above 0: `--dg-console-error` and a red `✗ exit 1`.
+4. Time in `--dg-console-duration`. Repo prefix as a neutral repo chip. `$` and command in `--dg-console-prompt`. stderr lines in `--dg-console-stderr`. Exit code above 0: `--dg-console-error` and a red `✗ exit 1`.
 5. Read-only commands that DeepGit runs for its own state (`status`, `for-each-ref`, `log`) are hidden by default. Toggle "Show background commands" shows them in secondary colour.
 6. Toolbar: filter by repo (chip), text search, "Show background commands", Clear, Copy all.
 7. Click a command line to copy it. Users can paste it in a terminal.
@@ -940,7 +917,7 @@ Left to right:
 1. **Command ticker** (signature 11.3).
 2. **Progress widget** (5.17), only while an operation runs.
 3. Flexible space.
-4. Focused repo: 8 px colour square + name. Click focuses the repo in the sidebar.
+4. Focused repo: repository icon + name. Click focuses the repo in the sidebar.
 5. Branch: branch icon 14 + name + ahead/behind capsule. Click opens the branch popup.
 6. Fetch age: 8 px age dot (signature 11.4) + "Fetched 4 min ago". Click fetches.
 7. Theme switch text "Dark" / "Light". Click toggles.
@@ -1101,7 +1078,7 @@ Show shortcuts in tooltips, menus and the palette. Use the keycap style (5.21).
 
 1. **Welcome** (no project): full window, logo 48, heading "Add your first project", body as above, primary "Add project folder", link "Clone repository". Under it: "Recent folders" if the OS gives a list.
 2. **Folder picker**: native dialog via Tauri.
-3. **Scan**: a dialog (640 wide) shows the scan live: "Scanning ~/work/payments-platform…" and the repo list fills row by row (colour square, name, relative path, current branch). Scan depth default 4. Skip `node_modules`, `target`, `.venv`, `vendor`, `dist`.
+3. **Scan**: a dialog (640 wide) shows the scan live: "Scanning ~/work/payments-platform…" and the repo list fills row by row (repository icon, name, relative path, current branch). Scan depth default 4. Skip `node_modules`, `target`, `.venv`, `vendor`, `dist`.
 4. **Review**: each found repo has a checkbox (all on). Nested repos show indented under their parent. The user can change the project name and colour.
 5. Primary button: "Add 12 repositories". Then the main window opens with the combined log, and runs one fetch of all repos in the background.
 6. Show one dismissable tip banner in the log for the first session: "Tip: press Shift twice to search everything. Press Alt+2 to see your branches across all repos."
@@ -1120,7 +1097,7 @@ Show shortcuts in tooltips, menus and the palette. Use the keycap style (5.21).
 
 1. Set `data-theme="light"` on `<html>`. All tokens switch. No component needs light-specific CSS.
 2. Islands are white (`#FFFFFF`) on `#E9EAEE`.
-3. Graph lanes, repo colours and status colours use darker values with 4.5:1 or more on white.
+3. Graph lanes and status colours use darker values with 4.5:1 or more on white.
 4. Avatars keep the same colours in both themes, with white text.
 5. Follow the OS theme by default (`prefers-color-scheme`). The status bar switch and settings override it.
 
@@ -1132,16 +1109,7 @@ These features make DeepGit different from Fork and from IntelliJ. Build each on
 
 ### 11.1 Repo spine
 
-**What it is.** A 3 px vertical bar at the left edge of each log row, in the repository colour. Rows of the same repo that follow each other form one continuous bar. The user sees bursts of work per repo while scrolling the combined log, without reading any label.
-
-**How to build it.**
-
-1. Make the spine the first grid column of the row (3 px). Paint it with the repo colour as background.
-2. Do not add a gap or radius between rows. Continuity comes from the fixed row height.
-3. Date group rows have no spine colour.
-4. The uncommitted changes row uses a repeating linear gradient of the dirty repos' colours, 4 px per colour.
-5. Hover the spine: the cursor is a pointer, and a tooltip shows "api-gateway". Click the spine: the repo filter changes to this repo only. `Alt+click`: add or remove this repo from the filter.
-6. Hide the spine in single-repo mode.
+Removed. Repositories have no colour, so there is no spine. The **Repository** column of the log (a neutral repo chip with the name) says which repository owns a commit.
 
 ### 11.2 Branch matrix and sync strip (synchronous branch control)
 
@@ -1152,9 +1120,9 @@ These features make DeepGit different from Fork and from IntelliJ. Build each on
 1. Card: margin 10 12 2, padding 8 10, radius 8, `--dg-layer-1-bg`.
 2. Line 1: matrix icon, branch name (12/600, ellipsis), link "Matrix" (11) at the right.
 3. Line 2: 12 equal segments in a grid (gap 3, height 6, radius 2), one per repo in sidebar order.
-   - Branch is current in the repo: filled with the repo colour.
-   - Branch exists only on origin: 1 px inset ring in the repo colour, no fill.
-   - Branch is local but not current: repo colour at 40 %.
+   - Branch is current in the repo: filled with `--dg-matrix-current`.
+   - Branch exists only on origin: 1 px inset ring in `--dg-matrix-local`, no fill.
+   - Branch is local but not current: `--dg-matrix-current` at 40 %.
    - Branch is missing: `--dg-matrix-missing`.
 4. Line 3: a legend with counts: "3 current", "2 on origin", "7 missing" (11 secondary, with 8 × 6 swatches).
 5. Hover a segment: tooltip "web-checkout: only origin/feature/PAY-2318-refunds".
@@ -1164,7 +1132,7 @@ These features make DeepGit different from Fork and from IntelliJ. Build each on
 **Matrix tool window.**
 
 1. Open with `Alt+2`, the stripe button, the "Matrix" link or the toast action. It opens as a large island that replaces the log area (the log stays one click away in the tabs).
-2. Rows: repos (colour square + name + current branch), 28 px high.
+2. Rows: repos (repository icon + name + current branch), 28 px high.
 3. Columns: branches that exist in 2 or more repos, sorted by number of repos, then by the newest commit date. Column width 120. Header: branch name rotated 0° (horizontal, ellipsis) with a repo count "7/12".
 4. Cell (28 × 120, `--dg-matrix-cell-bg`, hover `--dg-matrix-cell-hover-bg`) shows one glyph and the ahead/behind capsule against the column's base branch:
    - Filled 8 px dot `--dg-matrix-current`: checked out.
@@ -1190,7 +1158,7 @@ These features make DeepGit different from Fork and from IntelliJ. Build each on
 
 **How to build it.**
 
-1. Widget content: result icon 14 px (check `--dg-text-success`, cross `--dg-text-error`, spinner while running), repo name in its repo colour (mono 11.5), the command without the `git -C <path>` prefix (mono 11.5, `--dg-text-muted`), duration "0.8 s" (12 secondary).
+1. Widget content: result icon 14 px (check `--dg-text-success`, cross `--dg-text-error`, spinner while running), repo name (mono 11.5, `--dg-text-muted`), the command without the `git -C <path>` prefix (mono 11.5, `--dg-text-muted`), duration "0.8 s" (12 secondary).
 2. Max width 520 px. Truncate the command in the middle.
 3. While a multi-repo command runs, show "git fetch --prune origin × 12" and the progress widget next to it.
 4. Click: open the Git console and scroll to this command.
@@ -1227,11 +1195,9 @@ These features make DeepGit different from Fork and from IntelliJ. Build each on
 4. Click a mark: scroll to that row and select it. Hover a mark: tooltip with the ref name or subject.
 5. Compute marks in Rust from the full row list. Send them as one array of `{row, kind}`.
 
-### 11.6 Combined graph coloured by repository
+### 11.6 Combined graph
 
-**What it is.** In the combined log, each repo's lanes use the repo colour by default. The graph reads as N parallel histories, which is what a multi-repo project is.
-
-**How to build it.** See 4.1 rule 4 and 5.6 rule 4. The palette button in the log header switches between "Lane colours: by repository" and "by branch". Save the choice per project.
+Lanes are coloured by lane (4.1 rule 2) in the combined log too. There is no "by repository" lane mode: the Repository column names the repository of each commit.
 
 ### 11.7 Command preview in every dialog
 

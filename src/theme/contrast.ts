@@ -1,6 +1,6 @@
 /**
- * Colour maths for the repo palette: WCAG contrast, compositing a tint over a surface, and the
- * text-safe version of a custom repo colour. Pure functions, no DOM.
+ * Colour maths for the contrast test: WCAG contrast and compositing a translucent colour over a surface.
+ * Pure functions, no DOM.
  */
 
 export type Rgb = readonly [number, number, number];
@@ -38,56 +38,4 @@ export function contrast(a: Rgb, b: Rgb): number {
 export function over(fg: Rgb, bg: Rgb, alpha: number): Rgb {
   const a = Math.min(1, Math.max(0, alpha));
   return [fg[0] * a + bg[0] * (1 - a), fg[1] * a + bg[1] * (1 - a), fg[2] * a + bg[2] * (1 - a)];
-}
-
-/** Largest tint multiplier (`--dg-repo-tint-k`) the contrast guarantee covers. */
-export const TINT_K_MAX = 2;
-
-/**
- * Surfaces a repo colour can be drawn on, per theme: the lightest (dark theme) or darkest (light theme)
- * one is the worst case for text. Keep in sync with tokens.css (a test checks it).
- */
-export const SURFACES = {
-  dark: { worst: "#26282C", text: "#D1D3D9", extreme: "#FFFFFF" },
-  light: { worst: "#E9EAEE", text: "#000000", extreme: "#000000" },
-} as const;
-
-/** Tint alphas at k = 1, per theme. Keep in sync with `--dg-repo-tint-strong` and `--dg-repo-chip-tint` in colors.css (a test checks it). */
-export const TINT_ALPHA = {
-  dark: { strong: 0.14, chip: 0.16 },
-  light: { strong: 0.16, chip: 0.14 },
-} as const;
-
-/**
- * The colour a user-chosen hex colour is tinted with. In the dark theme a very light colour is dimmed to
- * luminance 0.45, so that light text can still read on its tint; every other colour is returned as it is.
- */
-export function tintSource(hex: string, theme: "dark" | "light"): string {
-  const rgb = parseHex(hex);
-  if (!rgb || theme === "light" || luminance(rgb) <= 0.45) return hex;
-  for (let t = 0.02; t <= 1.0001; t += 0.02) {
-    const c = over([0, 0, 0], rgb, t);
-    if (luminance(c) <= 0.45) return toHex(c);
-  }
-  return "#000000";
-}
-
-/**
- * Text colour for a user-chosen hex colour: the colour itself when it reads at 4.6:1 in the worst case
- * (a chip on the strongest tint at k = 2 over the worst surface), otherwise mixed toward the theme text
- * colour (white in the dark theme, black in the light one) in 4% steps.
- */
-export function readableFg(hex: string, theme: "dark" | "light"): string {
-  const rgb = parseHex(hex);
-  if (!rgb) return hex;
-  const { worst, extreme } = SURFACES[theme];
-  const { strong, chip } = TINT_ALPHA[theme];
-  const towards = parseHex(extreme) as Rgb;
-  const tint = parseHex(tintSource(hex, theme)) as Rgb;
-  const surface = over(tint, over(tint, parseHex(worst) as Rgb, strong * TINT_K_MAX), chip);
-  for (let t = 0; t <= 1.0001; t += 0.04) {
-    const c = over(towards, rgb, t);
-    if (contrast(c, surface) >= 4.6) return toHex(c);
-  }
-  return extreme;
 }

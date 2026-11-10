@@ -41,22 +41,19 @@ feature. Cross-feature communication goes through `state/` (selection, layout, a
   (virtual list row height, canvas/SVG maths), read it with `cssPx("--dg-...", fallback)` from `state/metrics.ts` inside a memo or
   effect: it re-runs when the font size changes, and the token must be `round(calc(N * var(--dg-u)), 1px)`. Never keep a row height as a
   px constant in TypeScript. Icon sizes (`<Icon size={14}>`) are px at the default font and scale on their own.
-- Repo and project colour: `repoColor(repo)` gives the fill (palette `var(--dg-repo-N)` or the custom `#RRGGBB`), `repoVars(repo)` gives the
-  inline style (`--rc`, `--rc-fg`, `--rc-tint`) for tints and chips (both from `state/workspace`, defined in `state/colors.ts`). Add the class
-  `dg-tint` (rows), `dg-tint-strong` (headers) or `dg-tint-soft` (children) to tint an element; use `background-color` (not the `background`
-  shorthand) for your own base and hover rules on it, so the tint stays. `isMultiRepo()` says when to tint. Lane colour:
-  `laneColorVar(i)` (`i % 10` is done for you). Never use them for anything else.
+- Repositories and projects have no colour of their own. Show a repository with `<RepoChip name={repo.name} />` (neutral badge) or
+  `<RepoIcon />` plus the name. Lane colour: `laneColorVar(i)` (`i % 10` is done for you); use it for graph lanes only.
 - No transitions on hover/selection (DESIGN.md section 7). Respect `prefers-reduced-motion` by using the `--dg-dur-*` tokens.
 
 ## State (`src/state/`)
 
 | Module | Use |
 |---|---|
-| `workspace.ts` | `workspace` (store), `activeProject()`, `projectRepos()`, `repoById(id)`, `repoColor(repo)`, `selectedRepoIds()` / `selectedRepos()` (the repo filter), `setSelectedRepoIds`, `toggleRepo`, `selectOnlyRepo`, `selectAllRepos`, `isRepoFilterActive()`, `focusedRepo()` / `setFocusedRepoId` (target of single-repo commands), `summary(repoId)` (reactive `RepoSummary`), `projectTotals()` (ahead/behind/changes/operations), `refreshSummaries(ids?)`, `addProject`, `setActiveProject`, `removeProject`, `rescanProject`. Summaries refresh themselves on `repo-changed` (throttled). |
+| `workspace.ts` | `workspace` (store), `activeProject()`, `projectRepos()`, `repoById(id)`, `selectedRepoIds()` / `selectedRepos()` (the repo filter), `setSelectedRepoIds`, `toggleRepo`, `selectOnlyRepo`, `selectAllRepos`, `isRepoFilterActive()`, `focusedRepo()` / `setFocusedRepoId` (target of single-repo commands), `summary(repoId)` (reactive `RepoSummary`), `projectTotals()` (ahead/behind/changes/operations), `refreshSummaries(ids?)`, `addProject`, `setActiveProject`, `removeProject`, `rescanProject`. Summaries refresh themselves on `repo-changed` (throttled). |
 | `refs.ts` | `repoRefs(repoId)` -> accessor of `Refs` (first read loads it), `refreshRefs`, `ensureRefs(ids)`, `cachedRefs`, `hasLocalBranch`, `hasRemoteBranch`. Auto-refresh on `repo-changed`. |
 | `selection.ts` | `selectedCommit()` / `setSelectedCommit({repoId, oid})`, `selectedFile()` / `selectFile({repoId, spec, path, oldPath?}, { reveal? })`, `detailsTab()` / `setDetailsTab("files" \| "diff")`, `mainTab()` / `setMainTab("log" \| "changes")`, `changesRepoId()` / `setChangesRepoId`, `clearSelection()`. |
-| `settings.ts` | `settings` store (`theme`, `dateFormat`, `diffMode`, `showGraph`, `laneColors`, `comfortableRows`, `showBackgroundCommands`, `useCredentialStore` (default true, synced to the backend with `setAuthPrefs`), `fontSize`, `editorFontSize`, `uiScale`, `repoTintStrength` (percent 0..200 in steps of 25, default 100; sets `--dg-repo-tint-k`, `data-repo-tints="off"` at 0), `autoFetchMinutes` (0 = off, 5, 15, 30, 60; default 15), `autoFetchPrune` (default true), `commitSignOff` (default false, remembered by the commit box)), `setSetting(key, value)` (validated, persisted as `deepgit.ui.<key>`), `resetSettings(keys?)`, `SETTING_DEFAULTS`, `zoomUi(+1 \| -1)`, `toggleTheme()`, `resolvedTheme()`. Add a key: extend `Settings`, `SETTING_DEFAULTS` and `SANITIZERS`. |
-| `appearance.ts` | Pure maths of font size / editor size / UI scale: limits, `sanitize*`, `appearanceVars()` (the CSS variables, tint strength included). `index.html` repeats it before first paint; `prepaint.test.ts` checks both agree. |
+| `settings.ts` | `settings` store (`theme`, `dateFormat`, `diffMode`, `showGraph`, `comfortableRows`, `showBackgroundCommands`, `useCredentialStore` (default true, synced to the backend with `setAuthPrefs`), `fontSize`, `editorFontSize`, `uiScale`, `autoFetchMinutes` (0 = off, 5, 15, 30, 60; default 15), `autoFetchPrune` (default true), `commitSignOff` (default false, remembered by the commit box)), `setSetting(key, value)` (validated, persisted as `deepgit.ui.<key>`), `resetSettings(keys?)`, `SETTING_DEFAULTS`, `zoomUi(+1 \| -1)`, `toggleTheme()`, `resolvedTheme()`. Add a key: extend `Settings`, `SETTING_DEFAULTS` and `SANITIZERS`. |
+| `appearance.ts` | Pure maths of font size / editor size / UI scale: limits, `sanitize*`, `appearanceVars()` (the CSS variables). `index.html` repeats it before first paint; `prepaint.test.ts` checks both agree. |
 | `metrics.ts` | `cssPx(token, fallback)` (resolved px of a CSS token, reactive to font-size changes), `appearanceRev()`. |
 | `layout.ts` | `sidebarVisible()`, `bottomTool()` ("console" \| "matrix" \| null), `toggleSidebar`, `openBottomTool(tool)`, `toggleBottomTool(tool)`. (The diff island and `diffVisible` / `toggleDiff` are gone.) |
 | `console.ts` | `consoleEntries()` (ring of 500 `ConsoleEntry`), `lastUserEntry()` (ticker), `lastConsoleEntry()`, `isBackgroundEntry(e)`, `clearConsole()`, `formatCommand(e)`. |
@@ -197,7 +194,7 @@ Open `http://localhost:1420/#gallery` for a live catalogue of everything below.
 `VirtualList` (`count`, `rowHeight`, `renderRow(i)`, `onRangeChange(start, end)`, `selectedIndex`, `onSelect(i)` for keyboard, `apiRef` -> `scrollToIndex`),
 `Tree<T>` (`roots`, `getId`, `getChildren`, `renderNode`, `expanded` + `onExpandedChange` via `createExpanded()`, `selectedId`, `onSelect`, `onActivate`, `onContextMenu`),
 `Badge`, `Pill`, `Kbd`, `Spinner`, `ProgressBar`, `EmptyState`, `Avatar` (`name`, `email`, `size`), `HeaderSlot name="main" | "details"`.
-Git-specific: `RepoChip`, `RepoSquare`, `RefPill` / `RefPills` (split HEAD pill, synced pill, +N), `AheadBehind`, `StatusLetter`.
+Git-specific: `RepoChip`, `RepoIcon`, `RefPill` / `RefPills` (split HEAD pill, synced pill, +N), `AheadBehind`, `StatusLetter`.
 Helpers: `formatLogDate`, `formatRelative`, `formatDateTime`, `shortOid`, `initials`, `fnv1a`, `splitPath`, `statusLetter`,
 `statusColorVar`, `fileIconFor(path)`, `copyText`, `plural`, `joinNames`.
 
@@ -207,7 +204,7 @@ The Settings window (`Ctrl+,`, gear menu, Search Everywhere) lists **sections**.
 `src/features/settings/sections/`. The dialog loads every `*.tsx` of that folder (`import.meta.glob`), so you change nothing else.
 
 ```tsx
-// src/features/settings/sections/Editor.tsx   (example; Git.tsx and Colors.tsx are real ones to copy from)
+// src/features/settings/sections/Editor.tsx   (example; Git.tsx is a real one to copy from)
 import { Checkbox } from "../../../components/ui";
 import { resetSettings, setSetting, settings } from "../../../state/settings";
 import { registerSettingsSection } from "../registry";
@@ -233,7 +230,7 @@ registerSettingsSection({ id: "editor", title: "Editor", order: 60, icon: "file"
 |---|---|
 | `id` | Stable lower-case id. Same id again replaces the section. `showDialog("settings", { section: "git" })` opens it. |
 | `title` | Entry in the left list and heading of the page. |
-| `order` | Sort key, ascending. Shipped: Appearance 10, Log 20, Console 30, Git 40, Colors 50. Use 60 and up for new ones. |
+| `order` | Sort key, ascending. Shipped: Appearance 10, Log 20, Console 30, Git 40. Use 50 and up for new ones. |
 | `keywords` | Extra words that the filter field matches (names of the controls). |
 | `icon` | Optional `IconName`. |
 | `component` | The page, no props. Use `Section`, `Row`, `NumberField`, `SizeControl` from `widgets.tsx` (`NumberField` and `SizeControl` take `zeroLabel`, for example "Off") and the `components/ui` controls. |

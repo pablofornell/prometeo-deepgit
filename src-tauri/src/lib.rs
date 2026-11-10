@@ -90,8 +90,6 @@ pub fn run() {
             commands::project_remove,
             commands::project_rescan,
             commands::project_set_active,
-            commands::project_set_color,
-            commands::repo_set_color,
             commands::repo_summaries,
             commands::log_open,
             commands::log_rows,

@@ -1,38 +1,33 @@
 /**
  * Small git-specific display parts shared by log, sidebar, details, palette and matrix:
- * RepoChip, RepoSquare, RefPill / RefPills, AheadBehind, StatusLetter.
+ * RepoChip, RepoIcon, RefPill / RefPills, AheadBehind, StatusLetter.
  */
 import { For, type JSX, Show } from "solid-js";
 import type { FileStatus, RefLabel } from "../../api/types";
 import { Icon } from "./Icon";
-import { repoColor, repoVars } from "../../state/colors";
-import type { ColorChoice } from "../../theme/palette";
 import { statusColorVar, statusLetter } from "./util";
 
 export interface RepoChipProps {
   name: string;
-  /** The repo (`RepoInfo`): its palette colour and custom colour. */
-  repo: ColorChoice | undefined;
   title?: string;
 }
 
 /**
- * Repository chip: tinted background, repo-colour text (DESIGN.md 4.1 rule 6).
+ * Repository chip: the repository name on a neutral badge. Every repository looks the same; the name tells them apart.
  *
- *   <RepoChip name={repo.name} repo={repo} />
+ *   <RepoChip name={repo.name} />
  */
 export function RepoChip(props: RepoChipProps): JSX.Element {
   return (
-    <span class="dg-repochip" style={repoVars(props.repo)} title={props.title ?? props.name}>
+    <span class="dg-repochip" title={props.title ?? props.name}>
       {props.name}
     </span>
   );
 }
 
-/** 10x10 rounded colour square of a repo (sidebar rows, status bar). `<RepoSquare repo={repo} />` */
-export function RepoSquare(props: { repo: ColorChoice | undefined; size?: number }): JSX.Element {
-  const s = () => (props.size ?? 10) + "px";
-  return <span class="dg-repo-square" style={{ background: repoColor(props.repo), width: s(), height: s() }} />;
+/** Neutral repository icon in front of a repository name (sidebar rows, status bar, lists). `<RepoIcon />` */
+export function RepoIcon(props: { size?: number }): JSX.Element {
+  return <Icon name="repo" size={props.size ?? 14} class="dg-repo-icon" />;
 }
 
 export interface RefPillProps {

@@ -1,11 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import type { CommitRow, GraphRow } from "../../api/types";
-import { DEFAULT_METRICS as M, autoGraphWidth, collectColorOwners, laneX, passThroughShape, rowGraphShape, segmentPath } from "./graph";
-
-const row = (repoId: string, graph: GraphRow): CommitRow => ({
-  repoId, oid: "a".repeat(40), parents: [], authorName: "A", authorEmail: "a@x", authorTime: 0, committerTime: 0, subject: "s", refs: [], graph,
-});
+import type { GraphRow } from "../../api/types";
+import { DEFAULT_METRICS as M, autoGraphWidth, laneX, passThroughShape, rowGraphShape, segmentPath } from "./graph";
 
 describe("segmentPath", () => {
   it("draws straight lanes as lines", () => {
@@ -54,21 +50,5 @@ describe("autoGraphWidth", () => {
     expect(autoGraphWidth(1)).toBe(30);
     expect(autoGraphWidth(5)).toBe(86);
     expect(autoGraphWidth(40)).toBe(220);
-  });
-});
-
-describe("collectColorOwners", () => {
-  it("maps lane colours to the repo whose node touches them", () => {
-    const owners = new Map<number, string>();
-    collectColorOwners(
-      [
-        row("r1", { node: 0, color: 0, width: 2, segments: [{ x1: 0, y1: 1, x2: 1, y2: 2, color: 5 }, { x1: 1, y1: 0, x2: 1, y2: 2, color: 9 }] }),
-        row("r2", { node: 1, color: 9, width: 2, segments: [{ x1: 1, y1: 0, x2: 1, y2: 1, color: 9 }] }),
-      ],
-      owners,
-    );
-    expect(owners.get(0)).toBe("r1");
-    expect(owners.get(5)).toBe("r1");
-    expect(owners.get(9)).toBe("r2"); // pass-through of r1 does not claim colour 9
   });
 });

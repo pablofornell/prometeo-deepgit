@@ -1,11 +1,10 @@
 /** Project switcher (DESIGN.md 5.1 #2): badge + name + chevron; the menu lists projects and the project actions. Ctrl+Alt+P. */
 import { type JSX, onCleanup } from "solid-js";
 import { Icon, initials, openMenu, plural, toast, type MenuItem } from "../../components/ui";
-import { projectColorMenu } from "../../state/colorActions";
 import * as actions from "../../state/actions";
 import { confirmAction } from "../../state/dialogs";
 import { register } from "../../state/keymap";
-import { activeProject, addProject, removeProject, repoVars, rescanProject, setActiveProject, workspace } from "../../state/workspace";
+import { activeProject, addProject, removeProject, rescanProject, setActiveProject, workspace } from "../../state/workspace";
 import * as api from "../../api/tauri";
 
 export function ProjectSwitcher(): JSX.Element {
@@ -48,7 +47,6 @@ export function ProjectSwitcher(): JSX.Element {
         shortcut: plural(p.repos.length, "repo"),
         checked: p.id === active?.id,
         tooltip: p.path,
-        tint: p,
         onSelect: () => void setActiveProject(p.id),
       });
     }
@@ -60,7 +58,6 @@ export function ProjectSwitcher(): JSX.Element {
     if (active) {
       list.push(
         { label: `Rescan ${active.name}`, icon: "refresh", onSelect: () => void rescan(active.id, active.name) },
-        projectColorMenu(active),
         { label: `Remove ${active.name}…`, icon: "delete", danger: true, onSelect: () => void remove(active.id, active.name) },
       );
     }
@@ -75,7 +72,7 @@ export function ProjectSwitcher(): JSX.Element {
   onCleanup(() => offs.forEach((off) => off()));
 
   return (
-    <button type="button" ref={button} class="dg-titlebar-dd dg-titlebar-project dg-tint-strong" style={repoVars(activeProject())} aria-haspopup="menu" data-tip="Switch project" data-tip-shortcut="Ctrl+Alt+P" onClick={open}>
+    <button type="button" ref={button} class="dg-titlebar-dd dg-titlebar-project" aria-haspopup="menu" data-tip="Switch project" data-tip-shortcut="Ctrl+Alt+P" onClick={open}>
       <span class="dg-titlebar-badge">{initials(activeProject()?.name ?? "")}</span>
       <span class="dg-titlebar-dd-main">{activeProject()?.name}</span>
       <Icon name="chevronDown" size={14} class="dg-titlebar-chev" />

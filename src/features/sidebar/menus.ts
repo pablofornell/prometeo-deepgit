@@ -1,7 +1,6 @@
 /** Context menus of the sidebar tree (DESIGN.md 5.3, 5.11). Every item names the exact branches it acts on. */
 import { copyText, plural, type MenuItem } from "../../components/ui";
 import * as actions from "../../state/actions";
-import { repoColorMenu } from "../../state/colorActions";
 import { branchColumn } from "../../state/branchTable";
 import { setChangesRepoId, setMainTab } from "../../state/selection";
 import { isRepoFilterActive, projectRepos, repoById, selectAllRepos, selectOnlyRepo, selectedRepoIds, summary, toggleRepo } from "../../state/workspace";
@@ -56,7 +55,6 @@ function repoMenu(n: Node<"repo">): MenuItem[] {
     { label: "Stash changes…", icon: "stashPush", onSelect: () => void actions.stashSave([id]) },
     { label: "Show local changes", icon: "changes", onSelect: () => { setChangesRepoId(id); setMainTab("changes"); } },
     { separator: true },
-    ...(repo ? [repoColorMenu(repo)] : []),
     { label: "Copy path", icon: "copy", onSelect: () => void copyText(repo?.path ?? "") },
   );
   return items;

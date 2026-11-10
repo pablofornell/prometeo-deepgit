@@ -39,15 +39,8 @@ The scan skips hidden folders and the folders `node_modules`, `target`, `dist`, 
 The scan does not follow symbolic links.
 
 The project opens with the combined log of all repositories.
-DeepGit gives each repository its own colour. The colours are bright and spread over the whole rainbow.
-The colour shows as a small square, a coloured spine, and a soft tint behind the rows of that repository.
-
-To change a colour, right-click the repository in the sidebar and choose **Set Color**. **Settings > Colors** lists all of them in one place.
-Pick one of the 12 colours, choose **Auto** to go back to the automatic colour, or choose **Custom…** to type a `#RRGGBB` value.
-You can also press `Shift Shift` and run **Set repository color…**.
-Each project has a colour too. It tints the project button in the title bar and its row in the project switcher.
-Change it in the project switcher menu (**Set Color**).
-The tint is soft on purpose: text stays readable in the light and the dark theme, and hover and selection stay clear above it.
+Every repository looks the same: a repository icon and its name. DeepGit does not give repositories or projects a colour of their own.
+Colour has one meaning in the whole app: the state of things (added, modified, deleted, ahead, behind, error and so on).
 
 To add more projects later, use the project switcher in the title bar (`Ctrl+Alt+P`) and choose **Add project folder…**.
 You can also click the **+** button in the sidebar header.
@@ -55,12 +48,12 @@ You can also click the **+** button in the sidebar header.
 ### Single repository and multi-repo projects
 
 A project with one repository works like a normal Git client.
-The log shows one repository. The repository column and the repo spine are hidden.
+The log shows one repository. The repository column is hidden.
 
 A project with several repositories shows all of them together:
 
 - The log merges the commits of all repositories.
-- Each commit row has a repository chip and a coloured spine.
+- Each commit row has a repository chip with the repository name.
 - The sidebar lists all repositories.
 - The branch matrix and the sync strip appear.
 - Operations such as checkout, new branch, merge and commit can run in many repositories at once.
@@ -127,7 +120,6 @@ The log header shows "combined · N repos" for several repositories, or the repo
 
 Each commit row shows these columns:
 
-- **Repo spine**: a 3 px bar in the colour of the repository. Only in multi-repo projects.
 - **Graph**: the commit graph.
 - **Subject**: the commit subject. Ref pills are at the right end.
 - **Repository**: a chip with the repository name. Only in multi-repo projects.
@@ -148,9 +140,7 @@ The graph draws the history as coloured lanes.
 Merge commits have a hollow node. The HEAD commit has a ring around its node.
 In a multi-repo project, each repository has its own group of lanes. Lane groups never connect.
 
-By default, the lane colour is the repository colour.
-To colour the lanes by branch, click the palette button in the log header.
-The same switch is in **Settings** as **Colour lanes by repository**.
+Each lane has its own colour. The colour follows the branch, not the repository: read the **Repository** column to see which repository owns a commit.
 To hide the graph, clear **Show commit graph** in the settings.
 
 ### Ref pills
@@ -193,13 +183,6 @@ Dates use the form `YYYY-MM-DD`. Use quotes for values that contain spaces, for 
 When a filter is on, its chip is highlighted. Click the **x** on a chip to clear it.
 Press `Ctrl+Shift+F` to clear all filters, including the repository filter.
 DeepGit hides the "Uncommitted changes" row while a text, branch, author, date or path filter is on.
-
-### Repo spine
-
-In a multi-repo project, the spine tells you which repository owns a commit without reading the chip.
-
-- Click the spine to show only that repository.
-- `Alt`+click the spine to add the repository to the filter or to remove it.
 
 ### Overview ruler
 
@@ -406,7 +389,7 @@ Actions in the tree:
 - **Double-click a local branch** to check it out.
 - **Double-click a remote branch** to create a local tracking branch and check it out. A dialog asks for the local name.
 - **Double-click a repository** (multi-repo projects) to show only that repository in the log.
-- **Click the colour square** of a repository to show or hide it in the log. `Alt`+click shows only this repository.
+- **Click the icon** of a repository to show or hide it in the log. `Alt`+click shows only this repository.
 - **Type letters** to filter the tree (speed search). `Backspace` removes a letter. `Esc` clears the search.
 - Press `F2` to rename the selected branch.
 - Press `Delete` to delete the selected branch, delete the selected tag or drop the selected stash. DeepGit asks first.
@@ -428,7 +411,7 @@ Click the branch widget in the title bar, or press ``Ctrl+Shift+` ``, to open th
 
 - Type to search branches in all repositories.
 - Sections: **Recent**, **Local**, **Remote** and **Tags** (tags show when you search).
-- In a multi-repo project, each row shows coloured dots for the repositories that have the branch, and a count such as `4/6`.
+- In a multi-repo project, each row shows dots for the repositories that have the branch, and a count such as `4/6`.
 - Press `Enter` to check out the branch in every repository that has it.
 - Press `→` to list the repositories of the branch. Press `←` to close the list.
 - Right-click a row for the branch menu. The menu can check out the branch in one repository only.
@@ -486,8 +469,8 @@ Double-click a cell to check out the branch in that repository only.
 When the project has several repositories and the current branch of the focused repository exists in at least two of them, the sidebar shows the sync strip.
 It has one segment for each repository:
 
-- Filled with the repository colour: the branch is checked out.
-- Dimmed colour: the branch is local but not checked out.
+- Filled: the branch is checked out.
+- Dimmed: the branch is local but not checked out.
 - Outline only: the branch exists only on `origin`.
 - Grey: the branch is missing.
 
@@ -815,7 +798,6 @@ In the log, the column widths stay the same when you change the font size. If a 
 | Setting | Values |
 |---|---|
 | **Show the commit graph** | On or off |
-| **Lane colors** | By repository, or by branch |
 
 ### Console
 
@@ -835,19 +817,9 @@ In the log, the column widths stay the same when you change the font size. If a 
 
 If the system key store is missing, a note says that DeepGit asks for the login every time.
 
-### Colors
-
-| Setting | Values |
-|---|---|
-| **Repository tint strength** | 0% to 200% in steps of 25%, default 100%. How strongly rows and headers are tinted with the colour of their repository. **Off** (0%) removes the tints. |
-| Colors of the project | A list with the project and each of its repositories. Each row shows the colour and has a **Change…** button. The menu has the 12 colours, **Auto** and **Custom…**, like **Set Color** in the sidebar. |
-| **Reset all colors to Auto** | Puts the project and its repositories back to the automatic colours. DeepGit asks you to confirm first. |
-
-**Reset to defaults** on this page puts only the tint strength back to 100%. Your colours are not settings: use **Reset all colors to Auto** for them.
-
 ### Quick settings in the gear menu
 
-The gear menu keeps the most used switches: theme, commit graph, lane colours, comfortable rows and background commands.
+The gear menu keeps the most used switches: theme, commit graph, comfortable rows and background commands.
 You can also click the theme name (**Dark** or **Light**) at the right end of the status bar to switch the theme.
 
 ### Zoom keys

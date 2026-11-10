@@ -13,10 +13,6 @@ export interface RepoInfo {
   /** Path relative to the project root, or the folder name when the repo is the project root. */
   name: string;
   path: string;
-  /** Index in the colour palette (0..11): `var(--dg-repo-N)`. Assigned automatically, or chosen by the user. */
-  color: number;
-  /** Colour the user typed in (`#RRGGBB`, upper case). Wins over `color`; null means use the palette colour. */
-  customColor: string | null;
 }
 
 export interface Project {
@@ -24,10 +20,6 @@ export interface Project {
   name: string;
   path: string;
   repos: RepoInfo[];
-  /** Palette index (0..11) of the project, assigned automatically or chosen by the user. */
-  color: number;
-  /** Custom project colour (`#RRGGBB`), or null. */
-  customColor: string | null;
 }
 
 export interface Workspace {

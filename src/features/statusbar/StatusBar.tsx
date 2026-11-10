@@ -1,6 +1,6 @@
 /** Status bar (DESIGN.md 5.19): command ticker (11.3), progress area (5.17), focused repo, branch, fetch age, theme. */
 import { For, type JSX, Show, createMemo, createSignal } from "solid-js";
-import { AheadBehind, Icon, Popup, ProgressBar, RepoSquare, Spinner } from "../../components/ui";
+import { AheadBehind, Icon, Popup, ProgressBar, RepoIcon, Spinner } from "../../components/ui";
 import * as actions from "../../state/actions";
 import { activities } from "../../state/activity";
 import { autoFetchLine, autoFetchStatus } from "../../state/autoFetch";
@@ -9,7 +9,7 @@ import { fetchAge } from "../../state/fetchAge";
 import { openBottomTool, setSidebarVisible } from "../../state/layout";
 import { runBinding } from "../../state/keymap";
 import { resolvedTheme, toggleTheme } from "../../state/settings";
-import { focusedRepo, repoById, repoTextColor, summary } from "../../state/workspace";
+import { focusedRepo, repoById, summary } from "../../state/workspace";
 import { middleTruncate } from "./format";
 import "./statusbar.css";
 
@@ -62,7 +62,7 @@ export function StatusBar(): JSX.Element {
               </Show>
               <span class="dg-statusbar-cmd">
                 <Show when={batchSize() < 2 && owner()}>
-                  {(o) => <span class="dg-statusbar-cmd-repo" style={{ color: repoTextColor(o()) }}>{o().name}</span>}
+                  {(o) => <span class="dg-statusbar-cmd-repo">{o().name}</span>}
                 </Show>
                 {middleTruncate(formatCommand(e()), MAX_COMMAND_CHARS)}
                 <Show when={batchSize() > 1}> × {batchSize()}</Show>
@@ -114,7 +114,7 @@ export function StatusBar(): JSX.Element {
                 setSidebarVisible(true);
               }}
             >
-              <RepoSquare repo={r()} size={8} />
+              <RepoIcon size={12} />
               {r().name}
             </button>
             <button type="button" class="dg-statusbar-widget" data-tip="Branches" data-tip-shortcut="Ctrl+Shift+`" onClick={() => runBinding("branch.popup")}>
