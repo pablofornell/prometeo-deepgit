@@ -209,11 +209,12 @@
   animation: dg-scale-in var(--dg-dur-base) var(--dg-ease-out);
 }
 .dg-dialog-wide { width: var(--dg-dialog-width-wide); }
-.dg-dialog-large { width: min(1040px, calc(100vw - 48px)); height: min(700px, calc(100vh - 48px)); max-height: none; }
+/* The box starts at 12vh (.dg-scrim). Keep 16px free at the bottom, so the footer stays in the window. */
+.dg-dialog-large { width: min(1040px, calc(100vw - 48px)); height: min(700px, calc(88vh - 16px)); max-height: calc(88vh - 16px); }
 .dg-dialog-large .dg-dialog-body { flex: 1; overflow: hidden; gap: 0; }
 .dg-dialog-title { font-size: var(--dg-font-size-h4); line-height: calc(20 * var(--dg-u)); font-weight: var(--dg-weight-semibold); margin-bottom: 12px; }
 .dg-dialog-body { display: flex; flex-direction: column; gap: 10px; overflow: auto; min-height: 0; padding: 2px; margin: -2px; }
-.dg-dialog-footer { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+.dg-dialog-footer { flex: none; display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 .dg-dialog-footer-left { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; }
 .dg-command {
   display: flex; align-items: flex-start; gap: 6px; margin-top: 12px; padding: 6px 8px; border-radius: 4px;

@@ -52,7 +52,7 @@ describe("settings store", () => {
     expect(settings.editorFontSize).toBe(10);
     expect(settings.theme).toBe("dark");
     expect(settings.showGraph).toBe(true);
-    expect(settings.dateFormat).toBe("relative");
+    expect(settings.dateFormat).toBe("iso");
   });
 
   it("loads valid stored values", async () => {
@@ -61,6 +61,12 @@ describe("settings store", () => {
     storage.set("deepgit.ui.theme", '"light"');
     const { settings } = await load();
     expect([settings.fontSize, settings.uiScale, settings.theme]).toEqual([16, 130, "light"]);
+  });
+
+  it("keeps a date format the user chose, even when it is not the default", async () => {
+    storage.set("deepgit.ui.dateFormat", '"relative"');
+    const { settings } = await load();
+    expect(settings.dateFormat).toBe("relative");
   });
 
   it("setSetting validates, persists and applies the sizes", async () => {
