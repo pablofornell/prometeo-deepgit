@@ -12,11 +12,13 @@
 .dg-changes-banners { flex: none; display: flex; flex-direction: column; gap: var(--dg-space-3); padding: 0 var(--dg-space-4) var(--dg-space-3); max-height: 40%; overflow: auto; }
 .dg-changes-banner {
   display: flex; align-items: center; gap: var(--dg-space-4); min-height: var(--dg-banner-height); padding: var(--dg-space-2) var(--dg-space-4) var(--dg-space-2) var(--dg-space-5);
-  border-radius: var(--dg-banner-radius); background: var(--dg-banner-warning-bg); box-shadow: inset 0 0 0 1px var(--dg-banner-warning-border);
+  border-radius: var(--dg-banner-radius);
+  /* an operation in progress (the only banner without a modifier): the violet operation wash */
+  background: var(--dg-banner-operation-bg); box-shadow: inset 0 0 0 1px var(--dg-banner-operation-border), inset 3px 0 0 var(--dg-special);
 }
-.dg-changes-banner.is-resolved { background: var(--dg-banner-success-bg); box-shadow: inset 0 0 0 1px var(--dg-banner-success-border); }
-.dg-changes-banner.is-error { background: var(--dg-banner-error-bg); box-shadow: inset 0 0 0 1px var(--dg-banner-error-border); }
-.dg-changes-banner-icon { flex: none; color: var(--dg-text-warning); }
+.dg-changes-banner.is-resolved { background: var(--dg-banner-success-bg); box-shadow: inset 0 0 0 1px var(--dg-banner-success-border), inset 3px 0 0 var(--dg-success); }
+.dg-changes-banner.is-error { background: var(--dg-banner-error-bg); box-shadow: inset 0 0 0 1px var(--dg-banner-error-border), inset 3px 0 0 var(--dg-danger); }
+.dg-changes-banner-icon { flex: none; color: var(--dg-banner-operation-fg); }
 .dg-changes-banner.is-resolved .dg-changes-banner-icon { color: var(--dg-text-success); }
 .dg-changes-banner.is-error .dg-changes-banner-icon { color: var(--dg-text-error); }
 .dg-changes-banner-text { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; column-gap: var(--dg-space-3); line-height: calc(18 * var(--dg-u)); }
@@ -34,7 +36,11 @@
 }
 .dg-changes-row:hover { background-color: var(--dg-row-hover-bg); }
 .dg-changes-row.is-selected { background: var(--dg-selection-inactive-bg); color: var(--dg-selection-fg); }
-.dg-changes-list:focus-within .dg-changes-row.is-selected { background: var(--dg-selection-bg); }
+.dg-changes-list:focus-within .dg-changes-row.is-selected { background: var(--dg-selection-bg); box-shadow: inset var(--dg-focus-width) 0 0 var(--dg-selection-edge); }
+/* a conflicted file: a danger wash under the row, stronger when selected */
+.dg-changes-row.is-conflict { background: var(--dg-danger-wash-soft); }
+.dg-changes-row.is-conflict.is-selected { background: var(--dg-danger-wash); }
+.dg-changes-list:focus-within .dg-changes-row.is-conflict.is-selected { background: var(--dg-danger-wash-strong); box-shadow: inset var(--dg-focus-width) 0 0 var(--dg-danger); }
 .dg-changes-list:focus-visible .dg-changes-row.is-cursor { box-shadow: inset 0 0 0 var(--dg-focus-width) var(--dg-focus-ring); }
 
 .dg-changes-chev { display: inline-grid; place-items: center; width: 14px; height: 14px; flex: none; color: var(--dg-icon-secondary); }
@@ -59,6 +65,7 @@
 .dg-changes-section { color: var(--dg-text-muted); }
 .dg-changes-section.is-cursor { background: var(--dg-selection-inactive-bg); }
 .dg-changes-section-title { font-size: var(--dg-font-size-medium); font-weight: var(--dg-weight-semibold); letter-spacing: 0.01em; }
+.dg-changes-section.is-staged .dg-changes-section-title { color: var(--dg-success-fg); }
 .dg-changes-section.is-conflicts .dg-changes-section-title { color: var(--dg-status-conflict); }
 
 /* directory and file rows */
@@ -66,12 +73,11 @@
 .dg-changes-dircount { flex: none; font-size: var(--dg-font-size-small); color: var(--dg-text-secondary); font-variant-numeric: tabular-nums; }
 .dg-changes-name { flex: none; max-width: 70%; overflow: hidden; text-overflow: ellipsis; color: var(--st, var(--dg-text)); }
 .dg-changes-name.is-deleted { text-decoration: line-through; text-decoration-thickness: 1px; }
-.dg-changes-row.is-selected .dg-changes-name { color: var(--dg-text); }
 .dg-changes-dir-dim { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: var(--dg-font-size-medium); color: var(--dg-text-secondary); }
 .dg-changes-from { flex: none; font-size: var(--dg-font-size-small); color: var(--dg-text-secondary); }
 .dg-changes-counts { display: inline-flex; align-items: center; gap: var(--dg-space-3); flex: none; font-size: var(--dg-font-size-small); font-variant-numeric: tabular-nums; }
-.dg-changes-add { color: var(--dg-diff-added-marker); }
-.dg-changes-del { color: var(--dg-diff-removed-marker); }
+.dg-changes-add { color: var(--dg-status-added); }
+.dg-changes-del { color: var(--dg-status-deleted); }
 .dg-changes-bin { color: var(--dg-text-secondary); }
 
 /* hover actions: overlay at the right, over the counts */
@@ -86,9 +92,9 @@
   height: 18px; padding: 0 7px; border-radius: var(--dg-pill-radius); line-height: 1; font-size: var(--dg-font-size-small); color: var(--dg-text);
   background: var(--dg-chip-bg); box-shadow: inset 0 0 0 1px var(--dg-chip-border);
 }
-.dg-changes-txtact:hover { background: var(--dg-hover-bg); }
+.dg-changes-txtact:hover { background: var(--dg-accent-wash-soft); box-shadow: inset 0 0 0 1px var(--dg-accent-border); }
 .dg-changes-txtact.is-primary { background: var(--dg-button-primary-bg); color: var(--dg-text-over-accent); box-shadow: none; }
-.dg-changes-txtact.is-primary:hover { background: var(--dg-button-primary-hover-bg, var(--dg-button-primary-bg)); filter: brightness(1.08); }
+.dg-changes-txtact.is-primary:hover { background: var(--dg-accent-hover); }
 
 .dg-changes-stashcount { font-size: var(--dg-font-size-small); color: var(--dg-text-secondary); }
 
@@ -111,7 +117,7 @@
   border-radius: var(--dg-input-radius); outline: 0; overflow: auto; white-space: pre-wrap;
 }
 .dg-changes-message::placeholder { color: var(--dg-input-placeholder); }
-.dg-changes-message:focus { border-color: var(--dg-input-focus-border); box-shadow: 0 0 0 1px var(--dg-input-focus-border); }
+.dg-changes-message:focus { border-color: var(--dg-input-focus-border); box-shadow: 0 0 0 1px var(--dg-input-focus-border), 0 0 0 4px var(--dg-accent-wash); }
 /* ruler at column 72 (the editor font is mono, so ch is exact) */
 .dg-changes-editor::after {
   content: ""; position: absolute; top: var(--dg-border-width); bottom: var(--dg-border-width); left: calc(var(--dg-space-4) + 72ch + var(--dg-border-width)); width: 1px;

@@ -12,7 +12,8 @@ button.dg-statusbar-widget:hover { background: var(--dg-statusbar-hover-bg); col
 .dg-statusbar-widget .dg-icon { color: currentColor; width: calc(14 * var(--dg-u)); height: calc(14 * var(--dg-u)); flex: none; }
 .dg-statusbar-ok { color: var(--dg-text-success) !important; }
 .dg-statusbar-bad { color: var(--dg-text-error) !important; }
-.dg-statusbar-dim { color: var(--dg-text-secondary); flex: none; font-variant-numeric: tabular-nums; }
+.dg-statusbar-autofetch { background: var(--dg-danger-wash); box-shadow: inset 0 0 0 1px var(--dg-danger-border); }
+.dg-statusbar-dim { color: var(--dg-statusbar-fg); flex: none; font-variant-numeric: tabular-nums; }
 
 /* ---- command ticker */
 .dg-statusbar-ticker { flex: 0 1 520px; }

@@ -40,7 +40,7 @@ function RepoBanner(props: { repoId: string }): JSX.Element {
   const conflicts = () => s()?.conflicted ?? 0;
   const isError = () => failed().has(props.repoId) && conflicts() > 0;
   return (
-    <div class="dg-log-banner" classList={{ "is-error": isError() }} role="status">
+    <div class="dg-log-banner" classList={{ "is-operation": !isError(), "is-error": isError() }} role="status">
       <Icon name={isError() ? "error" : "warning"} size={16} class="dg-log-banner-icon" />
       <span class="dg-log-banner-text">
         <b>{repoById(props.repoId)?.name ?? props.repoId}</b>: {kind()} in progress.
@@ -72,7 +72,7 @@ export function OperationBanners(): JSX.Element {
       <Show
         when={busy().length <= 2 || expanded()}
         fallback={
-          <div class="dg-log-banner" role="status">
+          <div class="dg-log-banner is-operation" role="status">
             <Icon name="warning" size={16} class="dg-log-banner-icon" />
             <span class="dg-log-banner-text">{busy().length} repos have an operation in progress.</span>
             <span class="dg-grow" />

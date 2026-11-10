@@ -22,6 +22,7 @@
 .dg-dialogs-note { display: flex; gap: var(--dg-space-4); align-items: flex-start; padding: var(--dg-space-3) var(--dg-space-4); border-radius: var(--dg-banner-radius); line-height: calc(16 * var(--dg-u)); font-size: var(--dg-font-size-medium); }
 .dg-dialogs-note .dg-icon { margin-top: 1px; }
 .dg-dialogs-note.is-info { background: var(--dg-banner-info-bg); box-shadow: inset 0 0 0 1px var(--dg-banner-info-border); }
+.dg-dialogs-note.is-info .dg-icon { color: var(--dg-info-fg); }
 .dg-dialogs-note.is-warning { background: var(--dg-banner-warning-bg); box-shadow: inset 0 0 0 1px var(--dg-banner-warning-border); }
 .dg-dialogs-note.is-warning .dg-icon { color: var(--dg-text-warning); }
 .dg-dialogs-note.is-error { background: var(--dg-banner-error-bg); box-shadow: inset 0 0 0 1px var(--dg-banner-error-border); }
@@ -38,7 +39,9 @@
 /* radios */
 .dg-dialogs-radios { display: flex; flex-direction: column; gap: var(--dg-space-1); }
 .dg-dialogs-radio { position: relative; display: flex; align-items: flex-start; gap: var(--dg-space-4); padding: var(--dg-space-3) var(--dg-space-4); border-radius: var(--dg-popup-selection-radius); cursor: default; }
-.dg-dialogs-radio:hover { background: var(--dg-hover-bg); }
+.dg-dialogs-radio:hover { background: var(--dg-row-hover-bg); }
+.dg-dialogs-radio.is-on { background: var(--dg-accent-wash-soft); box-shadow: inset 0 0 0 1px var(--dg-accent-border); }
+.dg-dialogs-radio.is-on.is-danger { background: var(--dg-danger-wash-soft); box-shadow: inset 0 0 0 1px var(--dg-danger-border); }
 .dg-dialogs-radio-input { position: absolute; opacity: 0; width: 16px; height: 16px; margin: 0; }
 .dg-dialogs-radio-dot {
   flex: none; display: grid; place-items: center; width: var(--dg-checkbox-size); height: var(--dg-checkbox-size); margin-top: 1px; border-radius: 50%;
@@ -83,7 +86,7 @@
 .dg-dialogs-fieldrow { display: flex; align-items: flex-end; gap: var(--dg-space-4); }
 .dg-dialogs-fieldrow > .dg-dialogs-field { flex: 1 1 auto; }
 .dg-dialogs-clone-progress { display: flex; flex-direction: column; gap: var(--dg-space-3); padding: var(--dg-space-4); border-radius: var(--dg-banner-radius); background: var(--dg-layer-1-bg); }
-.dg-dialogs-clone-phase { display: flex; align-items: center; gap: var(--dg-space-3); color: var(--dg-text-muted); font-variant-numeric: tabular-nums; }
+.dg-dialogs-clone-phase { display: flex; align-items: center; gap: var(--dg-space-3); color: var(--dg-accent-fg); font-variant-numeric: tabular-nums; }
 .dg-dialogs-clone-progress .dg-progress { width: 100% !important; }
 
 /* login: the host-key text ssh prints (host, key type, fingerprint) */

@@ -8,7 +8,7 @@
 import { type JSX, Match, Show, Switch, batch, createEffect, createMemo, createResource, createSignal, For, on, onCleanup, onMount, untrack } from "solid-js";
 import * as api from "../../api/tauri";
 import type { DiffSpec, FileDiff, HunkRef } from "../../api/types";
-import { Button, EmptyState, Icon, IconButton, SegmentedControl, Spinner, StatusLetter, copyText, fileIconFor, openMenu, shortOid, splitPath, toast, type MenuItem } from "../../components/ui";
+import { Button, EmptyState, Icon, IconButton, SegmentedControl, Spinner, StatusLetter, copyText, fileIconFor, openMenu, shortOid, splitPath, statusColorVar, toast, type MenuItem } from "../../components/ui";
 import { confirmAction } from "../../state/dialogs";
 import { repoVersion } from "../../state/events";
 import { cssPx } from "../../state/metrics";
@@ -431,7 +431,7 @@ export function DiffViewer(props: DiffViewerProps): JSX.Element {
             <span class="dg-diff-dir">{props.oldPath} → </span>
           </Show>
           <span class="dg-diff-dir">{path().dir}</span>
-          <span class="dg-diff-name">{path().name}</span>
+          <span class="dg-diff-name" style={diff() ? { color: statusColorVar(fileStatus()) } : undefined}>{path().name}</span>
         </span>
         <Show when={diff()}>
           <StatusLetter status={fileStatus()} />

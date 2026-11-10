@@ -149,7 +149,11 @@ export function AheadBehind(props: AheadBehindProps): JSX.Element {
     `${props.ahead} commit${props.ahead === 1 ? "" : "s"} to push${props.upstream ? " to " + props.upstream : ""}. ${props.behind} to pull.`;
   return (
     <Show when={props.ahead > 0 || props.behind > 0}>
-      <span class="dg-ab" classList={{ "is-diverged": props.ahead > 0 && props.behind > 0 }} title={title()}>
+      <span
+        class="dg-ab"
+        classList={{ "is-diverged": props.ahead > 0 && props.behind > 0, "is-ahead": props.ahead > 0 && props.behind === 0, "is-behind": props.behind > 0 && props.ahead === 0 }}
+        title={title()}
+      >
         <Show when={props.ahead > 0}>
           <span class="dg-ab-up">↑{cap(props.ahead)}</span>
         </Show>

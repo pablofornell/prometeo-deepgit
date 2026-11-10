@@ -136,20 +136,21 @@ Rules:
 
 ## 4. Colour
 
-All colours are in `tokens.css`. The tables in section 4.3 are generated from that file.
+The neutral base is in `tokens.css` (tables in 4.3, generated from that file). Every colour that carries meaning is in `colors.css`: the colour system v2 of section 4.4.
 
 ### 4.1 How colour assignment works
 
 1. **Repositories and projects have no colour.** Do not derive a colour from a repository or project. Show the name on a neutral repo chip, or a neutral repository icon next to the name.
 2. **Lane colour.** Use `--dg-lane-{laneIndex % 10}` in the single-repo log and in the combined log. Lane 0 is always the lane of the first-parent chain of HEAD, so HEAD is always blue.
 3. **Avatar colour.** Compute `hash(lowercase(email)) % 12`. Use `--dg-avatar-{n}`. Use FNV-1a 32-bit as the hash, so the colour is stable between sessions and machines.
-4. **Repo chip.** Neutral badge: `--dg-badge-bg` background, `--dg-text-muted` text, a 1 px `--dg-separator` edge. The same for every repository.
+4. **Repo chip.** Neutral badge: `--dg-badge-bg` (the neutral wash) background, `--dg-text-muted` text, a 1 px `--dg-separator` edge. The same for every repository.
+5. **Everything else.** Use the hue families of 4.4. A colour always means a state, never an identity.
 
 ### 4.2 Contrast rules
 
 1. Body text on island background must have a contrast of 7:1 or more. `--dg-text` on `--dg-island-bg` is 11.9:1 (dark).
-2. Secondary text must have 4.5:1 or more, except for hashes and placeholders. `--dg-text-secondary` (#73767C) is 4.1:1 on #191A1C. Use it only for non-essential text.
-3. Ref pill text must have 4.5:1 or more on its pill background.
+2. Secondary and muted text must have 4.5:1 or more on every surface and on a hovered row. On a coloured wash they switch to `--dg-text-muted-on-wash` (4.4 rule 13).
+3. Coloured text (`--dg-<family>-fg`, pill text, status letters) must have 4.5:1 or more on every surface it is drawn on, washes included. Non-text indicators (dots, rings, edges, lanes) must have 3:1 or more. `colors.test.ts` enforces all of this.
 4. Do not show state by colour alone. Each state has a letter, an icon or a shape too (status letters, `↑`/`↓`, dot versus ring).
 
 ### 4.3 Token tables
@@ -175,31 +176,17 @@ Values are `#RRGGBB` or `#RRGGBBAA`. Metrics, motion and font tokens are in the 
 | Token | Dark | Light | Use |
 |---|---|---|---|
 | `--dg-text` | `#D1D3D9` | `#000000` |  |
-| `--dg-text-secondary` | `#73767C` | `#73767C` |  |
+| `--dg-text-secondary` | `#969AA2` | `#5F6269` |  |
 | `--dg-text-muted` | `#9FA2A8` | `#5F6269` |  |
 | `--dg-text-disabled` | `#4C4F56` | `#9FA2A8` |  |
 | `--dg-text-over-accent` | `#FFFFFF` | `#FFFFFF` |  |
-| `--dg-text-error` | `#F57E84` | `#C54E58` |  |
-| `--dg-text-warning` | `#D59637` | `#A56906` |  |
-| `--dg-text-success` | `#6DB083` | `#338555` |  |
-| `--dg-text-link` | `#71A1FE` | `#2E62C9` |  |
 
 #### Accent / interaction
 
 | Token | Dark | Light | Use |
 |---|---|---|---|
-| `--dg-accent` | `#3871E1` | `#3871E1` |  |
-| `--dg-accent-hover` | `#4A80E8` | `#2E62C9` |  |
-| `--dg-accent-pressed` | `#2E62C9` | `#2554B0` |  |
-| `--dg-focus-ring` | `#3871E1` | `#3871E1` |  |
 | `--dg-hover-bg` | `#FFFFFF17` | `#00000012` | icon buttons, toolbar |
 | `--dg-pressed-bg` | `#FFFFFF29` | `#00000020` |  |
-| `--dg-row-hover-bg` | `#FFFFFF10` | `#00000008` | tree/list/log row hover |
-| `--dg-selection-bg` | `#2A4371` | `#D0DFFE` | focused selection |
-| `--dg-selection-inactive-bg` | `#33353B` | `#E9EAEE` | selection when the component has no focus |
-| `--dg-selection-muted-bg` | `#233558` | `#E3EBFE` |  |
-| `--dg-selection-fg` | `#D1D3D9` | `#000000` |  |
-| `--dg-toolbar-selected-bg` | `#2E4D89` | `#D0DFFE` | toggled icon button / active tool window |
 
 #### Title bar / stripe / status bar
 
@@ -210,43 +197,29 @@ Values are `#RRGGBB` or `#RRGGBBAA`. Metrics, motion and font tokens are in the 
 | `--dg-toolbar-separator` | `#FFFFFF21` | `#00000020` |  |
 | `--dg-stripe-bg` | `#26282C` | `#E9EAEE` |  |
 | `--dg-stripe-button-fg` | `#9FA2A8` | `#5F6269` |  |
-| `--dg-stripe-button-selected-bg` | `#3871E1` | `#3871E1` |  |
-| `--dg-stripe-button-selected-fg` | `#FFFFFF` | `#FFFFFF` |  |
 | `--dg-statusbar-bg` | `#26282C` | `#E9EAEE` |  |
-| `--dg-statusbar-fg` | `#9FA2A8` | `#5F6269` |  |
+| `--dg-statusbar-fg` | `#B4B7BE` | `#505359` |  |
 | `--dg-statusbar-hover-bg` | `#FFFFFF17` | `#00000012` |  |
 | `--dg-statusbar-hover-fg` | `#D1D3D9` | `#000000` |  |
-| `--dg-push-bg` | `#338555` | `#4E9D6C` | "Push" primary when commits are ahead (toolbar-run-bg) |
-| `--dg-push-hover-bg` | `#2A6E47` | `#338555` |  |
 
 #### Controls
 
 | Token | Dark | Light | Use |
 |---|---|---|---|
 | `--dg-button-border` | `#40434A` | `#D1D3D9` |  |
-| `--dg-button-primary-bg` | `#3871E1` | `#3871E1` |  |
-| `--dg-button-primary-fg` | `#FFFFFF` | `#FFFFFF` |  |
-| `--dg-button-danger-bg` | `#C54E58` | `#E4656E` |  |
-| `--dg-button-danger-hover-bg` | `#A4414A` | `#C54E58` |  |
 | `--dg-button-disabled-fg` | `#4C4F56` | `#9FA2A8` |  |
 | `--dg-button-disabled-border` | `#33353B` | `#E9EAEE` |  |
 | `--dg-input-bg` | `#191A1C` | `#FFFFFF` |  |
 | `--dg-input-fg` | `#D1D3D9` | `#000000` |  |
 | `--dg-input-border` | `#40434A` | `#D1D3D9` |  |
-| `--dg-input-focus-border` | `#3871E1` | `#3871E1` |  |
 | `--dg-input-placeholder` | `#73767C` | `#9FA2A8` |  |
-| `--dg-input-error-border` | `#C54E58` | `#E4656E` |  |
 | `--dg-combo-bg` | `#26282C` | `#FFFFFF` |  |
 | `--dg-checkbox-bg` | `#2B2D30` | `#FFFFFF` |  |
 | `--dg-checkbox-border` | `#5A5D63` | `#B4B7BD` |  |
-| `--dg-checkbox-selected-bg` | `#3574F0` | `#3574F0` |  |
 | `--dg-checkbox-check` | `#FFFFFF` | `#FFFFFF` |  |
-| `--dg-toggle-on-bg` | `#3871E1` | `#3871E1` |  |
 | `--dg-toggle-off-bg` | `#FFFFFF3B` | `#0000002E` |  |
 | `--dg-chip-bg` | `#26282C` | `#FFFFFF` | filter chip |
 | `--dg-chip-border` | `#40434A` | `#D1D3D9` |  |
-| `--dg-chip-active-bg` | `#233558` | `#E3EBFE` |  |
-| `--dg-chip-active-border` | `#2E4D89` | `#A9C2F7` |  |
 | `--dg-kbd-bg` | `#FFFFFF12` | `#0000000A` | keycap in menus, palette, empty states |
 | `--dg-kbd-border` | `#FFFFFF1F` | `#0000001F` |  |
 | `--dg-kbd-fg` | `#9FA2A8` | `#5F6269` |  |
@@ -258,8 +231,7 @@ Values are `#RRGGBB` or `#RRGGBBAA`. Metrics, motion and font tokens are in the 
 | `--dg-popup-bg` | `#26282C` | `#FFFFFF` |  |
 | `--dg-popup-border` | `#33353B` | `#D1D3D9` |  |
 | `--dg-popup-shadow` | `0 8px 24px #00000066, 0 0 0 1px #00000033` | `0 8px 24px #00000026, 0 0 0 1px #0000000F` |  |
-| `--dg-menu-accelerator-fg` | `#73767C` | `#73767C` |  |
-| `--dg-match-fg` | `#538AF9` | `#2E62C9` | matched characters in palette / speed search |
+| `--dg-menu-accelerator-fg` | `var(--dg-text-secondary)` | `var(--dg-text-secondary)` |  |
 | `--dg-tooltip-bg` | `#33353B` | `#FFFFFF` |  |
 | `--dg-tooltip-fg` | `#D1D3D9` | `#000000` |  |
 | `--dg-scrim` | `#0000008C` | `#00000052` | behind modal dialogs |
@@ -278,18 +250,6 @@ Values are `#RRGGBB` or `#RRGGBBAA`. Metrics, motion and font tokens are in the 
 |---|---|---|---|
 | `--dg-notification-bg` | `#33353B` | `#FFFFFF` |  |
 | `--dg-notification-fg` | `#D1D3D9` | `#000000` |  |
-| `--dg-banner-info-bg` | `#233558` | `#F7F8FF` |  |
-| `--dg-banner-info-border` | `#2E4D89` | `#BDD3FF` |  |
-| `--dg-banner-error-bg` | `#56272B` | `#FFF6F5` |  |
-| `--dg-banner-error-border` | `#80383E` | `#FFC4C5` |  |
-| `--dg-banner-warning-bg` | `#44321D` | `#FFF6E9` |  |
-| `--dg-banner-warning-border` | `#694820` | `#F4CD9A` |  |
-| `--dg-banner-success-bg` | `#203B2A` | `#F5FAF3` |  |
-| `--dg-banner-success-border` | `#29583C` | `#BBDBC2` |  |
-| `--dg-error` | `#C54E58` | `#E4656E` |  |
-| `--dg-warning` | `#A56906` | `#C27D04` |  |
-| `--dg-success` | `#338555` | `#4E9D6C` |  |
-| `--dg-progress-fg` | `#3871E1` | `#3871E1` |  |
 | `--dg-progress-track` | `#40434A` | `#D1D3D9` |  |
 | `--dg-icon` | `#C3C5CB` | `#6C707E` |  |
 | `--dg-icon-secondary` | `#868A91` | `#818594` |  |
@@ -317,16 +277,16 @@ Values are `#RRGGBB` or `#RRGGBBAA`. Metrics, motion and font tokens are in the 
 
 | Token | Dark | Light | Use |
 |---|---|---|---|
-| `--dg-lane-0` | `#5A9CF8` | `#2F6FDB` | blue   - reserved first for the lane that holds HEAD |
-| `--dg-lane-1` | `#3FBA8C` | `#1C9468` | jade |
-| `--dg-lane-2` | `#E6A94B` | `#B97A12` | amber |
-| `--dg-lane-3` | `#C27BE0` | `#9B4DC0` | orchid |
-| `--dg-lane-4` | `#E5707E` | `#C9435A` | rose |
-| `--dg-lane-5` | `#4CC3D4` | `#1A93A8` | cyan |
-| `--dg-lane-6` | `#A7C35A` | `#6F8F1E` | lime |
-| `--dg-lane-7` | `#F08C5A` | `#C9602A` | tangerine |
-| `--dg-lane-8` | `#8E95F2` | `#5A61D6` | periwinkle |
-| `--dg-lane-9` | `#D97BB8` | `#B14A8F` | pink |
+| `--dg-lane-0` | `#4C8DFF` | `#2563F5` | blue   - reserved first for the lane that holds HEAD |
+| `--dg-lane-1` | `#2FE08A` | `#0B9454` | jade |
+| `--dg-lane-2` | `#FFB52E` | `#AD6700` | amber |
+| `--dg-lane-3` | `#D65CFF` | `#BF2FE0` | orchid |
+| `--dg-lane-4` | `#FF5F7A` | `#E83A58` | rose |
+| `--dg-lane-5` | `#22D8EE` | `#07829C` | cyan |
+| `--dg-lane-6` | `#B6F03A` | `#5A8400` | lime |
+| `--dg-lane-7` | `#FF8A33` | `#CC5A06` | tangerine |
+| `--dg-lane-8` | `#8F8CFF` | `#5B57E8` | periwinkle |
+| `--dg-lane-9` | `#FF63B4` | `#E0287F` | pink |
 | `--dg-lane-dim-opacity` | `0.32` | `0.28` | lanes not on the selected commit's path when "highlight path" is on |
 | `--dg-graph-node-stroke` | `#191A1C` | `#FFFFFF` | 1.5px ring that cuts the node out of the edges |
 | `--dg-graph-head-ring` | `#D1D3D9` | `#000000` | outer ring of HEAD node |
@@ -338,77 +298,24 @@ Values are `#RRGGBB` or `#RRGGBBAA`. Metrics, motion and font tokens are in the 
 
 #### Ref pills
 
-| Token | Dark | Light | Use |
-|---|---|---|---|
-| `--dg-ref-head-bg` | `#3871E1` | `#3871E1` | "HEAD" pill and current branch pill outline |
-| `--dg-ref-head-fg` | `#FFFFFF` | `#FFFFFF` |  |
-| `--dg-ref-local-bg` | `#24392C` | `#E7F4EA` |  |
-| `--dg-ref-local-border` | `#35573F` | `#B5DCC0` |  |
-| `--dg-ref-local-fg` | `#8FD19E` | `#1F6E3A` |  |
-| `--dg-ref-local-current-bg` | `#2E5A3C` | `#CDEBD5` | current branch: brighter bg + bold text |
-| `--dg-ref-remote-bg` | `#322D45` | `#EFEBFB` |  |
-| `--dg-ref-remote-border` | `#4A416A` | `#CFC4F2` |  |
-| `--dg-ref-remote-fg` | `#B9A6F2` | `#5B45A8` |  |
-| `--dg-ref-tag-bg` | `#3D3220` | `#FBF2DE` |  |
-| `--dg-ref-tag-border` | `#614D27` | `#EBD39B` |  |
-| `--dg-ref-tag-fg` | `#E7C27A` | `#855C0A` |  |
-| `--dg-ref-stash-bg` | `#2B3540` | `#EAF1F8` |  |
-| `--dg-ref-stash-border` | `#3F4F60` | `#C5D6E8` |  |
-| `--dg-ref-stash-fg` | `#9DB7D2` | `#3E6286` |  |
-| `--dg-ref-overflow-bg` | `#33353B` | `#EBECF0` | "+3" pill |
-| `--dg-ref-overflow-fg` | `#9FA2A8` | `#5F6269` |  |
+All tokens of this group are aliases of the colour system: see 4.4.
 
 #### Ahead / behind / dirty
 
 | Token | Dark | Light | Use |
 |---|---|---|---|
-| `--dg-ahead-fg` | `#6DB083` | `#338555` | "up 2" (commits to push) |
-| `--dg-behind-fg` | `#71A1FE` | `#2E62C9` | "down 5" (commits to pull) |
-| `--dg-diverged-fg` | `#E6A94B` | `#A56906` | both ahead and behind |
-| `--dg-badge-bg` | `#FFFFFF0F` | `#0000000A` |  |
-| `--dg-dirty-dot` | `#E6A94B` | `#C27D04` | working tree has changes |
-| `--dg-conflict-dot` | `#F57E84` | `#E4656E` | merge/rebase in progress or conflicts |
 | `--dg-clean-dot` | `#4C4F56` | `#B4B7BD` | clean (hollow ring) |
-| `--dg-fetch-fresh` | `#6DB083` | `#4E9D6C` | fetch age ring: < 15 min |
-| `--dg-fetch-aging` | `#D59637` | `#C27D04` | 15 min - 2 h |
-| `--dg-fetch-stale` | `#F57E84` | `#E4656E` | > 2 h or never |
 
 #### File status (letter colour; file name uses the same colour)
 
-| Token | Dark | Light | Use |
-|---|---|---|---|
-| `--dg-status-added` | `#73BD79` | `#2F8A3B` | A |
-| `--dg-status-modified` | `#70AEFF` | `#2C67D9` | M |
-| `--dg-status-deleted` | `#F07A82` | `#C94A55` | D (file name also struck through) |
-| `--dg-status-renamed` | `#3FB4C6` | `#13859B` | R |
-| `--dg-status-copied` | `#A98EDB` | `#7A57C2` | C |
-| `--dg-status-conflict` | `#F0954A` | `#C25A10` | U |
-| `--dg-status-untracked` | `#D1675A` | `#B3432F` | ? |
-| `--dg-status-ignored` | `#848504` | `#8C8C00` | ! |
-| `--dg-status-typechange` | `#B3AE60` | `#8A7A0E` | T |
+All tokens of this group are aliases of the colour system: see 4.4.
 
 #### Diff
 
 | Token | Dark | Light | Use |
 |---|---|---|---|
-| `--dg-diff-added-bg` | `#1F3527` | `#E9F7EA` | whole added line |
-| `--dg-diff-added-word-bg` | `#2F5A3B` | `#BEE6BE` | changed characters inside an added line |
-| `--dg-diff-added-gutter-bg` | `#213A2A` | `#DDF1DE` |  |
-| `--dg-diff-added-marker` | `#549159` | `#7FC784` | +, gutter bar, scroll ruler |
-| `--dg-diff-removed-bg` | `#3A2427` | `#FCECEC` |  |
-| `--dg-diff-removed-word-bg` | `#6A3238` | `#F6C3C5` |  |
-| `--dg-diff-removed-gutter-bg` | `#3E2629` | `#F8E0E0` |  |
-| `--dg-diff-removed-marker` | `#C75450` | `#E57373` |  |
-| `--dg-diff-modified-bg` | `#22314D` | `#EAF1FD` | side-by-side: line exists on both sides but differs |
-| `--dg-diff-modified-word-bg` | `#304B7D` | `#C2D8F2` |  |
-| `--dg-diff-modified-marker` | `#375FAD` | `#88ADF7` |  |
-| `--dg-diff-conflict-bg` | `#3D3220` | `#FFF1D6` |  |
-| `--dg-diff-conflict-marker` | `#D59637` | `#E0A030` |  |
 | `--dg-diff-filler-bg` | `#1D1E21` | `#F7F8F9` | empty side in side-by-side, drawn with hatch |
 | `--dg-diff-filler-hatch` | `#FFFFFF08` | `#0000000A` |  |
-| `--dg-diff-hunk-header-bg` | `#1F2A3D` | `#EEF3FC` | "@@ -12,7 +12,9 @@ fn main" row |
-| `--dg-diff-hunk-header-fg` | `#7A9CCF` | `#4A6CA8` |  |
-| `--dg-diff-hunk-active-border` | `#3871E1` | `#3871E1` | left 2px bar on the focused hunk |
 | `--dg-diff-connector` | `#FFFFFF0D` | `#0000000A` | band between the two sides |
 
 #### Avatars (initials). Colour = palette[hash(lower(email)) % 12]. Text is #FFFFFF at 600.
@@ -433,16 +340,10 @@ Values are `#RRGGBB` or `#RRGGBBAA`. Metrics, motion and font tokens are in the 
 
 | Token | Dark | Light | Use |
 |---|---|---|---|
-| `--dg-log-date-header-fg` | `#73767C` | `#73767C` | sticky "Today", "Yesterday" rows |
+| `--dg-log-date-header-fg` | `var(--dg-text-secondary)` | `var(--dg-text-secondary)` | sticky "Today", "Yesterday" rows |
 | `--dg-log-date-header-bg` | `#191A1C` | `#FFFFFF` |  |
-| `--dg-log-hash-fg` | `#73767C` | `#818594` |  |
+| `--dg-log-hash-fg` | `var(--dg-text-secondary)` | `var(--dg-text-secondary)` |  |
 | `--dg-log-unreachable-fg` | `#73767C` | `#9FA2A8` | commits not reachable from a visible ref (filtered context) |
-| `--dg-log-match-bg` | `#BA975233` | `#F2C55C55` | text filter match highlight in subject |
-| `--dg-log-match-fg` | `#F2C55C` | `#6B4E00` |  |
-| `--dg-ruler-head` | `#3871E1` | `#3871E1` |  |
-| `--dg-ruler-branch` | `#6DB083` | `#4E9D6C` |  |
-| `--dg-ruler-tag` | `#E7C27A` | `#C9A03A` |  |
-| `--dg-ruler-match` | `#F2C55C` | `#E0A800` |  |
 | `--dg-ruler-selection` | `#D1D3D9` | `#000000` |  |
 
 #### Branch Matrix (synchronous branch control)
@@ -451,12 +352,7 @@ Values are `#RRGGBB` or `#RRGGBBAA`. Metrics, motion and font tokens are in the 
 |---|---|---|---|
 | `--dg-matrix-cell-bg` | `#1F2024` | `#F7F8F9` |  |
 | `--dg-matrix-cell-hover-bg` | `#26282C` | `#EBECF0` |  |
-| `--dg-matrix-current` | `#5A9CF8` | `#2F6FDB` | filled dot: branch is checked out |
-| `--dg-matrix-local` | `#9FA2A8` | `#5F6269` | hollow dot: local branch exists |
-| `--dg-matrix-remote-only` | `#4C4F56` | `#B4B7BD` | dashed ring: only origin/<branch> exists |
 | `--dg-matrix-missing` | `#33353B` | `#DFE1E5` | dash: branch not in this repo |
-| `--dg-matrix-column-selected-bg` | `#233558` | `#E3EBFE` |  |
-| `--dg-matrix-sweep` | `#3871E1` | `#3871E1` | progress sweep line while a batch operation runs |
 
 #### Git console
 
@@ -464,12 +360,72 @@ Values are `#RRGGBB` or `#RRGGBBAA`. Metrics, motion and font tokens are in the 
 |---|---|---|---|
 | `--dg-console-bg` | `#191A1C` | `#FFFFFF` |  |
 | `--dg-console-fg` | `#BCBEC4` | `#080808` |  |
-| `--dg-console-prompt` | `#6AAB73` | `#067D17` | "$" and the command |
 | `--dg-console-repo` | `#9FA2A8` | `#5F6269` | "[api-gateway]" prefix |
-| `--dg-console-stderr` | `#D59637` | `#A56906` | git writes progress to stderr: not an error |
-| `--dg-console-error` | `#F75464` | `#C94A55` | non-zero exit |
-| `--dg-console-duration` | `#73767C` | `#9FA2A8` |  |
+| `--dg-console-duration` | `var(--dg-text-secondary)` | `var(--dg-text-secondary)` |  |
 
+
+### 4.4 Colour system v2
+
+**Idea.** The DataGrip look: calm JetBrains Islands surfaces, and saturated, electric hues laid over them as low-alpha washes. Colour always means something: selection and focus, a ref kind, a file state, a result. Repositories and projects never get a colour (4.1 rule 1).
+
+**Where it lives.** `tokens.css` holds the neutral base (surfaces, text, neutral controls, editor, avatars, metrics). `colors.css` holds every colour that carries meaning: seven hue families, and every semantic token (selection, ref pills, file status, diff, merge, banners, toasts, ahead/behind, matrix, console) as an alias of a family token. Feature CSS uses these tokens only. It never writes a hex value (`colors.test.ts` checks this).
+
+**Tokens of a family `<fam>`.**
+
+| Token | What it is | Use |
+|---|---|---|
+| `--dg-<fam>` | vivid solid, 3:1 or more on every surface | dots, icons, lines, left edges, rings, the source of the washes |
+| `--dg-<fam>-fill` | deeper solid, white text on it is 4.5:1 or more | filled controls: primary and danger buttons, HEAD pill, Push |
+| `--dg-<fam>-fg` | text colour, 4.5:1 or more on every surface and on its own washes | coloured text: status letters and names, pill text, links |
+| `--dg-<fam>-wash-soft` | `color-mix(in srgb, <solid> soft%, transparent)` | hover, quiet highlights (a conflicted row) |
+| `--dg-<fam>-wash` | the same with the normal strength | badges, pills, banners, unfocused selection, tonal buttons |
+| `--dg-<fam>-wash-strong` | the same with the strong strength | focused selection, active states, current branch, operation banner |
+| `--dg-<fam>-border` | the same at the border strength | 1 px edge of a washed element |
+
+The washes are transparent, so they work on every surface. Where an opaque colour is needed (diff lines under a sticky gutter, merge chunks, toasts, the title bar glow) the same solid is mixed into the surface: `color-mix(in srgb, <solid> N%, <surface>)`.
+
+**Palette.**
+
+| Family | Means | Dark solid / fill / fg | Light solid / fill / fg |
+|---|---|---|---|
+| accent (electric blue) | selection, focus, active tab, primary action, behind, renamed, modified merge chunk, progress | `#4A86FF` / `#2862EB` / `#A8C8FF` | `#2563F5` / `#2563F5` / `#1442B8` |
+| success (green) | added, ahead, current branch, local branch pill, success, fresh fetch, Push | `#2ED98A` / `#147D49` / `#7DF0BC` | `#07844A` / `#0B7D46` / `#055C34` |
+| warning (amber) | modified, tags, warnings, text-filter match, diverged, aging fetch, dirty tree | `#FFB224` / `#9A6100` / `#FFCF6E` | `#AD6600` / `#A85F00` / `#724300` |
+| danger (coral red) | deleted, conflicts, errors, failed commands, stale fetch | `#FF5C6C` / `#D4364A` / `#FFA3AD` | `#DC2F45` / `#D02A40` / `#961628` |
+| info (cyan) | information, untracked, stashes, hunk headers, git command text, the progress gradient end | `#22D3EE` / `#0B7F94` / `#7AE6F7` | `#06819D` / `#087C96` / `#055769` |
+| special (violet) | remote branches, only-on-origin, merge / rebase / cherry-pick in progress, type change | `#B57BFF` / `#7C4DE0` / `#DEC4FF` | `#8B45F2` / `#7A35E0` / `#5C20B8` |
+| neutral (grey) | counters, repo chip, "+3" pill, ignored, deleted merge chunk | `#8E939E` / `#5B6070` / `#C3C7CF` | `#6E7382` / `#5B6070` / `#474C59` |
+
+**Wash strengths** (`--dg-wash-*-a`, per theme; light needs less to look as strong).
+
+| Strength | Dark | Light |
+|---|---|---|
+| soft | 8 % | 6 % |
+| normal | 16 % | 11 % |
+| strong | 24 % | 18 % |
+| border | 45 % | 40 % |
+| diff line / gutter / word | 13 / 19 / 30 % | 12 / 18 / 30 % |
+| merge chunk / changed word | 17 / 18 % | 15 / 24 % |
+| title bar glow accent / violet, status bar glow | 18 / 10 / 10 % | 16 / 10 / 10 % |
+
+**Rules.**
+
+1. **Selection.** A selected row is `--dg-selection-bg` (accent strong wash) with a 2 px `--dg-selection-edge` bar at the left when its list has the focus, and `--dg-selection-inactive-bg` (accent wash, no bar) when it has not. Hover is `--dg-row-hover-bg` (accent soft wash). Logs, trees, Local changes, the matrix, Search Everywhere, menus, selects, the branch popup, the conflicts table and the Settings section list all do this.
+2. **Active tab.** `--dg-tab-active-bg` (accent wash), `--dg-tab-active-fg` text and a 2 px `--dg-selection-edge` underline: Log / Local changes, Changed files / File changes, Git console / Branch matrix, the Search Everywhere tabs. Toggled icon buttons and tool stripe buttons: accent strong wash, accent text, 1 px accent border. A selected matrix column: accent wash down the column and an accent underline on its header.
+3. **Focus ring.** `--dg-focus-ring` is the accent solid.
+4. **Ref pills.** HEAD: accent fill, white text. Local branch: success wash, fg and border (current branch: the strong wash and bold). Remote branch: special. Tag: warning. Stash: info. "+3": neutral.
+5. **Ahead and behind.** Ahead is green (`--dg-ahead-*`, success), behind is blue (`--dg-behind-*`, accent), both is amber (`--dg-diverged-*`, warning wash and border). The same capsule everywhere: sidebar, sync strip, matrix, status bar, branch popup, Search Everywhere. Push with commits to push: a success wash on the title bar button.
+6. **File status.** Letter and file name in `--dg-status-*`: added success, modified warning, deleted danger (and struck through), renamed and copied accent, untracked info, conflicted danger (and the row gets a danger soft wash, a strong one when selected), type change special, ignored neutral. The same in Changed files, Local changes, the diff header, Search Everywhere, the conflicts dialog and the merge window title. The name keeps its colour on a selected row.
+7. **Diff.** Added lines are success, removed lines are danger, modified lines (side by side) are accent; the changed words are the stronger mix of the same family. Hunk headers are an info wash with info text and a 1 px info edge. Merge window chunks: conflict danger, modified accent, inserted success, deleted neutral; changed words in a chunk are its marker at `--dg-merge-word-a`.
+8. **Banners.** An operation in progress (merge, rebase, cherry-pick, revert) is the special strong wash with a special border and a 3 px special bar at the left. Errors are the danger wash, warnings the warning wash, done states the success wash, information the info wash, each with its border and a 3 px bar.
+9. **Toasts.** The toast surface with its family mixed in (`--dg-toast-<kind>-bg`), a 1 px family border, a 3 px family bar at the left and the icon in the family fg: success, info, warning, error.
+10. **Console.** The command and `$` are info fg. Exit 0 is success fg. The line of a failed command has a danger wash and a 2 px danger bar; its stderr is danger fg. stderr of a command that worked stays warning fg (git writes progress there).
+11. **Buttons.** Primary: accent fill. Danger: danger fill. Tonal (`variant="tonal"` / `"tonal-danger"`): the wash, the fg and the border of accent or danger. The git command preview in dialogs is an info wash with an info bar.
+12. **Glow.** The title bar is a gradient from `--dg-toolbar-tint` (accent mixed into the window colour) through `--dg-toolbar-tint-2` (violet) to the plain bar at 72 %. The status bar has a weaker accent glow at the left. Dialogs and Search Everywhere have a soft accent wash at the top (`--dg-dialog-glow`). The Welcome screen has an accent glow behind the logo and a violet one in a corner; its cards each get a family (accent, success, special, info) for the top edge and the icon tile.
+13. **Text on a wash.** Muted and secondary text is too weak on a coloured wash. Inside a selected row, a banner, a toast, the command preview and an active tab, `colors.css` section 4 sets them to `--dg-text-muted-on-wash`.
+14. **Motion.** The colour system adds no transition of its own. Existing transitions keep their `prefers-reduced-motion` rules.
+
+**Contrast guarantee** (`src/theme/colors.test.ts`). The test reads the real `tokens.css`, `extra.css` and `colors.css`, resolves `var()` and `color-mix` like the browser, and checks both themes: every `*-fg` on every surface (window, island, panel, raised, popup, dialog, console, editor), plain and under each wash of its family, on a hovered row and on both selected-row backgrounds, and as a pill on a selected row (4.5:1); body and on-wash text on every wash (4.5:1); family solids, lanes, the focus ring and the selection edge (3:1); white on every fill, the primary and danger buttons, Push, HEAD and the project badge (4.5:1); ref pills, ahead/behind, file status, diff and merge lines and words, toasts, banners, console lines, the title bar and status bar glow. It also fails when a stylesheet or a component uses a token that is not defined, and when feature CSS has a hex colour.
 
 ---
 
@@ -480,12 +436,12 @@ States use these tokens unless a component says something different:
 | State | Background | Text / icon | Other |
 |---|---|---|---|
 | Default | transparent | `--dg-text` / `--dg-icon` | — |
-| Hover (row) | `--dg-row-hover-bg` | unchanged | No transition. |
+| Hover (row) | `--dg-row-hover-bg` (accent soft wash) | unchanged | No transition. |
 | Hover (button, icon button) | `--dg-hover-bg` | unchanged | — |
 | Pressed | `--dg-pressed-bg` | unchanged | — |
-| Selected, component focused | `--dg-selection-bg` | `--dg-selection-fg` | — |
-| Selected, component not focused | `--dg-selection-inactive-bg` | `--dg-selection-fg` | — |
-| Toggled on (icon button) | `--dg-toolbar-selected-bg` | `#FFFFFF` icon | — |
+| Selected, component focused | `--dg-selection-bg` (accent strong wash) | `--dg-selection-fg` | 2 px `--dg-selection-edge` bar at the left (4.4 rule 1). |
+| Selected, component not focused | `--dg-selection-inactive-bg` (accent wash) | `--dg-selection-fg` | No bar. |
+| Toggled on (icon button) | `--dg-toolbar-selected-bg` (accent strong wash) | `--dg-toolbar-selected-fg` icon | 1 px `--dg-accent-border`. |
 | Keyboard focus | unchanged | unchanged | 2 px ring `--dg-focus-ring`, offset 0 for inputs, inset for rows. Show only for keyboard focus (`:focus-visible`). |
 | Disabled | transparent | `--dg-text-disabled` / `--dg-icon-disabled` | No hover. Tooltip still explains why it is disabled. |
 
@@ -585,7 +541,7 @@ Chip spec: height 24, radius 12, padding 0 6 0 8, 12 text, 1 px inset ring `--dg
 #### Operation banner (34 px)
 
 1. Show one banner for each repo with a merge, rebase, cherry-pick, revert or bisect in progress.
-2. Margin 0 10 6, radius 6, warning colours (`--dg-banner-warning-*`). Use error colours when there are unresolved conflicts and the user tried to continue.
+2. Margin 0 10 6, radius 6, operation colours (`--dg-banner-operation-*`: the special strong wash, a 3 px special bar at the left). Use error colours when there are unresolved conflicts and the user tried to continue. A banner about repositories that could not be loaded uses the warning colours.
 3. Text: "**ledger-service**: rebase onto main is in progress. Step 3 of 7. 2 files have conflicts."
 4. Buttons (24 px, small): "Resolve conflicts" (primary, only when conflicts exist), "Continue", "Skip" (rebase only), "Abort".
 5. More than 2 banners collapse into one: "3 repos have an operation in progress." with "Show".
@@ -1097,7 +1053,7 @@ Show shortcuts in tooltips, menus and the palette. Use the keycap style (5.21).
 
 1. Set `data-theme="light"` on `<html>`. All tokens switch. No component needs light-specific CSS.
 2. Islands are white (`#FFFFFF`) on `#E9EAEE`.
-3. Graph lanes and status colours use darker values with 4.5:1 or more on white.
+3. Every family has its own light values (4.4): text colours have 4.5:1 or more and solids 3:1 or more on white, on `#F7F8F9` and on a selected row; the washes are a little weaker.
 4. Avatars keep the same colours in both themes, with white text.
 5. Follow the OS theme by default (`prefers-color-scheme`). The status bar switch and settings override it.
 
@@ -1120,8 +1076,8 @@ Removed. Repositories have no colour, so there is no spine. The **Repository** c
 1. Card: margin 10 12 2, padding 8 10, radius 8, `--dg-layer-1-bg`.
 2. Line 1: matrix icon, branch name (12/600, ellipsis), link "Matrix" (11) at the right.
 3. Line 2: 12 equal segments in a grid (gap 3, height 6, radius 2), one per repo in sidebar order.
-   - Branch is current in the repo: filled with `--dg-matrix-current`.
-   - Branch exists only on origin: 1 px inset ring in `--dg-matrix-local`, no fill.
+   - Branch is current in the repo: filled with `--dg-matrix-current` (green).
+   - Branch exists only on origin: 1 px inset ring in `--dg-matrix-remote-only` (violet), no fill.
    - Branch is local but not current: `--dg-matrix-current` at 40 %.
    - Branch is missing: `--dg-matrix-missing`.
 4. Line 3: a legend with counts: "3 current", "2 on origin", "7 missing" (11 secondary, with 8 × 6 swatches).
@@ -1135,9 +1091,9 @@ Removed. Repositories have no colour, so there is no spine. The **Repository** c
 2. Rows: repos (repository icon + name + current branch), 28 px high.
 3. Columns: branches that exist in 2 or more repos, sorted by number of repos, then by the newest commit date. Column width 120. Header: branch name rotated 0° (horizontal, ellipsis) with a repo count "7/12".
 4. Cell (28 × 120, `--dg-matrix-cell-bg`, hover `--dg-matrix-cell-hover-bg`) shows one glyph and the ahead/behind capsule against the column's base branch:
-   - Filled 8 px dot `--dg-matrix-current`: checked out.
+   - Filled 8 px dot `--dg-matrix-current` (green, with a soft green halo): checked out.
    - Hollow 8 px ring `--dg-matrix-local`: local branch exists.
-   - Dashed 8 px ring `--dg-matrix-remote-only`: only on origin.
+   - Dashed 8 px ring `--dg-matrix-remote-only` (violet): only on origin.
    - 8 px dash `--dg-matrix-missing`: not present.
    - Red dot `--dg-conflict-dot`: repo is mid-operation; operations skip it.
 5. Click a column header to select the column. The selected column has `--dg-matrix-column-selected-bg`.

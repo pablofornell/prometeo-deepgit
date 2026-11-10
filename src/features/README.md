@@ -43,6 +43,11 @@ feature. Cross-feature communication goes through `state/` (selection, layout, a
   px constant in TypeScript. Icon sizes (`<Icon size={14}>`) are px at the default font and scale on their own.
 - Repositories and projects have no colour of their own. Show a repository with `<RepoChip name={repo.name} />` (neutral badge) or
   `<RepoIcon />` plus the name. Lane colour: `laneColorVar(i)` (`i % 10` is done for you); use it for graph lanes only.
+- Colours that mean something come from the colour system (`src/theme/colors.css`, DESIGN.md 4.4): a family token
+  (`--dg-<accent|success|warning|danger|info|special|neutral>` solid, `-fill`, `-fg`, `-wash-soft`, `-wash`, `-wash-strong`,
+  `-border`) or one of its aliases (`--dg-selection-bg`, `--dg-status-*`, `--dg-ref-*`...). A selected row in a focused list gets
+  `--dg-selection-bg` and a 2 px `--dg-selection-edge` bar at the left. `npx vitest run src/theme` checks the contrast and fails on
+  a hex colour in feature CSS.
 - No transitions on hover/selection (DESIGN.md section 7). Respect `prefers-reduced-motion` by using the `--dg-dur-*` tokens.
 
 ## State (`src/state/`)

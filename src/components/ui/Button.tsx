@@ -4,8 +4,8 @@ import type { IconName } from "./icons";
 import { tip } from "./Tooltip";
 
 export interface ButtonProps extends Omit<JSX.ButtonHTMLAttributes<HTMLButtonElement>, "title"> {
-  /** default = outlined, primary = accent fill, danger = red fill, ghost = no border. */
-  variant?: "default" | "primary" | "danger" | "ghost";
+  /** default = outlined, primary = accent fill, danger = red fill, ghost = no border, tonal / tonal-danger = accent / red wash. */
+  variant?: "default" | "primary" | "danger" | "ghost" | "tonal" | "tonal-danger";
   /** "small" is 24 px high (banners, inline). Default 28 px. */
   size?: "normal" | "small";
   icon?: IconName;

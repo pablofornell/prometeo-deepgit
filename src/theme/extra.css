@@ -4,8 +4,6 @@
  */
 :root {
   --dg-window-close-hover: #C42B1C;            /* DESIGN.md 2.4: close button hover, both themes */
-  --dg-project-badge-from: #3E7BD9;            /* project badge gradient (mockup) */
-  --dg-project-badge-to: #8A5CD6;
   --dg-on-badge: #FFFFFF;
   --dg-matrix-row-height: round(calc(28 * var(--dg-u)), 1px);                /* DESIGN.md 11.2: branch matrix row, column, action bar */
   --dg-matrix-col-width: round(calc(120 * var(--dg-u)), 1px);
@@ -25,10 +23,4 @@
   --dg-font-size-subject: round(calc(15 * var(--dg-u)), 1px);     /* commit subject in the details panel */
   --dg-font-size-body: calc(12.5 * var(--dg-u));                    /* commit body in the details panel */
   --dg-font-size-mono-small: calc(var(--dg-font-size-mono) - 0.5px); /* hashes in rows, command ticker */
-  --dg-seg-selected-bg: var(--dg-toolbar-selected-bg);   /* SegmentedControl selected item */
-  --dg-seg-selected-fg: var(--dg-text-over-accent);
-}
-/* light: toolbar-selected-bg is a pale blue, white text on it is washed out; use the accent (white on it is 4.6:1) */
-:root[data-theme="light"] {
-  --dg-seg-selected-bg: var(--dg-accent);
 }

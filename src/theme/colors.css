@@ -1,21 +1,271 @@
 /*
- * Electric colour layer. Loaded after tokens.css and extra.css; overrides the accent, ref pills and lane
- * colours with a more vivid set.
+ * Colour system v2 (docs/design/DESIGN.md 4.4). Loaded after tokens.css and extra.css.
  *
- * The calm Islands base (backgrounds, text) stays in tokens.css. Colour comes from accents and lanes.
- * src/theme/colors.test.ts reads this file and checks WCAG contrast in both themes. Change a value, run `npx vitest run`.
+ * tokens.css keeps the calm Islands base: surfaces, text, neutral controls, metrics. This file owns every
+ * colour that carries meaning. There is one palette of seven hue families, and every coloured thing in the
+ * app is an alias of a family token, so a state has the same colour in every view.
+ *
+ * A family `<fam>` (accent, success, warning, danger, info, special, neutral) has:
+ *   --dg-<fam>              vivid solid: icons, dots, lines, edges, and the source of the washes (>= 3:1 on surfaces)
+ *   --dg-<fam>-fill         deeper solid for filled controls with white text (>= 4.5:1 with --dg-text-over-accent)
+ *   --dg-<fam>-fg           text on a surface or on a wash of the same family (>= 4.5:1)
+ *   --dg-<fam>-wash-soft    faint wash: hover, quiet highlights
+ *   --dg-<fam>-wash         normal wash: badges, pills, banners, unfocused selection
+ *   --dg-<fam>-wash-strong  strong wash: focused selection, active states, current branch
+ *   --dg-<fam>-border       edge of a washed element
+ * The washes are `color-mix(in srgb, <solid> N%, transparent)`, so they sit on any surface. Where an opaque
+ * colour is needed (diff lines under a sticky gutter, toasts), the same solid is mixed into the surface.
+ *
+ * Feature CSS uses these tokens or the aliases below. It never writes a hex value.
+ * src/theme/colors.test.ts parses this file and tokens.css and checks WCAG contrast in both themes.
+ * Change a value, run `npx vitest run src/theme`.
  */
 
+/* =====================================================================================
+ * 1. Derived tokens and aliases (the same formulas in both themes)
+ * ===================================================================================== */
+:root {
+  /* ---- washes and borders ---- */
+  --dg-accent-wash-soft: color-mix(in srgb, var(--dg-accent) var(--dg-wash-soft-a), transparent);
+  --dg-accent-wash: color-mix(in srgb, var(--dg-accent) var(--dg-wash-a), transparent);
+  --dg-accent-wash-strong: color-mix(in srgb, var(--dg-accent) var(--dg-wash-strong-a), transparent);
+  --dg-accent-border: color-mix(in srgb, var(--dg-accent) var(--dg-wash-border-a), transparent);
+  --dg-success-wash-soft: color-mix(in srgb, var(--dg-success) var(--dg-wash-soft-a), transparent);
+  --dg-success-wash: color-mix(in srgb, var(--dg-success) var(--dg-wash-a), transparent);
+  --dg-success-wash-strong: color-mix(in srgb, var(--dg-success) var(--dg-wash-strong-a), transparent);
+  --dg-success-border: color-mix(in srgb, var(--dg-success) var(--dg-wash-border-a), transparent);
+  --dg-warning-wash-soft: color-mix(in srgb, var(--dg-warning) var(--dg-wash-soft-a), transparent);
+  --dg-warning-wash: color-mix(in srgb, var(--dg-warning) var(--dg-wash-a), transparent);
+  --dg-warning-wash-strong: color-mix(in srgb, var(--dg-warning) var(--dg-wash-strong-a), transparent);
+  --dg-warning-border: color-mix(in srgb, var(--dg-warning) var(--dg-wash-border-a), transparent);
+  --dg-danger-wash-soft: color-mix(in srgb, var(--dg-danger) var(--dg-wash-soft-a), transparent);
+  --dg-danger-wash: color-mix(in srgb, var(--dg-danger) var(--dg-wash-a), transparent);
+  --dg-danger-wash-strong: color-mix(in srgb, var(--dg-danger) var(--dg-wash-strong-a), transparent);
+  --dg-danger-border: color-mix(in srgb, var(--dg-danger) var(--dg-wash-border-a), transparent);
+  --dg-info-wash-soft: color-mix(in srgb, var(--dg-info) var(--dg-wash-soft-a), transparent);
+  --dg-info-wash: color-mix(in srgb, var(--dg-info) var(--dg-wash-a), transparent);
+  --dg-info-wash-strong: color-mix(in srgb, var(--dg-info) var(--dg-wash-strong-a), transparent);
+  --dg-info-border: color-mix(in srgb, var(--dg-info) var(--dg-wash-border-a), transparent);
+  --dg-special-wash-soft: color-mix(in srgb, var(--dg-special) var(--dg-wash-soft-a), transparent);
+  --dg-special-wash: color-mix(in srgb, var(--dg-special) var(--dg-wash-a), transparent);
+  --dg-special-wash-strong: color-mix(in srgb, var(--dg-special) var(--dg-wash-strong-a), transparent);
+  --dg-special-border: color-mix(in srgb, var(--dg-special) var(--dg-wash-border-a), transparent);
+  --dg-neutral-wash-soft: color-mix(in srgb, var(--dg-neutral) var(--dg-wash-soft-a), transparent);
+  --dg-neutral-wash: color-mix(in srgb, var(--dg-neutral) var(--dg-wash-a), transparent);
+  --dg-neutral-wash-strong: color-mix(in srgb, var(--dg-neutral) var(--dg-wash-strong-a), transparent);
+  --dg-neutral-border: color-mix(in srgb, var(--dg-neutral) var(--dg-wash-border-a), transparent);
+
+  /* ---- text ---- */
+  --dg-text-error: var(--dg-danger-fg);
+  --dg-text-warning: var(--dg-warning-fg);
+  --dg-text-success: var(--dg-success-fg);
+  --dg-text-link: var(--dg-accent-fg);
+  --dg-match-fg: var(--dg-accent-fg);                 /* matched characters in palette / speed search */
+  --dg-error: var(--dg-danger);                       /* old name of the danger solid */
+
+  /* ---- selection, hover, focus, active ---- */
+  --dg-focus-ring: var(--dg-accent);
+  --dg-row-hover-bg: var(--dg-accent-wash-soft);      /* tree / list / log row hover */
+  --dg-selection-bg: var(--dg-accent-wash-strong);    /* selected row, the list has the focus */
+  --dg-selection-inactive-bg: var(--dg-accent-wash);  /* selected row, the list has no focus */
+  --dg-selection-muted-bg: var(--dg-accent-wash);     /* open console entry, quiet active rows */
+  --dg-selection-edge: var(--dg-accent);              /* 2 px bar at the left of a focused selected row, underline of an active tab */
+  --dg-selection-fg: var(--dg-text);
+  --dg-toolbar-selected-bg: var(--dg-accent-wash-strong);   /* toggled icon button */
+  --dg-toolbar-selected-fg: var(--dg-accent-fg);
+  --dg-stripe-button-selected-bg: var(--dg-accent-wash-strong);
+  --dg-stripe-button-selected-fg: var(--dg-accent-fg);
+  --dg-seg-selected-bg: var(--dg-accent-wash-strong);       /* SegmentedControl selected item */
+  --dg-seg-selected-fg: var(--dg-accent-fg);
+  --dg-chip-active-bg: var(--dg-accent-wash);               /* filter chip that is on */
+  --dg-chip-active-border: var(--dg-accent-border);
+  --dg-tab-active-bg: var(--dg-accent-wash);                /* active tab (Log / Changes, palette tabs): wash + selection-edge underline */
+  --dg-tab-active-fg: var(--dg-accent-fg);
+  --dg-dialog-glow: var(--dg-accent-wash-soft);             /* top of dialogs and Search Everywhere */
+
+  /* ---- title bar and status bar glow ---- */
+  --dg-toolbar-tint: color-mix(in srgb, var(--dg-accent) var(--dg-toolbar-tint-a), var(--dg-window-bg));
+  --dg-toolbar-tint-2: color-mix(in srgb, var(--dg-special) var(--dg-toolbar-tint-2-a), var(--dg-window-bg));
+  --dg-statusbar-tint: color-mix(in srgb, var(--dg-accent) var(--dg-statusbar-tint-a), var(--dg-window-bg));
+  --dg-project-badge-from: var(--dg-accent-fill);           /* project badge gradient (white initials on it) */
+  --dg-project-badge-to: var(--dg-special-fill);
+
+  /* ---- controls ---- */
+  --dg-button-primary-bg: var(--dg-accent-fill);
+  --dg-button-primary-fg: var(--dg-text-over-accent);
+  --dg-button-danger-bg: var(--dg-danger-fill);
+  --dg-push-bg: var(--dg-success-fill);                     /* "Push" when commits are ahead */
+  --dg-input-focus-border: var(--dg-accent);
+  --dg-input-error-border: var(--dg-danger);
+  --dg-checkbox-selected-bg: var(--dg-accent-fill);
+  --dg-toggle-on-bg: var(--dg-accent-fill);
+  --dg-progress-fg: var(--dg-accent);
+  --dg-progress-fg-end: var(--dg-info);                     /* progress bars run from electric blue to cyan */
+  --dg-command-bg: var(--dg-info-wash);                     /* git command preview of a dialog */
+  --dg-command-border: var(--dg-info-border);
+  --dg-badge-bg: var(--dg-neutral-wash);                    /* neutral counter, repo chip */
+
+  /* ---- banners (inside an island) and toasts (floating, so opaque) ---- */
+  --dg-banner-info-bg: var(--dg-info-wash);
+  --dg-banner-info-border: var(--dg-info-border);
+  --dg-banner-error-bg: var(--dg-danger-wash);
+  --dg-banner-error-border: var(--dg-danger-border);
+  --dg-banner-warning-bg: var(--dg-warning-wash);
+  --dg-banner-warning-border: var(--dg-warning-border);
+  --dg-banner-success-bg: var(--dg-success-wash);
+  --dg-banner-success-border: var(--dg-success-border);
+  --dg-banner-operation-bg: var(--dg-special-wash-strong);  /* merge / rebase / cherry-pick in progress */
+  --dg-banner-operation-border: var(--dg-special-border);
+  --dg-banner-operation-fg: var(--dg-special-fg);
+  --dg-toast-info-bg: color-mix(in srgb, var(--dg-info) var(--dg-wash-a), var(--dg-notification-bg));
+  --dg-toast-success-bg: color-mix(in srgb, var(--dg-success) var(--dg-wash-a), var(--dg-notification-bg));
+  --dg-toast-warning-bg: color-mix(in srgb, var(--dg-warning) var(--dg-wash-a), var(--dg-notification-bg));
+  --dg-toast-error-bg: color-mix(in srgb, var(--dg-danger) var(--dg-wash-a), var(--dg-notification-bg));
+
+  /* ---- ref pills: HEAD accent fill, local green, remote violet, tag amber, stash cyan ---- */
+  --dg-ref-head-bg: var(--dg-accent-fill);
+  --dg-ref-head-fg: var(--dg-text-over-accent);
+  --dg-ref-local-bg: var(--dg-success-wash);
+  --dg-ref-local-border: var(--dg-success-border);
+  --dg-ref-local-fg: var(--dg-success-fg);
+  --dg-ref-local-current-bg: var(--dg-success-wash-strong);  /* current branch: stronger wash + bold text */
+  --dg-ref-remote-bg: var(--dg-special-wash);
+  --dg-ref-remote-border: var(--dg-special-border);
+  --dg-ref-remote-fg: var(--dg-special-fg);
+  --dg-ref-tag-bg: var(--dg-warning-wash);
+  --dg-ref-tag-border: var(--dg-warning-border);
+  --dg-ref-tag-fg: var(--dg-warning-fg);
+  --dg-ref-stash-bg: var(--dg-info-wash);
+  --dg-ref-stash-border: var(--dg-info-border);
+  --dg-ref-stash-fg: var(--dg-info-fg);
+  --dg-ref-overflow-bg: var(--dg-neutral-wash);              /* "+3" pill */
+  --dg-ref-overflow-fg: var(--dg-neutral-fg);
+
+  /* ---- ahead / behind / working tree state: ahead green, behind blue, both amber ---- */
+  --dg-ahead-fg: var(--dg-success-fg);
+  --dg-ahead-bg: var(--dg-success-wash);
+  --dg-behind-fg: var(--dg-accent-fg);
+  --dg-behind-bg: var(--dg-accent-wash);
+  --dg-diverged-fg: var(--dg-warning-fg);
+  --dg-diverged-bg: var(--dg-warning-wash);
+  --dg-diverged-border: var(--dg-warning-border);
+  --dg-dirty-dot: var(--dg-warning);                         /* working tree has changes */
+  --dg-conflict-dot: var(--dg-danger);                       /* operation in progress or conflicts */
+  --dg-fetch-fresh: var(--dg-success);                       /* fetch age ring: < 15 min */
+  --dg-fetch-aging: var(--dg-warning);                       /* 15 min - 2 h */
+  --dg-fetch-stale: var(--dg-danger);                        /* > 2 h, never, or the auto-fetch failed */
+
+  /* ---- file status: letter and file name ---- */
+  --dg-status-added: var(--dg-success-fg);        /* A */
+  --dg-status-modified: var(--dg-warning-fg);     /* M */
+  --dg-status-deleted: var(--dg-danger-fg);       /* D (file name also struck through) */
+  --dg-status-renamed: var(--dg-accent-fg);       /* R */
+  --dg-status-copied: var(--dg-accent-fg);        /* C */
+  --dg-status-conflict: var(--dg-danger-fg);      /* U (the row also gets a danger wash) */
+  --dg-status-untracked: var(--dg-info-fg);       /* ? */
+  --dg-status-ignored: var(--dg-neutral-fg);      /* ! */
+  --dg-status-typechange: var(--dg-special-fg);   /* T */
+
+  /* ---- diff: added green, removed red, modified blue; the word highlight is the stronger mix ---- */
+  --dg-diff-added-bg: color-mix(in srgb, var(--dg-success) var(--dg-diff-line-a), var(--dg-editor-bg));
+  --dg-diff-added-gutter-bg: color-mix(in srgb, var(--dg-success) var(--dg-diff-gutter-a), var(--dg-editor-bg));
+  --dg-diff-added-word-bg: color-mix(in srgb, var(--dg-success) var(--dg-diff-word-a), var(--dg-editor-bg));
+  --dg-diff-added-marker: var(--dg-success);                 /* +, gutter bar, scroll ruler */
+  --dg-diff-removed-bg: color-mix(in srgb, var(--dg-danger) var(--dg-diff-line-a), var(--dg-editor-bg));
+  --dg-diff-removed-gutter-bg: color-mix(in srgb, var(--dg-danger) var(--dg-diff-gutter-a), var(--dg-editor-bg));
+  --dg-diff-removed-word-bg: color-mix(in srgb, var(--dg-danger) var(--dg-diff-word-a), var(--dg-editor-bg));
+  --dg-diff-removed-marker: var(--dg-danger);
+  --dg-diff-modified-bg: color-mix(in srgb, var(--dg-accent) var(--dg-diff-line-a), var(--dg-editor-bg));
+  --dg-diff-modified-word-bg: color-mix(in srgb, var(--dg-accent) var(--dg-diff-word-a), var(--dg-editor-bg));
+  --dg-diff-modified-marker: var(--dg-accent);
+  --dg-diff-conflict-bg: color-mix(in srgb, var(--dg-danger) var(--dg-diff-gutter-a), var(--dg-editor-bg));
+  --dg-diff-conflict-marker: var(--dg-danger);
+  --dg-diff-hunk-header-bg: color-mix(in srgb, var(--dg-info) var(--dg-diff-hunk-a), var(--dg-editor-bg));  /* "@@ -12,7 +12,9 @@ fn main" row */
+  --dg-diff-hunk-header-fg: var(--dg-info-fg);
+  --dg-diff-hunk-active-border: var(--dg-accent);            /* left 2 px bar on the focused hunk */
+
+  /* ---- merge window: conflict red, modified blue, inserted green, deleted grey ---- */
+  --dg-merge-conflict-bg: color-mix(in srgb, var(--dg-danger) var(--dg-merge-line-a), var(--dg-editor-bg));
+  --dg-merge-conflict-marker: var(--dg-danger);
+  --dg-merge-modified-bg: color-mix(in srgb, var(--dg-accent) var(--dg-merge-line-a), var(--dg-editor-bg));
+  --dg-merge-modified-marker: var(--dg-accent);
+  --dg-merge-inserted-bg: color-mix(in srgb, var(--dg-success) var(--dg-merge-line-a), var(--dg-editor-bg));
+  --dg-merge-inserted-marker: var(--dg-success);
+  --dg-merge-deleted-bg: color-mix(in srgb, var(--dg-neutral) var(--dg-merge-line-a), var(--dg-editor-bg));
+  --dg-merge-deleted-marker: var(--dg-neutral);
+
+  /* ---- log ---- */
+  --dg-log-match-bg: var(--dg-warning-wash-strong);          /* text filter match in the subject */
+  --dg-log-match-fg: var(--dg-warning-fg);
+  --dg-ruler-head: var(--dg-accent);
+  --dg-ruler-branch: var(--dg-success);
+  --dg-ruler-tag: var(--dg-warning);
+  --dg-ruler-match: var(--dg-warning);
+
+  /* ---- branch matrix and sync strip: checked out green, local grey, only on origin violet ---- */
+  --dg-matrix-current: var(--dg-success);
+  --dg-matrix-local: var(--dg-neutral);
+  --dg-matrix-remote-only: var(--dg-special);
+  --dg-matrix-column-selected-bg: var(--dg-accent-wash);
+  --dg-matrix-sweep: var(--dg-accent);
+
+  /* ---- Git console ---- */
+  --dg-console-prompt: var(--dg-info-fg);                    /* "$" and the command */
+  --dg-console-ok: var(--dg-success-fg);                     /* exit 0 */
+  --dg-console-stderr: var(--dg-warning-fg);                 /* git writes progress to stderr: not an error */
+  --dg-console-error: var(--dg-danger-fg);                   /* non-zero exit */
+  --dg-console-error-bg: var(--dg-danger-wash);              /* line of a failed command */
+}
+
+/* =====================================================================================
+ * 2. Dark theme
+ * ===================================================================================== */
 :root[data-theme="dark"] {
-  /* ---- Accent: electric blue (white text on it >= 4.5:1) ---- */
-  --dg-accent: #2860E8;
-  --dg-accent-hover: #2E6AF5;
-  --dg-accent-pressed: #1F4FCC;
-  --dg-focus-ring: #4A8CFF;
-  --dg-text-link: #6FA2FF;
-  --dg-selection-bg: #274A8F;
-  --dg-selection-muted-bg: #20386B;
-  --dg-ref-head-bg: #2860E8;
+  /* ---- Hue families ---- */
+  --dg-accent: #4A86FF;          /* electric blue */
+  --dg-accent-fill: #2862EB;
+  --dg-accent-fg: #A8C8FF;
+  --dg-accent-hover: #2F6BF2;    /* hover and pressed of the accent fill (primary button) */
+  --dg-accent-pressed: #1F52CC;
+  --dg-success: #2ED98A;         /* green: added, ahead, current branch, success */
+  --dg-success-fill: #147D49;
+  --dg-success-fg: #7DF0BC;
+  --dg-warning: #FFB224;         /* amber: modified, tags, warnings */
+  --dg-warning-fill: #9A6100;
+  --dg-warning-fg: #FFCF6E;
+  --dg-danger: #FF5C6C;          /* coral red: deleted, conflicts, errors */
+  --dg-danger-fill: #D4364A;
+  --dg-danger-fg: #FFA3AD;
+  --dg-info: #22D3EE;            /* cyan: information, untracked, stashes, the console prompt */
+  --dg-info-fill: #0B7F94;
+  --dg-info-fg: #7AE6F7;
+  --dg-special: #B57BFF;         /* violet: remote branches, only-on-origin, operations in progress */
+  --dg-special-fill: #7C4DE0;
+  --dg-special-fg: #DEC4FF;
+  --dg-neutral: #8E939E;         /* grey: counters, repo chips, deleted merge chunks */
+  --dg-neutral-fill: #5B6070;
+  --dg-neutral-fg: #C3C7CF;
+
+  /* ---- Wash strengths ---- */
+  --dg-wash-soft-a: 8%;
+  --dg-wash-a: 16%;
+  --dg-wash-strong-a: 24%;
+  --dg-wash-border-a: 45%;
+  --dg-toolbar-tint-a: 18%;
+  --dg-toolbar-tint-2-a: 10%;
+  --dg-statusbar-tint-a: 10%;
+  --dg-diff-line-a: 13%;
+  --dg-diff-gutter-a: 19%;
+  --dg-diff-word-a: 30%;
+  --dg-diff-hunk-a: 10%;
+  --dg-merge-line-a: 17%;
+  --dg-merge-word-a: 18%;        /* changed words inside a merge chunk, laid over the chunk colour */
+
+  /* ---- Text on a wash: muted and secondary text use this on selected rows, banners and toasts ---- */
+  --dg-text-muted-on-wash: #C3C6CD;
+
+  --dg-button-danger-hover-bg: #BF2E41;
+  --dg-push-hover-bg: #10693D;
 
   /* ---- Graph lanes (10) ---- */
   --dg-lane-0: #4C8DFF;  /* electric blue - first for the lane that holds HEAD */
@@ -28,44 +278,104 @@
   --dg-lane-7: #FF8A33;  /* orange    */
   --dg-lane-8: #8F8CFF;  /* indigo    */
   --dg-lane-9: #FF63B4;  /* pink      */
-
-  /* ---- Ref pills ---- */
-  --dg-ref-local-bg: #1B3F2C;
-  --dg-ref-local-border: #2A6A45;
-  --dg-ref-local-fg: #6EE6A0;
-  --dg-ref-local-current-bg: #25603F;
-  --dg-ref-remote-bg: #33295C;
-  --dg-ref-remote-border: #5B47A8;
-  --dg-ref-remote-fg: #B9A5FF;
 }
 
+/* =====================================================================================
+ * 3. Light theme
+ * ===================================================================================== */
 :root[data-theme="light"] {
-  --dg-accent: #2860E8;
-  --dg-accent-hover: #2255E0;
-  --dg-accent-pressed: #1A45C0;
-  --dg-focus-ring: #2860E8;
-  --dg-text-link: #1F55D6;
-  --dg-selection-bg: #C4D8FF;
-  --dg-selection-muted-bg: #DBE7FF;
-  --dg-ref-head-bg: #2860E8;
+  /* ---- Hue families ---- */
+  --dg-accent: #2563F5;
+  --dg-accent-fill: #2563F5;
+  --dg-accent-fg: #1442B8;
+  --dg-accent-hover: #1E56DE;
+  --dg-accent-pressed: #1848C0;
+  --dg-success: #07844A;
+  --dg-success-fill: #0B7D46;
+  --dg-success-fg: #055C34;
+  --dg-warning: #AD6600;
+  --dg-warning-fill: #A85F00;
+  --dg-warning-fg: #724300;
+  --dg-danger: #DC2F45;
+  --dg-danger-fill: #D02A40;
+  --dg-danger-fg: #961628;
+  --dg-info: #06819D;
+  --dg-info-fill: #087C96;
+  --dg-info-fg: #055769;
+  --dg-special: #8B45F2;
+  --dg-special-fill: #7A35E0;
+  --dg-special-fg: #5C20B8;
+  --dg-neutral: #6E7382;
+  --dg-neutral-fill: #5B6070;
+  --dg-neutral-fg: #474C59;
+
+  /* ---- Wash strengths ---- */
+  --dg-wash-soft-a: 6%;
+  --dg-wash-a: 11%;
+  --dg-wash-strong-a: 18%;
+  --dg-wash-border-a: 40%;
+  --dg-toolbar-tint-a: 16%;
+  --dg-toolbar-tint-2-a: 10%;
+  --dg-statusbar-tint-a: 10%;
+  --dg-diff-line-a: 12%;
+  --dg-diff-gutter-a: 18%;
+  --dg-diff-word-a: 30%;
+  --dg-diff-hunk-a: 9%;
+  --dg-merge-line-a: 15%;
+  --dg-merge-word-a: 24%;
+
+  --dg-text-muted-on-wash: #43464D;
+
+  --dg-button-danger-hover-bg: #B82236;
+  --dg-push-hover-bg: #096A3B;
 
   /* ---- Graph lanes (10) ---- */
   --dg-lane-0: #2563F5;
-  --dg-lane-1: #0FA85F;
-  --dg-lane-2: #C47400;
+  --dg-lane-1: #0B9454;
+  --dg-lane-2: #AD6700;
   --dg-lane-3: #BF2FE0;
   --dg-lane-4: #E83A58;
-  --dg-lane-5: #0897B5;
-  --dg-lane-6: #628F00;
-  --dg-lane-7: #EB6A0A;
+  --dg-lane-5: #07829C;
+  --dg-lane-6: #5A8400;
+  --dg-lane-7: #CC5A06;
   --dg-lane-8: #5B57E8;
   --dg-lane-9: #E0287F;
+}
 
-  --dg-ref-local-bg: #D8F5E3;
-  --dg-ref-local-border: #8EDBAE;
-  --dg-ref-local-fg: #0D6B35;
-  --dg-ref-local-current-bg: #B9EDCE;
-  --dg-ref-remote-bg: #E6DEFF;
-  --dg-ref-remote-border: #B9A5F5;
-  --dg-ref-remote-fg: #4B2FB0;
+/* =====================================================================================
+ * 4. Text on a wash
+ * Muted and secondary text is too weak on a coloured wash. Inside these elements it takes the stronger
+ * value, so every line of a selected row, a banner or a toast reads at 4.5:1 or more.
+ * ===================================================================================== */
+.dg-tree-row.is-selected,
+.dg-log-row.is-selected,
+.dg-changes-row.is-selected,
+.dg-changes-row.is-conflict,
+.dg-cf-row.is-selected,
+.dg-palette-row.is-active,
+.dg-menu-item.is-active,
+.dg-select-opt.is-active,
+.dg-titlebar-brow.is-active,
+.dg-titlebar-pop-action:hover,
+.dg-settings-item.is-selected,
+.dg-settings-preview-row.is-selected,
+.dg-matrix-rowhead.is-focused,
+.dg-matrix-cell.is-selected,
+.dg-matrix-colhead.is-selected,
+.dg-console-entry.is-open > .dg-console-row,
+.dg-console-entry.is-error > .dg-console-row,
+.dg-shell-tab.is-on,
+.dg-log-banner,
+.dg-changes-banner,
+.dg-cf-continue,
+.dg-matrix-bar,
+.dg-dialogs-note,
+.dg-dialogs-radio.is-on,
+.dg-toast,
+.dg-command {
+  --dg-text-muted: var(--dg-text-muted-on-wash);
+  --dg-text-secondary: var(--dg-text-muted-on-wash);
+  --dg-log-hash-fg: var(--dg-text-muted-on-wash);
+  --dg-menu-accelerator-fg: var(--dg-text-muted-on-wash);
+  --dg-console-duration: var(--dg-text-muted-on-wash);
 }

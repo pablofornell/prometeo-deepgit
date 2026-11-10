@@ -17,7 +17,8 @@
 .dg-log-chip:hover { background: var(--dg-hover-bg); }
 .dg-log-chip .dg-icon { color: var(--dg-icon-secondary); flex: none; }
 .dg-log-chip.is-open:not(.is-on) { background: var(--dg-hover-bg); }
-.dg-log-chip.is-on { background: var(--dg-chip-active-bg); box-shadow: inset 0 0 0 1px var(--dg-chip-active-border); color: var(--dg-text); }
+.dg-log-chip.is-on { background: var(--dg-chip-active-bg); box-shadow: inset 0 0 0 1px var(--dg-chip-active-border); color: var(--dg-accent-fg); }
+.dg-log-chip.is-on .dg-icon { color: currentColor; }
 .dg-log-chip-label { overflow: hidden; text-overflow: ellipsis; }
 .dg-log-chip-clear { display: none; width: 14px; height: 14px; border-radius: 7px; place-items: center; flex: none; color: var(--dg-icon-secondary); }
 .dg-log-chip-clear:hover { background: var(--dg-hover-bg); color: var(--dg-text); }
@@ -33,7 +34,7 @@
 .dg-log-pop { min-width: 240px; max-width: 380px; padding: var(--dg-menu-padding-y) 0; }
 .dg-log-pop-wide { min-width: 300px; }
 .dg-log-pop-head { display: flex; align-items: center; justify-content: space-between; padding: 2px 14px 6px; font-size: var(--dg-font-size-medium); color: var(--dg-text-secondary); }
-.dg-log-pop-link { color: var(--dg-accent); font-size: var(--dg-font-size-medium); }
+.dg-log-pop-link { color: var(--dg-text-link); font-size: var(--dg-font-size-medium); }
 .dg-log-pop-link:disabled { color: var(--dg-text-disabled); }
 .dg-log-pop-search { padding: 2px 8px 6px; }
 .dg-log-pop-list { display: flex; flex-direction: column; max-height: 320px; overflow: auto; }
@@ -41,15 +42,15 @@
   display: flex; align-items: center; gap: 8px; flex: none; height: var(--dg-popup-item-height); margin: 0 6px; padding: 0 var(--dg-menu-item-padding-x);
   border-radius: var(--dg-popup-selection-radius); white-space: nowrap; cursor: default;
 }
-.dg-log-pop-item:hover { background: var(--dg-hover-bg); }
+.dg-log-pop-item:hover { background: var(--dg-row-hover-bg); }
 .dg-log-pop-item .dg-check { pointer-events: none; }
 .dg-log-pop-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .dg-log-pop-item.is-selected .dg-log-pop-text { font-weight: var(--dg-weight-medium); }
 .dg-log-pop-meta { color: var(--dg-text-secondary); font-size: var(--dg-font-size-small); font-variant-numeric: tabular-nums; }
 .dg-log-pop-icon { color: var(--dg-icon-secondary); flex: none; }
-.dg-log-pop-group { padding: 6px 14px 2px; font-size: var(--dg-font-size-small); font-weight: var(--dg-weight-semibold); color: var(--dg-text-secondary); flex: none; }
+.dg-log-pop-group { padding: 6px 14px 2px; font-size: var(--dg-font-size-small); font-weight: var(--dg-weight-semibold); color: var(--dg-accent-fg); flex: none; }
 .dg-log-pop-foot { padding: 6px 14px 2px; font-size: var(--dg-font-size-small); color: var(--dg-text-secondary); }
-.dg-log-pop-only { display: none; font-size: var(--dg-font-size-small); color: var(--dg-accent); padding: 0 4px; }
+.dg-log-pop-only { display: none; font-size: var(--dg-font-size-small); color: var(--dg-text-link); padding: 0 4px; }
 .dg-log-pop-item.has-only:hover .dg-log-pop-only { display: inline; }
 .dg-log-pop-item.has-only:hover .dg-log-pop-meta { display: none; }
 .dg-log-pop-custom { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 8px; padding: 8px 14px 4px; border-top: 1px solid var(--dg-separator); margin-top: 4px; }
@@ -72,8 +73,11 @@
   background: var(--dg-banner-warning-bg); box-shadow: inset 0 0 0 1px var(--dg-banner-warning-border);
   animation: dg-log-banner-in var(--dg-dur-base) var(--dg-ease-out);
 }
-.dg-log-banner.is-error { background: var(--dg-banner-error-bg); box-shadow: inset 0 0 0 1px var(--dg-banner-error-border); }
+/* merge / rebase / cherry-pick in progress: the strong violet wash of the operation banner */
+.dg-log-banner.is-operation { background: var(--dg-banner-operation-bg); box-shadow: inset 0 0 0 1px var(--dg-banner-operation-border), inset 3px 0 0 var(--dg-special); }
+.dg-log-banner.is-error { background: var(--dg-banner-error-bg); box-shadow: inset 0 0 0 1px var(--dg-banner-error-border), inset 3px 0 0 var(--dg-danger); }
 .dg-log-banner-icon { color: var(--dg-text-warning); flex: none; }
+.dg-log-banner.is-operation .dg-log-banner-icon { color: var(--dg-banner-operation-fg); }
 .dg-log-banner.is-error .dg-log-banner-icon { color: var(--dg-text-error); }
 .dg-log-banner-text { overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 0 1 auto; }
 .dg-log-banner .dg-btn { flex: none; }
@@ -113,7 +117,9 @@
 .dg-log-row.is-date:hover, .dg-log-row.is-loading:hover { background: transparent; }
 .dg-log-row.is-selected { background: var(--dg-selection-inactive-bg); }
 .dg-log-vlist:focus-within .dg-log-row.is-selected { background: var(--dg-selection-bg); }
-.dg-log-row.is-selected .dg-log-author, .dg-log-row.is-selected .dg-log-date, .dg-log-row.is-selected .dg-log-hash { color: var(--dg-text); }
+.dg-log-vlist:focus-within .dg-log-row.is-selected::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: var(--dg-focus-width); background: var(--dg-selection-edge); z-index: 1; }
+.dg-log-row.is-selected .dg-log-author, .dg-log-row.is-selected .dg-log-date { color: var(--dg-text); }
+.dg-log-row.is-selected .dg-log-hash { color: var(--dg-accent-fg); }
 .dg-log-row > .dg-log-gcell { padding: 0; }
 .dg-log-gcell { align-self: stretch; display: block; line-height: 0; }
 .dg-log-graph { display: block; overflow: hidden; }
@@ -146,7 +152,7 @@
 
 /* uncommitted changes row */
 .dg-log-wip-t { color: var(--dg-text-muted); font-style: italic; }
-.dg-log-wip-n { color: var(--dg-text-secondary); font-size: var(--dg-font-size-medium); }
+.dg-log-wip-n { color: var(--dg-status-modified); font-size: var(--dg-font-size-medium); }
 .dg-log-row.is-wip { cursor: pointer; }
 .dg-log-wip-node { fill: none; stroke: var(--dg-graph-wip-stroke); stroke-width: 1.5px; stroke-dasharray: 2 1.6; }
 .dg-log-wip-edge { fill: none; stroke: var(--dg-graph-wip-stroke); stroke-width: var(--dg-log-edge-width); stroke-dasharray: 3 3; opacity: 0.75; }
@@ -160,7 +166,7 @@
 
 /* ---------------------------------------------------------------- loading bar */
 .dg-log-loading { position: absolute; top: 0; left: 0; right: 0; height: 2px; overflow: hidden; z-index: 4; pointer-events: none; }
-.dg-log-loading i { position: absolute; top: 0; bottom: 0; left: -30%; width: 30%; background: var(--dg-accent); animation: dg-log-load var(--dg-dur-progress-loop) linear infinite; }
+.dg-log-loading i { position: absolute; top: 0; bottom: 0; left: -30%; width: 30%; background: linear-gradient(90deg, transparent, var(--dg-progress-fg), var(--dg-progress-fg-end)); animation: dg-log-load var(--dg-dur-progress-loop) linear infinite; }
 @keyframes dg-log-load { from { left: -30%; } to { left: 100%; } }
 @media (prefers-reduced-motion: reduce) { .dg-log-loading i { animation: none; left: 0; width: 100%; opacity: 0.5; } }
 

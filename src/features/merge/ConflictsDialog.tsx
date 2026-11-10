@@ -10,7 +10,7 @@ import { For, type JSX, Show, createEffect, createSignal, on, onCleanup } from "
 import * as api from "../../api/tauri";
 import { toApiError } from "../../api/tauri";
 import type { ConflictEntry, ConflictLabels, ConflictSide, SideStatus } from "../../api/types";
-import { Button, Dialog, type DialogComponentProps, EmptyState, Icon, RepoChip, Spinner, fileIconFor, joinNames, plural, splitPath, toast } from "../../components/ui";
+import { Button, Dialog, type DialogComponentProps, EmptyState, Icon, RepoChip, Spinner, StatusLetter, fileIconFor, joinNames, plural, splitPath, toast } from "../../components/ui";
 import * as actions from "../../state/actions";
 import type { ConflictsProps, ConflictsResult } from "../../state/dialogs";
 import { subscribeRepoChanged } from "../../state/events";
@@ -333,6 +333,7 @@ export function ConflictsDialog(props: ConflictsProps & DialogComponentProps<Con
                     onDblClick={() => void merge(item)}
                   >
                     <span class="dg-cf-name">
+                      <StatusLetter status="conflicted" />
                       <Icon name={fileIconFor(item.entry.path)} size={16} class="dg-cf-icon" />
                       <span class="dg-cf-file">{splitPath(item.entry.path).name}</span>
                       <span class="dg-cf-dir">{splitPath(item.entry.path).dir}</span>

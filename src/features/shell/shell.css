@@ -1,7 +1,11 @@
 /* Window shell (DESIGN.md section 2). Prefix dg-shell-. */
 .dg-shell { display: grid; grid-template-rows: var(--dg-titlebar-height) minmax(0, 1fr) var(--dg-statusbar-height); height: 100%; min-width: calc(1200px / var(--dg-ui-scale)); min-height: calc(720px / var(--dg-ui-scale)); position: relative; }
-.dg-shell-titlebar { background: var(--dg-toolbar-bg); color: var(--dg-toolbar-fg); min-width: 0; }
-.dg-shell-statusbar { background: var(--dg-statusbar-bg); color: var(--dg-statusbar-fg); min-width: 0; }
+/* the DataGrip toolbar tint: an accent glow at the left that fades into the calm bar, a violet hint in the middle */
+.dg-shell-titlebar {
+  background: linear-gradient(90deg, var(--dg-toolbar-tint) 0%, var(--dg-toolbar-tint-2) 38%, var(--dg-toolbar-bg) 72%);
+  color: var(--dg-toolbar-fg); min-width: 0;
+}
+.dg-shell-statusbar { background: linear-gradient(90deg, var(--dg-statusbar-tint) 0%, var(--dg-statusbar-bg) 55%); color: var(--dg-statusbar-fg); min-width: 0; }
 .dg-shell-main { display: flex; min-height: 0; min-width: 0; }
 
 /* ---- tool stripe */
@@ -12,13 +16,13 @@
 }
 .dg-shell-stripe-btn .dg-icon { color: currentColor; }
 .dg-shell-stripe-btn:hover { background: var(--dg-hover-bg); }
-.dg-shell-stripe-btn.is-on { background: var(--dg-stripe-button-selected-bg); color: var(--dg-stripe-button-selected-fg); }
+.dg-shell-stripe-btn.is-on { background: var(--dg-stripe-button-selected-bg); color: var(--dg-stripe-button-selected-fg); box-shadow: inset 0 0 0 1px var(--dg-accent-border); }
 .dg-shell-stripe-count {
   position: absolute; right: -3px; bottom: -1px; min-width: calc(14 * var(--dg-u)); height: calc(14 * var(--dg-u)); padding: 0 3px; border-radius: 7px; line-height: calc(14 * var(--dg-u));
   font-size: var(--dg-font-size-micro); font-weight: var(--dg-weight-semibold); text-align: center; font-variant-numeric: tabular-nums;
   background: var(--dg-layer-2-bg); color: var(--dg-text); box-shadow: 0 0 0 2px var(--dg-window-bg);
 }
-.dg-shell-stripe-btn.is-on .dg-shell-stripe-count { background: var(--dg-accent); color: var(--dg-text-over-accent); }
+.dg-shell-stripe-btn.is-on .dg-shell-stripe-count { background: var(--dg-accent-fill); color: var(--dg-text-over-accent); }
 .dg-shell-stripe-dot { position: absolute; top: 5px; right: 5px; width: 6px; height: 6px; border-radius: 50%; background: var(--dg-accent); box-shadow: 0 0 0 2px var(--dg-window-bg); }
 
 /* ---- islands */
@@ -36,11 +40,13 @@
 /* ---- island header with tabs */
 .dg-shell-head { height: var(--dg-panel-header-height); flex: none; display: flex; align-items: center; gap: 2px; padding: var(--dg-panel-header-padding); padding-left: 6px; }
 .dg-shell-tab {
-  display: inline-flex; align-items: center; gap: 6px; height: calc(28 * var(--dg-u)); padding: 0 10px; border-radius: 6px; color: var(--dg-text-muted); white-space: nowrap;
+  position: relative; display: inline-flex; align-items: center; gap: 6px; height: calc(28 * var(--dg-u)); padding: 0 10px; border-radius: 6px; color: var(--dg-text-muted); white-space: nowrap;
 }
 .dg-shell-tab .dg-icon { color: currentColor; }
 .dg-shell-tab:hover:not(.is-on) { background: var(--dg-hover-bg); }
-.dg-shell-tab.is-on { background: var(--dg-selection-muted-bg); box-shadow: inset 0 0 0 1px var(--dg-chip-active-border); color: var(--dg-text); font-weight: var(--dg-weight-medium); }
+/* active tab: accent wash and a 2 px accent underline */
+.dg-shell-tab.is-on { background: var(--dg-tab-active-bg); color: var(--dg-tab-active-fg); font-weight: var(--dg-weight-medium); }
+.dg-shell-tab.is-on::after { content: ""; position: absolute; left: 8px; right: 8px; bottom: 0; height: var(--dg-focus-width); border-radius: 1px; background: var(--dg-selection-edge); }
 .dg-shell-tab-sub { color: var(--dg-text-secondary); font-weight: var(--dg-weight-regular); font-size: var(--dg-font-size-medium); }
 .dg-shell-view { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .dg-app { height: 100%; }

@@ -192,7 +192,7 @@ export function SectionRowView(props: { row: SectionRow; ctl: RowCtl }): JSX.Ele
   return (
     <div
       class="dg-changes-row dg-changes-section"
-      classList={{ "is-cursor": props.ctl.isCursor(props.row.key), "is-conflicts": props.row.section === "conflicts" }}
+      classList={{ "is-cursor": props.ctl.isCursor(props.row.key), "is-conflicts": props.row.section === "conflicts", "is-staged": props.row.section === "staged" }}
       role="treeitem"
       aria-level={props.row.depth + 1}
       aria-expanded={props.row.open}
@@ -202,7 +202,7 @@ export function SectionRowView(props: { row: SectionRow; ctl: RowCtl }): JSX.Ele
     >
       <Chevron open={props.row.open} />
       <span class="dg-changes-section-title" title={SECTION_HINT[props.row.section]}>{SECTION_TITLE[props.row.section]}</span>
-      <Badge tone={props.row.section === "conflicts" ? "warning" : "neutral"}>{props.row.count}</Badge>
+      <Badge tone={props.row.section === "conflicts" ? "error" : props.row.section === "staged" ? "success" : "neutral"}>{props.row.count}</Badge>
       <span class="dg-grow" />
       <span class="dg-changes-actions is-header">
         <Show when={props.row.section === "conflicts"}>
@@ -273,7 +273,7 @@ export function FileRowView(props: { row: FileRow; ctl: RowCtl }): JSX.Element {
   return (
     <div
       class="dg-changes-row dg-changes-file"
-      classList={{ "is-selected": props.ctl.isSelected(props.row.key), "is-cursor": props.ctl.isCursor(props.row.key) }}
+      classList={{ "is-selected": props.ctl.isSelected(props.row.key), "is-cursor": props.ctl.isCursor(props.row.key), "is-conflict": file().status === "conflicted" }}
       role="treeitem"
       aria-level={props.row.depth + 1}
       aria-selected={props.ctl.isSelected(props.row.key)}

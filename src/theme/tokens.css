@@ -2,7 +2,9 @@
  * DeepGit design tokens.
  * Base: JetBrains New UI "Islands" Dark / Light, shared with Prometeo DataGrip
  * (prometeo-datagrip/src/theme/dark.css, light.css, metrics.css). Shared names and values are kept identical.
- * DeepGit-specific groups: graph lanes, ref pills, file status, diff, avatars, sync matrix, console.
+ * This file is the calm base: surfaces, text, neutral controls, editor, avatars and all metrics.
+ * Every colour that carries meaning (accent, selection, ref pills, file status, diff, merge, banners, ahead/behind,
+ * matrix, console) lives in colors.css, as an alias of one of the seven hue families (DESIGN.md 4.4).
  * Hex with 8 digits = #RRGGBBAA. Prefix: --dg-* (DeepGit and DataGrip share it on purpose).
  * Spec: docs/design/DESIGN.md
  */
@@ -185,28 +187,14 @@
 
   /* ---- Text ---- */
   --dg-text: #D1D3D9;
-  --dg-text-secondary: #73767C;
+  --dg-text-secondary: #969AA2;    /* 4.5:1 on the window and on the island */
   --dg-text-muted: #9FA2A8;
   --dg-text-disabled: #4C4F56;
   --dg-text-over-accent: #FFFFFF;
-  --dg-text-error: #F57E84;
-  --dg-text-warning: #D59637;
-  --dg-text-success: #6DB083;
-  --dg-text-link: #71A1FE;
 
-  /* ---- Accent / interaction ---- */
-  --dg-accent: #3871E1;
-  --dg-accent-hover: #4A80E8;
-  --dg-accent-pressed: #2E62C9;
-  --dg-focus-ring: #3871E1;
+  /* ---- Neutral hover and press (accent, selection and focus: colors.css) ---- */
   --dg-hover-bg: #FFFFFF17;        /* icon buttons, toolbar */
   --dg-pressed-bg: #FFFFFF29;
-  --dg-row-hover-bg: #FFFFFF10;    /* tree/list/log row hover */
-  --dg-selection-bg: #2A4371;      /* focused selection */
-  --dg-selection-inactive-bg: #33353B; /* selection when the component has no focus */
-  --dg-selection-muted-bg: #233558;
-  --dg-selection-fg: #D1D3D9;
-  --dg-toolbar-selected-bg: #2E4D89;   /* toggled icon button / active tool window */
 
   /* ---- Title bar / stripe / status bar ---- */
   --dg-toolbar-bg: #26282C;
@@ -214,40 +202,26 @@
   --dg-toolbar-separator: #FFFFFF21;
   --dg-stripe-bg: #26282C;
   --dg-stripe-button-fg: #9FA2A8;
-  --dg-stripe-button-selected-bg: #3871E1;
-  --dg-stripe-button-selected-fg: #FFFFFF;
   --dg-statusbar-bg: #26282C;
-  --dg-statusbar-fg: #9FA2A8;
+  --dg-statusbar-fg: #B4B7BE;      /* reads on the status bar glow */
   --dg-statusbar-hover-bg: #FFFFFF17;
   --dg-statusbar-hover-fg: #D1D3D9;
-  --dg-push-bg: #338555;           /* "Push" primary when commits are ahead (toolbar-run-bg) */
-  --dg-push-hover-bg: #2A6E47;
 
   /* ---- Controls ---- */
   --dg-button-border: #40434A;
-  --dg-button-primary-bg: #3871E1;
-  --dg-button-primary-fg: #FFFFFF;
-  --dg-button-danger-bg: #C54E58;
-  --dg-button-danger-hover-bg: #A4414A;
   --dg-button-disabled-fg: #4C4F56;
   --dg-button-disabled-border: #33353B;
   --dg-input-bg: #191A1C;
   --dg-input-fg: #D1D3D9;
   --dg-input-border: #40434A;
-  --dg-input-focus-border: #3871E1;
   --dg-input-placeholder: #73767C;
-  --dg-input-error-border: #C54E58;
   --dg-combo-bg: #26282C;
   --dg-checkbox-bg: #2B2D30;
   --dg-checkbox-border: #5A5D63;
-  --dg-checkbox-selected-bg: #3574F0;
   --dg-checkbox-check: #FFFFFF;
-  --dg-toggle-on-bg: #3871E1;
   --dg-toggle-off-bg: #FFFFFF3B;
   --dg-chip-bg: #26282C;           /* filter chip */
   --dg-chip-border: #40434A;
-  --dg-chip-active-bg: #233558;
-  --dg-chip-active-border: #2E4D89;
   --dg-kbd-bg: #FFFFFF12;          /* keycap in menus, palette, empty states */
   --dg-kbd-border: #FFFFFF1F;
   --dg-kbd-fg: #9FA2A8;
@@ -256,8 +230,7 @@
   --dg-popup-bg: #26282C;
   --dg-popup-border: #33353B;
   --dg-popup-shadow: 0 8px 24px #00000066, 0 0 0 1px #00000033;
-  --dg-menu-accelerator-fg: #73767C;
-  --dg-match-fg: #538AF9;          /* matched characters in palette / speed search */
+  --dg-menu-accelerator-fg: var(--dg-text-secondary);
   --dg-tooltip-bg: #33353B;
   --dg-tooltip-fg: #D1D3D9;
   --dg-scrim: #0000008C;           /* behind modal dialogs */
@@ -267,21 +240,9 @@
   --dg-scrollbar-thumb-hover: #8080808C;
   --dg-scrollbar-track-hover: #8080801A;
 
-  /* ---- Notifications / banners ---- */
+  /* ---- Notifications, progress track, icons ---- */
   --dg-notification-bg: #33353B;
   --dg-notification-fg: #D1D3D9;
-  --dg-banner-info-bg: #233558;
-  --dg-banner-info-border: #2E4D89;
-  --dg-banner-error-bg: #56272B;
-  --dg-banner-error-border: #80383E;
-  --dg-banner-warning-bg: #44321D;
-  --dg-banner-warning-border: #694820;
-  --dg-banner-success-bg: #203B2A;
-  --dg-banner-success-border: #29583C;
-  --dg-error: #C54E58;
-  --dg-warning: #A56906;
-  --dg-success: #338555;
-  --dg-progress-fg: #3871E1;
   --dg-progress-track: #40434A;
   --dg-icon: #C3C5CB;
   --dg-icon-secondary: #868A91;
@@ -304,86 +265,21 @@
 
   /* =========================== DeepGit-specific ============================ */
 
-  /* ---- Graph lanes (10): see colors.css. ---- */
+  /* ---- Graph (the 10 lane colours are in colors.css) ---- */
   --dg-lane-dim-opacity: 0.32;     /* lanes not on the selected commit's path when "highlight path" is on */
   --dg-graph-node-stroke: #191A1C; /* 1.5px ring that cuts the node out of the edges */
   --dg-graph-head-ring: #D1D3D9;   /* outer ring of HEAD node */
   --dg-graph-wip-stroke: #9FA2A8;  /* dashed hollow node of the "Uncommitted changes" row */
 
-  /* ---- Accent and ref pill overrides: see colors.css (loaded after this file). ---- */
-
-  /* ---- Ref pills ---- */
-  --dg-ref-head-bg: #3871E1;       /* "HEAD" pill and current branch pill outline */
-  --dg-ref-head-fg: #FFFFFF;
-  --dg-ref-local-bg: #24392C;
-  --dg-ref-local-border: #35573F;
-  --dg-ref-local-fg: #8FD19E;
-  --dg-ref-local-current-bg: #2E5A3C; /* current branch: brighter bg + bold text */
-  --dg-ref-remote-bg: #322D45;
-  --dg-ref-remote-border: #4A416A;
-  --dg-ref-remote-fg: #B9A6F2;
-  --dg-ref-tag-bg: #3D3220;
-  --dg-ref-tag-border: #614D27;
-  --dg-ref-tag-fg: #E7C27A;
-  --dg-ref-stash-bg: #2B3540;
-  --dg-ref-stash-border: #3F4F60;
-  --dg-ref-stash-fg: #9DB7D2;
-  --dg-ref-overflow-bg: #33353B;   /* "+3" pill */
-  --dg-ref-overflow-fg: #9FA2A8;
-
-  /* ---- Ahead / behind / dirty ---- */
-  --dg-ahead-fg: #6DB083;          /* "up 2" (commits to push) */
-  --dg-behind-fg: #71A1FE;         /* "down 5" (commits to pull) */
-  --dg-diverged-fg: #E6A94B;       /* both ahead and behind */
-  --dg-badge-bg: #FFFFFF0F;
-  --dg-dirty-dot: #E6A94B;         /* working tree has changes */
-  --dg-conflict-dot: #F57E84;      /* merge/rebase in progress or conflicts */
+  /* ---- Working tree state ---- */
   --dg-clean-dot: #4C4F56;         /* clean (hollow ring) */
-  --dg-fetch-fresh: #6DB083;       /* fetch age ring: < 15 min */
-  --dg-fetch-aging: #D59637;       /* 15 min - 2 h */
-  --dg-fetch-stale: #F57E84;       /* > 2 h or never */
-
-  /* ---- File status (letter colour; file name uses the same colour) ---- */
-  --dg-status-added: #73BD79;      /* A */
-  --dg-status-modified: #70AEFF;   /* M */
-  --dg-status-deleted: #F07A82;    /* D (file name also struck through) */
-  --dg-status-renamed: #3FB4C6;    /* R */
-  --dg-status-copied: #A98EDB;     /* C */
-  --dg-status-conflict: #F0954A;   /* U */
-  --dg-status-untracked: #D1675A;  /* ? */
-  --dg-status-ignored: #848504;    /* ! */
-  --dg-status-typechange: #B3AE60; /* T */
 
   /* ---- Diff ---- */
-  --dg-diff-added-bg: #1F3527;         /* whole added line */
-  --dg-diff-added-word-bg: #2F5A3B;    /* changed characters inside an added line */
-  --dg-diff-added-gutter-bg: #213A2A;
-  --dg-diff-added-marker: #549159;     /* +, gutter bar, scroll ruler */
-  --dg-diff-removed-bg: #3A2427;
-  --dg-diff-removed-word-bg: #6A3238;
-  --dg-diff-removed-gutter-bg: #3E2629;
-  --dg-diff-removed-marker: #C75450;
-  --dg-diff-modified-bg: #22314D;      /* side-by-side: line exists on both sides but differs */
-  --dg-diff-modified-word-bg: #304B7D;
-  --dg-diff-modified-marker: #375FAD;
-  --dg-diff-conflict-bg: #3D3220;
-  --dg-diff-conflict-marker: #D59637;
   --dg-diff-filler-bg: #1D1E21;        /* empty side in side-by-side, drawn with hatch */
   --dg-diff-filler-hatch: #FFFFFF08;
-  --dg-diff-hunk-header-bg: #1F2A3D;   /* "@@ -12,7 +12,9 @@ fn main" row */
-  --dg-diff-hunk-header-fg: #7A9CCF;
-  --dg-diff-hunk-active-border: #3871E1; /* left 2px bar on the focused hunk */
   --dg-diff-connector: #FFFFFF0D;      /* band between the two sides */
 
-  /* ---- Merge window (three-way editor). JetBrains merge colours: conflict red, modified blue, inserted green, deleted grey. ---- */
-  --dg-merge-conflict-bg: #4A2B2F;
-  --dg-merge-conflict-marker: #C75450;
-  --dg-merge-modified-bg: #22314D;
-  --dg-merge-modified-marker: #375FAD;
-  --dg-merge-inserted-bg: #1F3527;
-  --dg-merge-inserted-marker: #549159;
-  --dg-merge-deleted-bg: #2E3035;
-  --dg-merge-deleted-marker: #7B7F87;
+  /* ---- Merge window (three-way editor): strengths only, the chunk colours are in colors.css ---- */
   --dg-merge-resolved-mix: 35%;         /* a resolved change in the Result pane: its colour at this strength */
   --dg-merge-ribbon-alpha: 55%;         /* the bands between the panes */
 
@@ -403,36 +299,22 @@
   --dg-avatar-fg: #FFFFFF;
 
   /* ---- Log ---- */
-  --dg-log-date-header-fg: #73767C;  /* sticky "Today", "Yesterday" rows */
+  --dg-log-date-header-fg: var(--dg-text-secondary);  /* sticky "Today", "Yesterday" rows */
   --dg-log-date-header-bg: #191A1C;
-  --dg-log-hash-fg: #73767C;
+  --dg-log-hash-fg: var(--dg-text-secondary);
   --dg-log-unreachable-fg: #73767C;  /* commits not reachable from a visible ref (filtered context) */
-  --dg-log-match-bg: #BA975233;      /* text filter match highlight in subject */
-  --dg-log-match-fg: #F2C55C;
-  --dg-ruler-head: #3871E1;
-  --dg-ruler-branch: #6DB083;
-  --dg-ruler-tag: #E7C27A;
-  --dg-ruler-match: #F2C55C;
   --dg-ruler-selection: #D1D3D9;
 
   /* ---- Branch Matrix (synchronous branch control) ---- */
   --dg-matrix-cell-bg: #1F2024;
   --dg-matrix-cell-hover-bg: #26282C;
-  --dg-matrix-current: #5A9CF8;      /* filled dot: branch is checked out */
-  --dg-matrix-local: #9FA2A8;        /* hollow dot: local branch exists */
-  --dg-matrix-remote-only: #4C4F56;  /* dashed ring: only origin/<branch> exists */
   --dg-matrix-missing: #33353B;      /* dash: branch not in this repo */
-  --dg-matrix-column-selected-bg: #233558;
-  --dg-matrix-sweep: #3871E1;        /* progress sweep line while a batch operation runs */
 
   /* ---- Git console ---- */
   --dg-console-bg: #191A1C;
   --dg-console-fg: #BCBEC4;
-  --dg-console-prompt: #6AAB73;      /* "$" and the command */
   --dg-console-repo: #9FA2A8;        /* "[api-gateway]" prefix */
-  --dg-console-stderr: #D59637;      /* git writes progress to stderr: not an error */
-  --dg-console-error: #F75464;       /* non-zero exit */
-  --dg-console-duration: #73767C;
+  --dg-console-duration: var(--dg-text-secondary);
 }
 
 /* =====================================================================================
@@ -452,66 +334,38 @@
   --dg-island-header-border: #EBECF0;
 
   --dg-text: #000000;
-  --dg-text-secondary: #73767C;
+  --dg-text-secondary: #5F6269;
   --dg-text-muted: #5F6269;
   --dg-text-disabled: #9FA2A8;
   --dg-text-over-accent: #FFFFFF;
-  --dg-text-error: #C54E58;
-  --dg-text-warning: #A56906;
-  --dg-text-success: #338555;
-  --dg-text-link: #2E62C9;
 
-  --dg-accent: #3871E1;
-  --dg-accent-hover: #2E62C9;
-  --dg-accent-pressed: #2554B0;
-  --dg-focus-ring: #3871E1;
   --dg-hover-bg: #00000012;
   --dg-pressed-bg: #00000020;
-  --dg-row-hover-bg: #00000008;
-  --dg-selection-bg: #D0DFFE;
-  --dg-selection-inactive-bg: #E9EAEE;
-  --dg-selection-muted-bg: #E3EBFE;
-  --dg-selection-fg: #000000;
-  --dg-toolbar-selected-bg: #D0DFFE;
 
   --dg-toolbar-bg: #E9EAEE;
   --dg-toolbar-fg: #000000;
   --dg-toolbar-separator: #00000020;
   --dg-stripe-bg: #E9EAEE;
   --dg-stripe-button-fg: #5F6269;
-  --dg-stripe-button-selected-bg: #3871E1;
-  --dg-stripe-button-selected-fg: #FFFFFF;
   --dg-statusbar-bg: #E9EAEE;
-  --dg-statusbar-fg: #5F6269;
+  --dg-statusbar-fg: #505359;
   --dg-statusbar-hover-bg: #00000012;
   --dg-statusbar-hover-fg: #000000;
-  --dg-push-bg: #4E9D6C;
-  --dg-push-hover-bg: #338555;
 
   --dg-button-border: #D1D3D9;
-  --dg-button-primary-bg: #3871E1;
-  --dg-button-primary-fg: #FFFFFF;
-  --dg-button-danger-bg: #E4656E;
-  --dg-button-danger-hover-bg: #C54E58;
   --dg-button-disabled-fg: #9FA2A8;
   --dg-button-disabled-border: #E9EAEE;
   --dg-input-bg: #FFFFFF;
   --dg-input-fg: #000000;
   --dg-input-border: #D1D3D9;
-  --dg-input-focus-border: #3871E1;
   --dg-input-placeholder: #9FA2A8;
-  --dg-input-error-border: #E4656E;
   --dg-combo-bg: #FFFFFF;
   --dg-checkbox-bg: #FFFFFF;
   --dg-checkbox-border: #B4B7BD;
-  --dg-checkbox-selected-bg: #3574F0;
   --dg-checkbox-check: #FFFFFF;
-  --dg-toggle-on-bg: #3871E1;
   --dg-toggle-off-bg: #0000002E;
   --dg-chip-bg: #FFFFFF;
   --dg-chip-border: #D1D3D9;
-  --dg-chip-active-bg: #E3EBFE;
-  --dg-chip-active-border: #A9C2F7;
   --dg-kbd-bg: #0000000A;
   --dg-kbd-border: #0000001F;
   --dg-kbd-fg: #5F6269;
@@ -519,8 +373,7 @@
   --dg-popup-bg: #FFFFFF;
   --dg-popup-border: #D1D3D9;
   --dg-popup-shadow: 0 8px 24px #00000026, 0 0 0 1px #0000000F;
-  --dg-menu-accelerator-fg: #73767C;
-  --dg-match-fg: #2E62C9;
+  --dg-menu-accelerator-fg: var(--dg-text-secondary);
   --dg-tooltip-bg: #FFFFFF;
   --dg-tooltip-fg: #000000;
   --dg-scrim: #00000052;
@@ -531,18 +384,6 @@
 
   --dg-notification-bg: #FFFFFF;
   --dg-notification-fg: #000000;
-  --dg-banner-info-bg: #F7F8FF;
-  --dg-banner-info-border: #BDD3FF;
-  --dg-banner-error-bg: #FFF6F5;
-  --dg-banner-error-border: #FFC4C5;
-  --dg-banner-warning-bg: #FFF6E9;
-  --dg-banner-warning-border: #F4CD9A;
-  --dg-banner-success-bg: #F5FAF3;
-  --dg-banner-success-border: #BBDBC2;
-  --dg-error: #E4656E;
-  --dg-warning: #C27D04;
-  --dg-success: #4E9D6C;
-  --dg-progress-fg: #3871E1;
   --dg-progress-track: #D1D3D9;
   --dg-icon: #6C707E;
   --dg-icon-secondary: #818594;
@@ -568,73 +409,14 @@
   --dg-graph-head-ring: #000000;
   --dg-graph-wip-stroke: #73767C;
 
-  --dg-ref-head-bg: #3871E1;
-  --dg-ref-head-fg: #FFFFFF;
-  --dg-ref-local-bg: #E7F4EA;
-  --dg-ref-local-border: #B5DCC0;
-  --dg-ref-local-fg: #1F6E3A;
-  --dg-ref-local-current-bg: #CDEBD5;
-  --dg-ref-remote-bg: #EFEBFB;
-  --dg-ref-remote-border: #CFC4F2;
-  --dg-ref-remote-fg: #5B45A8;
-  --dg-ref-tag-bg: #FBF2DE;
-  --dg-ref-tag-border: #EBD39B;
-  --dg-ref-tag-fg: #855C0A;
-  --dg-ref-stash-bg: #EAF1F8;
-  --dg-ref-stash-border: #C5D6E8;
-  --dg-ref-stash-fg: #3E6286;
-  --dg-ref-overflow-bg: #EBECF0;
-  --dg-ref-overflow-fg: #5F6269;
 
-  --dg-ahead-fg: #338555;
-  --dg-behind-fg: #2E62C9;
-  --dg-diverged-fg: #A56906;
-  --dg-badge-bg: #0000000A;
-  --dg-dirty-dot: #C27D04;
-  --dg-conflict-dot: #E4656E;
   --dg-clean-dot: #B4B7BD;
-  --dg-fetch-fresh: #4E9D6C;
-  --dg-fetch-aging: #C27D04;
-  --dg-fetch-stale: #E4656E;
 
-  --dg-status-added: #2F8A3B;
-  --dg-status-modified: #2C67D9;
-  --dg-status-deleted: #C94A55;
-  --dg-status-renamed: #13859B;
-  --dg-status-copied: #7A57C2;
-  --dg-status-conflict: #C25A10;
-  --dg-status-untracked: #B3432F;
-  --dg-status-ignored: #8C8C00;
-  --dg-status-typechange: #8A7A0E;
 
-  --dg-diff-added-bg: #E9F7EA;
-  --dg-diff-added-word-bg: #BEE6BE;
-  --dg-diff-added-gutter-bg: #DDF1DE;
-  --dg-diff-added-marker: #7FC784;
-  --dg-diff-removed-bg: #FCECEC;
-  --dg-diff-removed-word-bg: #F6C3C5;
-  --dg-diff-removed-gutter-bg: #F8E0E0;
-  --dg-diff-removed-marker: #E57373;
-  --dg-diff-modified-bg: #EAF1FD;
-  --dg-diff-modified-word-bg: #C2D8F2;
-  --dg-diff-modified-marker: #88ADF7;
-  --dg-diff-conflict-bg: #FFF1D6;
-  --dg-diff-conflict-marker: #E0A030;
   --dg-diff-filler-bg: #F7F8F9;
   --dg-diff-filler-hatch: #0000000A;
-  --dg-diff-hunk-header-bg: #EEF3FC;
-  --dg-diff-hunk-header-fg: #4A6CA8;
-  --dg-diff-hunk-active-border: #3871E1;
   --dg-diff-connector: #0000000A;
 
-  --dg-merge-conflict-bg: #FBE3E4;
-  --dg-merge-conflict-marker: #D9696A;
-  --dg-merge-modified-bg: #E3EDFC;
-  --dg-merge-modified-marker: #6F9BEA;
-  --dg-merge-inserted-bg: #E2F4E4;
-  --dg-merge-inserted-marker: #6DBB75;
-  --dg-merge-deleted-bg: #ECEEF1;
-  --dg-merge-deleted-marker: #A1A5AD;
   --dg-merge-resolved-mix: 40%;
   --dg-merge-ribbon-alpha: 70%;
 
@@ -652,32 +434,18 @@
   --dg-avatar-11: #8C7A2E;
   --dg-avatar-fg: #FFFFFF;
 
-  --dg-log-date-header-fg: #73767C;
+  --dg-log-date-header-fg: var(--dg-text-secondary);
   --dg-log-date-header-bg: #FFFFFF;
-  --dg-log-hash-fg: #818594;
+  --dg-log-hash-fg: var(--dg-text-secondary);
   --dg-log-unreachable-fg: #9FA2A8;
-  --dg-log-match-bg: #F2C55C55;
-  --dg-log-match-fg: #6B4E00;
-  --dg-ruler-head: #3871E1;
-  --dg-ruler-branch: #4E9D6C;
-  --dg-ruler-tag: #C9A03A;
-  --dg-ruler-match: #E0A800;
   --dg-ruler-selection: #000000;
 
   --dg-matrix-cell-bg: #F7F8F9;
   --dg-matrix-cell-hover-bg: #EBECF0;
-  --dg-matrix-current: #2F6FDB;
-  --dg-matrix-local: #5F6269;
-  --dg-matrix-remote-only: #B4B7BD;
   --dg-matrix-missing: #DFE1E5;
-  --dg-matrix-column-selected-bg: #E3EBFE;
-  --dg-matrix-sweep: #3871E1;
 
   --dg-console-bg: #FFFFFF;
   --dg-console-fg: #080808;
-  --dg-console-prompt: #067D17;
   --dg-console-repo: #5F6269;
-  --dg-console-stderr: #A56906;
-  --dg-console-error: #C94A55;
-  --dg-console-duration: #9FA2A8;
+  --dg-console-duration: var(--dg-text-secondary);
 }
