@@ -8,7 +8,7 @@ import { fetchAge } from "../../state/fetchAge";
 import { openBottomTool, setSidebarVisible } from "../../state/layout";
 import { runBinding } from "../../state/keymap";
 import { resolvedTheme, toggleTheme } from "../../state/settings";
-import { focusedRepo, repoById, repoColor, summary } from "../../state/workspace";
+import { focusedRepo, repoById, repoTextColor, summary } from "../../state/workspace";
 import { middleTruncate } from "./format";
 import "./statusbar.css";
 
@@ -61,7 +61,7 @@ export function StatusBar(): JSX.Element {
               </Show>
               <span class="dg-statusbar-cmd">
                 <Show when={batchSize() < 2 && owner()}>
-                  {(o) => <span class="dg-statusbar-cmd-repo" style={{ color: repoColor(o()) }}>{o().name}</span>}
+                  {(o) => <span class="dg-statusbar-cmd-repo" style={{ color: repoTextColor(o()) }}>{o().name}</span>}
                 </Show>
                 {middleTruncate(formatCommand(e()), MAX_COMMAND_CHARS)}
                 <Show when={batchSize() > 1}> × {batchSize()}</Show>
@@ -113,7 +113,7 @@ export function StatusBar(): JSX.Element {
                 setSidebarVisible(true);
               }}
             >
-              <RepoSquare color={r().color} size={8} />
+              <RepoSquare repo={r()} size={8} />
               {r().name}
             </button>
             <button type="button" class="dg-statusbar-widget" data-tip="Branches" data-tip-shortcut="Ctrl+Shift+`" onClick={() => runBinding("branch.popup")}>

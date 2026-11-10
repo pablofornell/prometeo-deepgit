@@ -14,7 +14,7 @@
  */
 import type {
   ApiErrorShape, CommitDetails, ConsoleEntry, DiffSpec, FileDiff, LogQuery, LogSessionInfo, OpResult, Project,
-  CommitRow, HunkOpts, RepoChanged, RepoSummary, Refs, ResetMode, Workspace, WorkingTree,
+  CommitRow, HunkOpts, RepoChanged, RepoInfo, RepoSummary, Refs, ResetMode, Workspace, WorkingTree,
 } from "./types";
 
 /** True when running inside the Tauri webview (false in a plain browser). */
@@ -67,6 +67,15 @@ export const projectAdd = (path: string) => invoke<Project>("project_add", { pat
 export const projectRemove = (projectId: string) => invoke<void>("project_remove", { projectId });
 export const projectRescan = (projectId: string) => invoke<Project>("project_rescan", { projectId });
 export const projectSetActive = (projectId: string) => invoke<void>("project_set_active", { projectId });
+/**
+ * Sets a repository colour: `color` is a palette index (0..11), `custom` a `#RRGGBB` string. Give one of
+ * them, or neither to go back to "Auto". Applies to the repo in every project. Resolves to the updated repo.
+ */
+export const repoSetColor = (repoId: string, color: number | null, custom: string | null) =>
+  invoke<RepoInfo>("repo_set_color", { repoId, color, custom });
+/** Same as `repoSetColor` for a project. Resolves to the updated project. */
+export const projectSetColor = (projectId: string, color: number | null, custom: string | null) =>
+  invoke<Project>("project_set_color", { projectId, color, custom });
 export const repoSummaries = (repoIds: string[]) => invoke<RepoSummary[]>("repo_summaries", { repoIds });
 
 // ---------------------------------------------------------------- 5.2 log sessions

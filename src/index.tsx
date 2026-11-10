@@ -3,6 +3,7 @@ import { render } from "solid-js/web";
 import "./theme/fonts.css";
 import "./theme/tokens.css";
 import "./theme/extra.css";
+import "./theme/colors.css";
 import "./styles/global.css";
 import App from "./App";
 

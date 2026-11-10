@@ -12,7 +12,7 @@ import { branchTable, matrixBranch, setMatrixBranch, type BranchCell, type Branc
 import { confirmAction } from "../../state/dialogs";
 import { notifyRepoChanged } from "../../state/events";
 import { cachedRefs, refreshRefs } from "../../state/refs";
-import { focusedRepoIdSignal, projectRepos, refreshSummaries, repoColor, setFocusedRepoId, summary } from "../../state/workspace";
+import { focusedRepoIdSignal, projectRepos, isMultiRepo, refreshSummaries, repoVars, setFocusedRepoId, summary } from "../../state/workspace";
 import "./matrix.css";
 
 /** Columns drawn at most; the filter narrows the rest. */
@@ -287,11 +287,12 @@ export function BranchMatrix(): JSX.Element {
                       type="button"
                       role="rowheader"
                       class="dg-matrix-rowhead"
-                      classList={{ "is-focused": r.id === focusedRepoIdSignal() }}
+                      classList={{ "is-focused": r.id === focusedRepoIdSignal(), "dg-tint-strong": isMultiRepo() }}
+                      style={repoVars(r)}
                       onClick={() => setFocusedRepoId(r.id)}
                     >
-                      <RepoSquare color={r.color} />
-                      <span class="dg-matrix-rname" style={{ "--rc": repoColor(r) }}>{r.name}</span>
+                      <RepoSquare repo={r} />
+                      <span class="dg-matrix-rname">{r.name}</span>
                       <span class="dg-matrix-rbranch">{summary(r.id)?.branch ?? ""}</span>
                     </button>
                     <For each={shown()}>
@@ -302,7 +303,8 @@ export function BranchMatrix(): JSX.Element {
                             type="button"
                             role="gridcell"
                             class="dg-matrix-cell"
-                            classList={{ "is-selected": c.name === matrixBranch() }}
+                            classList={{ "is-selected": c.name === matrixBranch(), "dg-tint": isMultiRepo() }}
+                            style={repoVars(r)}
                             data-tip={cellTip(r.id, c, cell())}
                             onClick={() => {
                               setFocusedRepoId(r.id);

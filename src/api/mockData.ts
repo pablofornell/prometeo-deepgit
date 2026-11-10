@@ -451,13 +451,13 @@ export const PAYMENTS_ROOT = "~/work/payments-platform";
 export const DEEPGIT_ROOT = "~/work/deepgit";
 
 export const SCENARIOS: Scenario[] = [
-  { name: "api-gateway", color: 4, commits: 2500, head: "feature/PAY-2318-refunds", curated: true, ahead: 3, dirty: { staged: 2, unstaged: 3, untracked: 1 }, stashes: 2 },
-  { name: "ledger-service", color: 0, commits: 2300, head: "feature/PAY-2318-refunds", curated: true, ahead: 1, state: "rebasing", conflicts: 2, dirty: { staged: 1, unstaged: 2, untracked: 0 } },
+  { name: "api-gateway", color: 0, commits: 2500, head: "feature/PAY-2318-refunds", curated: true, ahead: 3, dirty: { staged: 2, unstaged: 3, untracked: 1 }, stashes: 2 },
+  { name: "ledger-service", color: 1, commits: 2300, head: "feature/PAY-2318-refunds", curated: true, ahead: 1, state: "rebasing", conflicts: 2, dirty: { staged: 1, unstaged: 2, untracked: 0 } },
   { name: "refunds-worker", color: 2, commits: 2100, head: "main", behind: 2, remoteOnly: ["feature/PAY-2318-refunds"] },
-  { name: "web-checkout", color: 5, commits: 2400, head: "main", dirty: { staged: 0, unstaged: 3, untracked: 0 }, remoteOnly: ["feature/PAY-2318-refunds"] },
-  { name: "shared-proto", color: 1, commits: 900, head: "main" },
-  { name: "docs-site", color: 9, commits: 1200, head: "main", ahead: 1, stashes: 1 },
-  { name: "deepgit", color: 4, commits: 700, head: "main", dirty: { staged: 1, unstaged: 2, untracked: 1 } },
+  { name: "web-checkout", color: 3, commits: 2400, head: "main", dirty: { staged: 0, unstaged: 3, untracked: 0 }, remoteOnly: ["feature/PAY-2318-refunds"] },
+  { name: "shared-proto", color: 4, commits: 900, head: "main" },
+  { name: "docs-site", color: 5, commits: 1200, head: "main", ahead: 1, stashes: 1 },
+  { name: "deepgit", color: 6, commits: 700, head: "main", dirty: { staged: 1, unstaged: 2, untracked: 1 } },
 ];
 
 export function repoId(path: string): string {

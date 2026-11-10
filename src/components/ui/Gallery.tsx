@@ -88,7 +88,7 @@ export function Gallery(): JSX.Element {
       </Section>
       <Section title="Badges, pills, chips">
         <Badge>14</Badge><Badge tone="accent">3</Badge><Badge tone="error">2 conflicts</Badge><Pill>gone</Pill><Pill tone="head">HEAD</Pill>
-        <RepoChip name="api-gateway" color={4} /><RepoChip name="ledger-service" color={0} /><RepoChip name="refunds-worker" color={2} />
+        {[4, 0, 2, 5, 9, 11].map((color, i) => <RepoChip name={["api-gateway", "ledger-service", "refunds-worker", "web-checkout", "shared-proto", "docs-site"][i]} repo={{ color }} />)}
         <AheadBehind ahead={3} behind={0} upstream="origin/main" /><AheadBehind ahead={0} behind={12} /><AheadBehind ahead={2} behind={1} />
         <StatusLetter status="added" /><StatusLetter status="modified" /><StatusLetter status="deleted" /><StatusLetter status="renamed" /><StatusLetter status="conflicted" /><StatusLetter status="untracked" />
       </Section>

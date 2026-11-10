@@ -32,7 +32,7 @@
   padding-left: calc(var(--dg-space-2) + var(--d, 0) * var(--dg-tree-indent)); padding-right: var(--dg-space-3);
   border-radius: var(--dg-tree-selection-radius); white-space: nowrap; user-select: none;
 }
-.dg-changes-row:hover { background: var(--dg-row-hover-bg); }
+.dg-changes-row:hover { background-color: var(--dg-row-hover-bg); }  /* keeps the repo tint under the hover */
 .dg-changes-row.is-selected { background: var(--dg-selection-inactive-bg); color: var(--dg-selection-fg); }
 .dg-changes-list:focus-within .dg-changes-row.is-selected { background: var(--dg-selection-bg); }
 .dg-changes-list:focus-visible .dg-changes-row.is-cursor { box-shadow: inset 0 0 0 var(--dg-focus-width) var(--dg-focus-ring); }
@@ -49,8 +49,8 @@
 .dg-changes-icon { flex: none; color: var(--dg-icon-secondary); }
 
 /* repo row */
-.dg-changes-repo { margin-top: var(--dg-space-1); background: var(--dg-panel-bg); font-weight: var(--dg-weight-semibold); }
-.dg-changes-repo:hover { background: var(--dg-row-hover-bg); }
+.dg-changes-repo { margin-top: var(--dg-space-1); background-color: var(--dg-panel-bg); font-weight: var(--dg-weight-semibold); }
+.dg-changes-repo:hover { background-color: var(--dg-row-hover-bg); }
 .dg-changes-repo.is-cursor { background: var(--dg-selection-inactive-bg); }
 .dg-changes-repo-name { overflow: hidden; text-overflow: ellipsis; }
 .dg-changes-repo-branch { display: inline-flex; align-items: center; gap: var(--dg-space-2); min-width: 0; overflow: hidden; text-overflow: ellipsis; font-weight: var(--dg-weight-regular); font-size: var(--dg-font-size-medium); color: var(--dg-text-muted); }

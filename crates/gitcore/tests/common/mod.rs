@@ -65,6 +65,7 @@ pub fn info_for(id: &str, path: &Path) -> RepoInfo {
         name: id.to_string(),
         path: path.to_string_lossy().into_owned(),
         color: 0,
+        custom_color: None,
     }
 }
 

@@ -108,7 +108,7 @@ export function RepoChecklist(props: { repoIds: string[]; picked: string[]; onCh
                     onChange={(on) => toggle(id, on)}
                     label={
                       <span class="dg-dialogs-repo">
-                        <RepoSquare color={r().color} />
+                        <RepoSquare repo={r()} />
                         <span class="dg-dialogs-repo-name">{r().name}</span>
                         <Show when={props.detail?.(id)}>{(d) => <span class="dg-dialogs-repo-detail">{d()}</span>}</Show>
                       </span>
@@ -133,7 +133,7 @@ export function RepoRows(props: { rows: { repoId: string; detail: JSX.Element; t
           <Show when={repoById(row.repoId)}>
             {(r) => (
               <div class="dg-dialogs-row">
-                <RepoSquare color={r().color} />
+                <RepoSquare repo={r()} />
                 <span class="dg-dialogs-repo-name">{r().name}</span>
                 <span class="dg-dialogs-row-detail">{row.detail}</span>
                 <Show when={row.trailing}>{(t) => <span class="dg-dialogs-row-trailing">{t()}</span>}</Show>

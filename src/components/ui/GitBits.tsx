@@ -5,32 +5,34 @@
 import { For, type JSX, Show } from "solid-js";
 import type { FileStatus, RefLabel } from "../../api/types";
 import { Icon } from "./Icon";
-import { repoColorVar, statusColorVar, statusLetter } from "./util";
+import { repoColor, repoVars } from "../../state/colors";
+import type { ColorChoice } from "../../theme/palette";
+import { statusColorVar, statusLetter } from "./util";
 
 export interface RepoChipProps {
   name: string;
-  /** Repo colour index (`RepoInfo.color`). */
-  color: number;
+  /** The repo (`RepoInfo`): its palette colour and custom colour. */
+  repo: ColorChoice | undefined;
   title?: string;
 }
 
 /**
  * Repository chip: tinted background, repo-colour text (DESIGN.md 4.1 rule 6).
  *
- *   <RepoChip name={repo.name} color={repo.color} />
+ *   <RepoChip name={repo.name} repo={repo} />
  */
 export function RepoChip(props: RepoChipProps): JSX.Element {
   return (
-    <span class="dg-repochip" style={{ "--rc": repoColorVar(props.color) }} title={props.title ?? props.name}>
+    <span class="dg-repochip" style={repoVars(props.repo)} title={props.title ?? props.name}>
       {props.name}
     </span>
   );
 }
 
-/** 10x10 rounded colour square of a repo (sidebar rows, status bar). `<RepoSquare color={repo.color} />` */
-export function RepoSquare(props: { color: number; size?: number }): JSX.Element {
+/** 10x10 rounded colour square of a repo (sidebar rows, status bar). `<RepoSquare repo={repo} />` */
+export function RepoSquare(props: { repo: ColorChoice | undefined; size?: number }): JSX.Element {
   const s = () => (props.size ?? 10) + "px";
-  return <span class="dg-repo-square" style={{ background: repoColorVar(props.color), width: s(), height: s() }} />;
+  return <span class="dg-repo-square" style={{ background: repoColor(props.repo), width: s(), height: s() }} />;
 }
 
 export interface RefPillProps {

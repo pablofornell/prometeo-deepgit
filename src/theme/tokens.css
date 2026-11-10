@@ -305,37 +305,13 @@
 
   /* =========================== DeepGit-specific ============================ */
 
-  /* ---- Graph lanes (10). Lane colour = palette[laneIndex % 10]. ---- */
-  --dg-lane-0: #5A9CF8;  /* blue   - reserved first for the lane that holds HEAD */
-  --dg-lane-1: #3FBA8C;  /* jade   */
-  --dg-lane-2: #E6A94B;  /* amber  */
-  --dg-lane-3: #C27BE0;  /* orchid */
-  --dg-lane-4: #E5707E;  /* rose   */
-  --dg-lane-5: #4CC3D4;  /* cyan   */
-  --dg-lane-6: #A7C35A;  /* lime   */
-  --dg-lane-7: #F08C5A;  /* tangerine */
-  --dg-lane-8: #8E95F2;  /* periwinkle */
-  --dg-lane-9: #D97BB8;  /* pink   */
+  /* ---- Graph lanes (10): see colors.css. ---- */
   --dg-lane-dim-opacity: 0.32;     /* lanes not on the selected commit's path when "highlight path" is on */
   --dg-graph-node-stroke: #191A1C; /* 1.5px ring that cuts the node out of the edges */
   --dg-graph-head-ring: #D1D3D9;   /* outer ring of HEAD node */
   --dg-graph-wip-stroke: #9FA2A8;  /* dashed hollow node of the "Uncommitted changes" row */
 
-  /* ---- Repo palette (12). Repo colour = user choice, else palette[hash(repoPath) % 12]. ---- */
-  --dg-repo-0: #E06C75;  /* coral  */
-  --dg-repo-1: #D19A4A;  /* ochre  */
-  --dg-repo-2: #98C379;  /* moss   */
-  --dg-repo-3: #3EB8A8;  /* teal   */
-  --dg-repo-4: #61AFEF;  /* sky    */
-  --dg-repo-5: #9D8CF0;  /* iris   */
-  --dg-repo-6: #C678DD;  /* plum   */
-  --dg-repo-7: #E5A3C0;  /* blush  */
-  --dg-repo-8: #B8B26A;  /* olive  */
-  --dg-repo-9: #7FA3C8;  /* steel  */
-  --dg-repo-10: #E8875F; /* clay   */
-  --dg-repo-11: #6FC3DF; /* glacier */
-  --dg-repo-tint-mix: 14%;         /* chip background = color-mix(in srgb, repoColor 14%, transparent) */
-  --dg-repo-chip-fg-mix: 85%;      /* chip text = color-mix(in srgb, repoColor 85%, var(--dg-text)) */
+  /* ---- Repo palette (12), repo tints, accent and ref pill overrides: see colors.css (loaded after this file). ---- */
 
   /* ---- Ref pills ---- */
   --dg-ref-head-bg: #3871E1;       /* "HEAD" pill and current branch pill outline */
@@ -576,35 +552,10 @@
   --dg-editor-type: #008080;
 
   /* DeepGit-specific (light) */
-  --dg-lane-0: #2F6FDB;
-  --dg-lane-1: #1C9468;
-  --dg-lane-2: #B97A12;
-  --dg-lane-3: #9B4DC0;
-  --dg-lane-4: #C9435A;
-  --dg-lane-5: #1A93A8;
-  --dg-lane-6: #6F8F1E;
-  --dg-lane-7: #C9602A;
-  --dg-lane-8: #5A61D6;
-  --dg-lane-9: #B14A8F;
   --dg-lane-dim-opacity: 0.28;
   --dg-graph-node-stroke: #FFFFFF;
   --dg-graph-head-ring: #000000;
   --dg-graph-wip-stroke: #73767C;
-
-  --dg-repo-0: #C94A55;
-  --dg-repo-1: #B07617;
-  --dg-repo-2: #4F8F2F;
-  --dg-repo-3: #13897A;
-  --dg-repo-4: #2C7FCC;
-  --dg-repo-5: #6A57D6;
-  --dg-repo-6: #9C45B8;
-  --dg-repo-7: #C2557F;
-  --dg-repo-8: #888217;
-  --dg-repo-9: #4F7398;
-  --dg-repo-10: #C25A2C;
-  --dg-repo-11: #208FB3;
-  --dg-repo-tint-mix: 12%;
-  --dg-repo-chip-fg-mix: 90%;
 
   --dg-ref-head-bg: #3871E1;
   --dg-ref-head-fg: #FFFFFF;

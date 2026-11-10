@@ -145,7 +145,7 @@ All colours are in `tokens.css`. The tables in section 4.3 are generated from th
 3. **Lane colour (single-repo log).** Use `--dg-lane-{laneIndex % 10}`. Lane 0 is always the lane of the first-parent chain of HEAD, so HEAD is always blue.
 4. **Lane colour (combined log).** Default mode is "by repository": all lanes of one repository use its repository colour. The user can switch to "by branch" with the palette button in the log header.
 5. **Avatar colour.** Compute `hash(lowercase(email)) % 12`. Use `--dg-avatar-{n}`. Use FNV-1a 32-bit as the hash for all three cases, so the colour is stable between sessions and machines.
-6. **Repo chip.** Background is `color-mix(in srgb, <repo colour> var(--dg-repo-tint-mix), transparent)`. Text is `color-mix(in srgb, <repo colour> var(--dg-repo-chip-fg-mix), var(--dg-text))`.
+6. **Repo chip.** Background is `color-mix(in srgb, <repo colour> var(--dg-repo-chip-tint), transparent)`. Text is the text-safe repo colour `--rc-fg` (`--dg-repo-N-fg`, or a readable version of a custom colour).
 
 ### 4.2 Contrast rules
 
@@ -334,7 +334,12 @@ Values are `#RRGGBB` or `#RRGGBBAA`. Metrics, motion and font tokens are in the 
 | `--dg-graph-head-ring` | `#D1D3D9` | `#000000` | outer ring of HEAD node |
 | `--dg-graph-wip-stroke` | `#9FA2A8` | `#73767C` | dashed hollow node of the "Uncommitted changes" row |
 
-#### Repo palette (12). Repo colour = user choice, else palette[hash(repoPath) % 12].
+#### Repo palette (12). Repo colour = user choice, else the least-used palette index (see PLAN.md 4).
+
+> The values in this table are the original calm palette. The shipped values are the electric palette in
+> `src/theme/colors.css` (fill `--dg-repo-N` and text `--dg-repo-N-fg`), with contrast checked by
+> `src/theme/colors.test.ts`. Repo tints (`.dg-tint`, `.dg-tint-strong`, `.dg-tint-soft`) and the intensity
+> variable `--dg-repo-tint-k` are described in that file.
 
 | Token | Dark | Light | Use |
 |---|---|---|---|

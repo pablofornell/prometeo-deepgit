@@ -386,7 +386,7 @@ function RepoChips(props: { repoIds: string[] }): JSX.Element {
   const repos = () => props.repoIds.map((id) => repoById(id)).filter((r): r is NonNullable<typeof r> => !!r);
   return (
     <span class="dg-palette-chips">
-      <For each={repos().slice(0, 2)}>{(r) => <RepoChip name={r.name} color={r.color} />}</For>
+      <For each={repos().slice(0, 2)}>{(r) => <RepoChip name={r.name} repo={r} />}</For>
       <Show when={repos().length > 2}>
         <span class="dg-palette-sub" title={repos().slice(2).map((r) => r.name).join("\n")}>+{repos().length - 2}</span>
       </Show>
@@ -413,7 +413,7 @@ function CommitRow(props: { item: CommitItem; positions: number[] }): JSX.Elemen
       <span class="dg-palette-dot-cell"><span class="dg-palette-dot" style={{ background: repoColor(repo()) }} /></span>
       <span class="dg-palette-text"><Hl text={props.item.subject} positions={props.positions} /></span>
       <span class="dg-palette-sub dg-palette-author">{props.item.authorName}</span>
-      <Show when={repo()}>{(r) => <RepoChip name={r().name} color={r().color} />}</Show>
+      <Show when={repo()}>{(r) => <RepoChip name={r().name} repo={r()} />}</Show>
       <span class="dg-palette-hash">{shortOid(props.item.oid)}</span>
     </>
   );
@@ -433,7 +433,7 @@ function FileRow(props: { item: FileItem; positions: number[] }): JSX.Element {
         </Show>
       </span>
       <StatusLetter status={props.item.status} />
-      <Show when={repo()}>{(r) => <RepoChip name={r().name} color={r().color} />}</Show>
+      <Show when={repo()}>{(r) => <RepoChip name={r().name} repo={r()} />}</Show>
     </>
   );
 }
@@ -452,7 +452,7 @@ function RepoRow(props: { item: RepoItem; positions: number[] }): JSX.Element {
     <Show when={repo()}>
       {(r) => (
         <>
-          <span class="dg-palette-square-cell"><RepoSquare color={r().color} /></span>
+          <span class="dg-palette-square-cell"><RepoSquare repo={r()} /></span>
           <span class="dg-palette-text"><Hl text={r().name} positions={props.positions} /></span>
           <Show when={s()?.branch}>
             {(b) => <span class="dg-palette-sub dg-palette-branch"><Icon name="branch" size={12} />{b()}</span>}

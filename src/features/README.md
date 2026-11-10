@@ -40,7 +40,10 @@ feature. Cross-feature communication goes through `state/` (selection, layout, a
   (virtual list row height, canvas/SVG maths), read it with `cssPx("--dg-...", fallback)` from `state/metrics.ts` inside a memo or
   effect: it re-runs when the font size changes, and the token must be `round(calc(N * var(--dg-u)), 1px)`. Never keep a row height as a
   px constant in TypeScript. Icon sizes (`<Icon size={14}>`) are px at the default font and scale on their own.
-- Repo colour: `var(--dg-repo-N)` via `repoColor(repo)` (state/workspace) or `repoColorVar(index)`; lane colour:
+- Repo and project colour: `repoColor(repo)` gives the fill (palette `var(--dg-repo-N)` or the custom `#RRGGBB`), `repoVars(repo)` gives the
+  inline style (`--rc`, `--rc-fg`, `--rc-tint`) for tints and chips (both from `state/workspace`, defined in `state/colors.ts`). Add the class
+  `dg-tint` (rows), `dg-tint-strong` (headers) or `dg-tint-soft` (children) to tint an element; use `background-color` (not the `background`
+  shorthand) for your own base and hover rules on it, so the tint stays. `isMultiRepo()` says when to tint. Lane colour:
   `laneColorVar(i)` (`i % 10` is done for you). Never use them for anything else.
 - No transitions on hover/selection (DESIGN.md section 7). Respect `prefers-reduced-motion` by using the `--dg-dur-*` tokens.
 

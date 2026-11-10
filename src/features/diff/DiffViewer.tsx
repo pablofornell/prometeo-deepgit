@@ -13,6 +13,7 @@ import { confirmAction } from "../../state/dialogs";
 import { repoVersion } from "../../state/events";
 import { cssPx } from "../../state/metrics";
 import { settings } from "../../state/settings";
+import { isMultiRepo, repoById, repoVars } from "../../state/workspace";
 import { chooseDiffMode, collapseOn, explicitDiffMode, ignoreWs, lineNumbersOn, setCollapseOn, setIgnoreWs, setLineNumbersOn, setSyntaxOn, setWordDiffOn, syntaxOn, wordDiffOn } from "./diffPrefs";
 import { activateDiff, releaseDiff, type DiffController } from "./diffKeys";
 import { NARROW_DIFF_PX, effectiveDiffMode } from "./diffMode";
@@ -424,7 +425,7 @@ export function DiffViewer(props: DiffViewerProps): JSX.Element {
       onPointerDown={() => activateDiff(controller)}
       onFocusIn={() => activateDiff(controller)}
     >
-      <div class="dg-diff-head">
+      <div class="dg-diff-head" classList={{ "dg-tint-strong": !!repoById(props.repoId) && isMultiRepo() }} style={repoVars(repoById(props.repoId))}>
         <Icon name={fileIconFor(props.path)} size={16} class="dg-diff-file-icon" />
         <span class="dg-diff-path" title={props.oldPath && props.oldPath !== props.path ? `${props.oldPath} → ${props.path}` : props.path}>
           <Show when={props.oldPath && props.oldPath !== props.path}>

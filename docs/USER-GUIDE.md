@@ -39,7 +39,15 @@ The scan skips hidden folders and the folders `node_modules`, `target`, `dist`, 
 The scan does not follow symbolic links.
 
 The project opens with the combined log of all repositories.
-DeepGit gives each repository a colour.
+DeepGit gives each repository its own colour. The colours are bright and spread over the whole rainbow.
+The colour shows as a small square, a coloured spine, and a soft tint behind the rows of that repository.
+
+To change a colour, right-click the repository in the sidebar and choose **Set Color**.
+Pick one of the 12 colours, choose **Auto** to go back to the automatic colour, or choose **Custom…** to type a `#RRGGBB` value.
+You can also press `Shift Shift` and run **Set repository color…**.
+Each project has a colour too. It tints the project button in the title bar and its row in the project switcher.
+Change it in the project switcher menu (**Set Color**).
+The tint is soft on purpose: text stays readable in the light and the dark theme, and hover and selection stay clear above it.
 
 To add more projects later, use the project switcher in the title bar (`Ctrl+Alt+P`) and choose **Add project folder…**.
 You can also click the **+** button in the sidebar header.

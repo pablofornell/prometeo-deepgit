@@ -18,7 +18,9 @@
  */
 import { type Accessor, For, Index, type JSX, Show, createEffect, createMemo, createSignal, onCleanup, onMount } from "solid-js";
 import { Portal } from "solid-js/web";
+import { repoVars } from "../../state/colors";
 import { trackOverlay } from "../../state/keymap";
+import type { ColorChoice } from "../../theme/palette";
 import { Icon } from "./Icon";
 import type { IconName } from "./icons";
 import { Kbd } from "./Kbd";
@@ -36,6 +38,10 @@ export interface MenuItem {
   separator?: boolean;
   /** Small grey group title (not selectable). */
   heading?: boolean;
+  /** CSS colour of a small rounded square drawn in the icon slot (colour pickers). */
+  swatch?: string;
+  /** Tints the row with this repo or project colour (a semi-transparent background; hover and the active row stay visible). */
+  tint?: ColorChoice;
   /** Shows a tick; the item still needs `onSelect` to toggle. */
   checked?: boolean;
   /** Nested items; opens on hover (150 ms) or Right. */
@@ -251,7 +257,9 @@ function MenuPanel(props: { level: Accessor<Level>; depth: number }): JSX.Elemen
                   "is-active": props.level().active === i(),
                   "is-disabled": !!item.disabled,
                   "is-danger": !!item.danger,
+                  "dg-tint": !!item.tint,
                 }}
+                style={item.tint ? repoVars(item.tint) : undefined}
                 role={item.checked !== undefined ? "menuitemcheckbox" : "menuitem"}
                 aria-checked={item.checked}
                 aria-disabled={item.disabled}
@@ -284,6 +292,7 @@ function MenuPanel(props: { level: Accessor<Level>; depth: number }): JSX.Elemen
                 </span>
                 <span class="dg-menu-icon">
                   <Show when={item.icon}>{(n) => <Icon name={n()} />}</Show>
+                  <Show when={item.swatch}>{(c) => <i class="dg-menu-swatch" style={{ background: c() }} />}</Show>
                 </span>
                 <span class="dg-menu-label">{item.label}</span>
                 <Show when={item.shortcut}>

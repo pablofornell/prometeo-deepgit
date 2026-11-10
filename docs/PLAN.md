@@ -61,11 +61,26 @@ src/                       SolidJS UI
 ## 4. Types (Rust names; TS mirror is identical, camelCase)
 
 ```rust
-pub struct RepoInfo { pub id: String, pub name: String, pub path: String, pub color: u8 }
+pub struct RepoInfo { pub id: String, pub name: String, pub path: String,
+                      pub color: u8, pub custom_color: Option<String> }
 // id = first 12 hex chars of sha1(canonical path). name = path relative to project root,
-// or the folder name when the repo is the project root. color = index in repo palette (0..8).
+// or the folder name when the repo is the project root.
+// color = index in the 12-colour palette (PALETTE_SIZE = 12, src/theme/colors.css). It is always set.
+// custom_color = "#RRGGBB" (upper case) the user typed in; when set it wins over `color`.
+// `custom_color` is `#[serde(default)]`: old workspace.json files load (None).
+//
+// Colour assignment (src-tauri/src/workspace.rs, gitcore/src/palette.rs):
+// - A new repo gets the palette index that is used least among the repos of the workspace that show
+//   a palette colour (repos with a custom colour show none). Ties: the lowest index.
+// - A repo the workspace already knows (same id, in any project) keeps `color` and `custom_color`
+//   when a project is added again or rescanned. A repo that vanished frees its colour.
+// - One repo has one colour: `repo_set_color` changes every copy of the repo in all projects.
 
-pub struct Project { pub id: String, pub name: String, pub path: String, pub repos: Vec<RepoInfo> }
+pub struct Project { pub id: String, pub name: String, pub path: String, pub repos: Vec<RepoInfo>,
+                     pub color: u8, pub custom_color: Option<String> }
+// Same rules for the project colour: least-used index among the projects, `custom_color` wins.
+// Old files have no project colour (`color` = 255 on load, `UNASSIGNED`); the workspace gives each such
+// project the least-used index when it loads.
 
 pub struct Workspace { pub projects: Vec<Project>, pub active_project_id: Option<String>,
                        pub ui: serde_json::Value /* opaque UI state the frontend saves */ }
@@ -177,6 +192,15 @@ with the same name in camelCase (e.g. `logOpen`).
 | `project_remove` | `projectId` | `()` |
 | `project_rescan` | `projectId` | `Project` |
 | `project_set_active` | `projectId` | `()` |
+| `repo_set_color` | `repoId`, `color: Option<u8>`, `custom: Option<String>` | `RepoInfo` (updated; saves the workspace) |
+| `project_set_color` | `projectId`, `color: Option<u8>`, `custom: Option<String>` | `Project` (updated; saves the workspace) |
+
+Colour commands (`color`, `custom`): give a palette index (`0..11`) **or** a `#RRGGBB` string **or** neither.
+- `color = Some(i)`: sets the palette index and clears the custom colour. Error `Unknown palette color` when `i >= 12`.
+- `custom = Some(hex)`: sets the custom colour (stored upper case) and keeps the palette index. Error `Invalid color, expected #RRGGBB` for anything else.
+- both `None` ("Auto"): clears the custom colour and sets `color` to the least-used index among the other repos (or projects).
+- both `Some`: error `Give a palette color or a custom color, not both`. Unknown id: `unknown repository` / `unknown project`.
+The browser mock (`src/api/mock.ts`, `mockColors.ts`) applies the same rules and messages.
 | `repo_summaries` | `repoIds: Vec<String>` | `Vec<RepoSummary>` (parallel) |
 
 ### 5.2 Log (server-side sessions; the UI only fetches visible rows)

@@ -40,6 +40,10 @@ export interface TreeProps<T> {
   /** Vertical indent guides (default true). */
   guides?: boolean;
   class?: string;
+  /** Extra class names for the row of a node (for example a repo tint class from colors.css). */
+  rowClass?: (node: T) => string | undefined;
+  /** Extra inline style for the row of a node (for example `repoVars(repo)`). */
+  rowStyle?: (node: T) => JSX.CSSProperties | undefined;
   ariaLabel?: string;
   apiRef?: (api: TreeApi) => void;
 }
@@ -154,13 +158,13 @@ export function Tree<T>(props: TreeProps<T>): JSX.Element {
               const toggle = () => row().hasChildren && setExpanded(row().id, !isExpanded());
               return (
                 <div
-                  class="dg-tree-row"
+                  class={"dg-tree-row" + (props.rowClass?.(row().node) ? " " + props.rowClass(row().node) : "")}
                   classList={{ "is-selected": selected() }}
                   role="treeitem"
                   aria-level={row().depth + 1}
                   aria-expanded={row().hasChildren ? isExpanded() : undefined}
                   aria-selected={selected()}
-                  style={{ "padding-left": 4 + row().depth * indent() + "px" }}
+                  style={{ ...props.rowStyle?.(row().node), "padding-left": 4 + row().depth * indent() + "px" }}
                   onClick={() => props.onSelect?.(row().node, row().id)}
                   onDblClick={() => (props.onActivate ? props.onActivate(row().node, row().id) : toggle())}
                   onContextMenu={(e) => props.onContextMenu?.(row().node, e)}

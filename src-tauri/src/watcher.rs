@@ -656,6 +656,7 @@ mod live_tests {
             name: "r1".into(),
             path: root.to_string_lossy().into_owned(),
             color: 0,
+            custom_color: None,
         }]);
         if !w.is_active() {
             eprintln!("skipping: no file watcher available here");
@@ -682,6 +683,7 @@ mod live_tests {
             name: "r1".into(),
             path: root.to_string_lossy().into_owned(),
             color: 0,
+            custom_color: None,
         }
     }
 

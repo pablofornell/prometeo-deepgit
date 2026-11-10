@@ -114,7 +114,7 @@
 .dg-log-vlist::-webkit-scrollbar { display: none; }
 
 .dg-log-row { display: grid; grid-template-columns: var(--lg-cols); align-items: center; height: 100%; white-space: nowrap; position: relative; user-select: none; cursor: default; }
-.dg-log-row:hover { background: var(--dg-row-hover-bg); }
+.dg-log-row:hover { background-color: var(--dg-row-hover-bg); }  /* keeps the repo tint (a background-image) under the hover */
 .dg-log-row.is-date:hover, .dg-log-row.is-loading:hover { background: transparent; }
 .dg-log-row.is-selected { background: var(--dg-selection-inactive-bg); }
 .dg-log-vlist:focus-within .dg-log-row.is-selected { background: var(--dg-selection-bg); }

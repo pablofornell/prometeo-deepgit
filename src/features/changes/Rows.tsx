@@ -5,8 +5,8 @@
  */
 import { type JSX, Show } from "solid-js";
 import type { FileChange, WorkingTree } from "../../api/types";
-import { Badge, Icon, IconButton, RepoSquare, StatusLetter, fileIconFor, plural, repoColorVar, splitPath, statusColorVar, tip } from "../../components/ui";
-import { repoById, summary } from "../../state/workspace";
+import { Badge, Icon, IconButton, RepoSquare, StatusLetter, fileIconFor, plural, splitPath, statusColorVar, tip } from "../../components/ui";
+import { repoById, repoColor, repoVars, summary } from "../../state/workspace";
 import { SECTION_TITLE, type Row, type Section } from "./model";
 
 type Of<K extends Row["kind"]> = Extract<Row, { kind: K }>;
@@ -111,7 +111,7 @@ function Counts(props: { file: FileChange }): JSX.Element {
 
 const rowAttrs = (ctl: RowCtl, row: Row) => ({
   "data-key": row.key,
-  "style": { "--d": row.depth, ...(ctl.spine ? { "--spine": repoColorVar(repoById(row.repoId)?.color ?? 0) } : {}) } as JSX.CSSProperties,
+  "style": { "--d": row.depth, ...(ctl.spine ? { "--spine": repoColor(repoById(row.repoId)), ...repoVars(repoById(row.repoId)) } : {}) } as JSX.CSSProperties,
 });
 
 // ---------------------------------------------------------------- repo
@@ -122,7 +122,7 @@ export function RepoRowView(props: { row: RepoRow; ctl: RowCtl; open: boolean })
   return (
     <div
       class="dg-changes-row dg-changes-repo"
-      classList={{ "is-cursor": props.ctl.isCursor(props.row.key) }}
+      classList={{ "is-cursor": props.ctl.isCursor(props.row.key), "dg-tint-strong": props.ctl.spine }}
       role="treeitem"
       aria-level={1}
       aria-expanded={props.open}
@@ -131,7 +131,7 @@ export function RepoRowView(props: { row: RepoRow; ctl: RowCtl; open: boolean })
       onContextMenu={(e) => props.ctl.context(props.row, e)}
     >
       <Chevron open={props.open} />
-      <RepoSquare color={repo()?.color ?? 0} />
+      <RepoSquare repo={repo()} />
       <span class="dg-changes-repo-name">{repo()?.name ?? props.row.repoId}</span>
       <Show when={summary(props.row.repoId)?.branch ?? "detached HEAD"}>
         {(b) => (
@@ -169,7 +169,7 @@ export function SectionRowView(props: { row: SectionRow; ctl: RowCtl }): JSX.Ele
   return (
     <div
       class="dg-changes-row dg-changes-section"
-      classList={{ "is-cursor": props.ctl.isCursor(props.row.key), "is-conflicts": props.row.section === "conflicts" }}
+      classList={{ "is-cursor": props.ctl.isCursor(props.row.key), "is-conflicts": props.row.section === "conflicts", "dg-tint": props.ctl.spine }}
       role="treeitem"
       aria-level={props.row.depth + 1}
       aria-expanded={props.row.open}
@@ -204,7 +204,7 @@ export function DirRowView(props: { row: DirRow; ctl: RowCtl }): JSX.Element {
   return (
     <div
       class="dg-changes-row dg-changes-dir"
-      classList={{ "is-selected": props.ctl.isSelected(props.row.key), "is-cursor": props.ctl.isCursor(props.row.key) }}
+      classList={{ "is-selected": props.ctl.isSelected(props.row.key), "is-cursor": props.ctl.isCursor(props.row.key), "dg-tint": props.ctl.spine }}
       role="treeitem"
       aria-level={props.row.depth + 1}
       aria-expanded={props.row.open}
@@ -250,7 +250,7 @@ export function FileRowView(props: { row: FileRow; ctl: RowCtl }): JSX.Element {
   return (
     <div
       class="dg-changes-row dg-changes-file"
-      classList={{ "is-selected": props.ctl.isSelected(props.row.key), "is-cursor": props.ctl.isCursor(props.row.key) }}
+      classList={{ "is-selected": props.ctl.isSelected(props.row.key), "is-cursor": props.ctl.isCursor(props.row.key), "dg-tint": props.ctl.spine }}
       role="treeitem"
       aria-level={props.row.depth + 1}
       aria-selected={props.ctl.isSelected(props.row.key)}

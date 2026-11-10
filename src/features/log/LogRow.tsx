@@ -3,8 +3,9 @@
  * and the "Uncommitted changes" row. All three share the grid of the column header (CSS variables on `.dg-log`).
  */
 import { For, type JSX, Show, createMemo } from "solid-js";
-import type { CommitRow, GraphRow } from "../../api/types";
+import type { CommitRow, GraphRow, RepoInfo } from "../../api/types";
 import { Avatar, RefPills, RepoChip, formatDateTime, formatLogDate, plural, shortOid } from "../../components/ui";
+import { repoColor, repoVars } from "../../state/colors";
 import { type GraphMetrics, type NodeKind, passThroughShape, rowGraphShape } from "./graph";
 import type { DisplayMap } from "./dateGroups";
 import { splitMatches } from "./query";
@@ -13,7 +14,7 @@ import { isHeadRow } from "./scan";
 
 export interface WipInfo {
   /** Dirty repos among the selected ones, in sidebar order. */
-  repos: { id: string; name: string; color: number }[];
+  repos: RepoInfo[];
   files: number;
   /** Lane of the HEAD node the dashed edge connects to, and the commit index of that HEAD. */
   lane: number;
@@ -33,9 +34,8 @@ export interface RowCtx {
   multiRepo: () => boolean;
   /** CSS colour of a lane colour index; `owner` is the repo of the node when it is known (by-repository colours). */
   laneColor: (color: number, owner?: string) => string;
-  repoColor: (repoId: string) => string;
-  /** Repo colour index (0..11), for `RepoChip`. */
-  repoIdx: (repoId: string) => number;
+  /** The repo of a row: its colour (spine, chip, tint) and name. Undefined for an unknown id. */
+  repo: (repoId: string) => RepoInfo | undefined;
   repoName: (repoId: string) => string;
   isSelected: (key: string) => boolean;
   needle: () => string;
@@ -114,7 +114,8 @@ function CommitRowBody(props: { ctx: RowCtx; ci: number; row: CommitRow }): JSX.
   return (
     <div
       class="dg-log-row"
-      classList={{ "is-selected": ctx.isSelected(key), "is-head": head, "is-merge": kind === "merge" }}
+      classList={{ "is-selected": ctx.isSelected(key), "is-head": head, "is-merge": kind === "merge", "dg-tint": ctx.multiRepo() }}
+      style={ctx.multiRepo() ? repoVars(ctx.repo(r.repoId)) : undefined}
       role="row"
       aria-selected={ctx.isSelected(key)}
       aria-label={accessibleName(r, ctx.repoName(r.repoId))}
@@ -125,7 +126,7 @@ function CommitRowBody(props: { ctx: RowCtx; ci: number; row: CommitRow }): JSX.
       <span
         class="dg-log-spine"
         classList={{ "is-on": ctx.multiRepo() }}
-        style={{ background: ctx.multiRepo() ? ctx.repoColor(r.repoId) : undefined }}
+        style={{ background: ctx.multiRepo() ? repoColor(ctx.repo(r.repoId)) : undefined }}
         data-tip={ctx.multiRepo() ? ctx.repoName(r.repoId) : undefined}
         onClick={(e) => ctx.multiRepo() && ctx.onSpine(e, r.repoId)}
       />
@@ -146,7 +147,7 @@ function CommitRowBody(props: { ctx: RowCtx; ci: number; row: CommitRow }): JSX.
       </span>
       <span class="dg-log-repo" role="gridcell">
         <Show when={ctx.multiRepo()}>
-          <RepoChip name={ctx.repoName(r.repoId)} color={ctx.repoIdx(r.repoId)} />
+          <RepoChip name={ctx.repoName(r.repoId)} repo={ctx.repo(r.repoId)} />
         </Show>
       </span>
       <span class="dg-log-author" role="gridcell">
@@ -206,7 +207,7 @@ const stripes = (colors: string[]): string => `repeating-linear-gradient(180deg,
 
 export function WipRowView(props: { ctx: RowCtx; wip: WipInfo }): JSX.Element {
   const ctx = props.ctx;
-  const colors = () => props.wip.repos.map((r) => `var(--dg-repo-${r.color % 12})`);
+  const colors = () => props.wip.repos.map((r) => repoColor(r));
   const w = () => ctx.graphWidth();
   const h = () => ctx.metrics().rowHeight;
   const x = () => (props.wip.lane + 1) * ctx.metrics().lane;
@@ -229,7 +230,7 @@ export function WipRowView(props: { ctx: RowCtx; wip: WipInfo }): JSX.Element {
       <span class="dg-log-repo">
         <Show when={ctx.multiRepo()}>
           <span class="dg-log-dots is-row">
-            <For each={props.wip.repos.slice(0, 4)}>{(r) => <i style={{ background: `var(--dg-repo-${r.color % 12})` }} />}</For>
+            <For each={props.wip.repos.slice(0, 4)}>{(r) => <i style={{ background: repoColor(r) }} />}</For>
           </span>
           <span class="dg-log-wip-n">{props.wip.repos.length === 1 ? props.wip.repos[0].name : plural(props.wip.repos.length, "repo")}</span>
         </Show>

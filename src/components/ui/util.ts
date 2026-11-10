@@ -14,11 +14,6 @@ export function fnv1a(s: string): number {
   return h >>> 0;
 }
 
-/** `var(--dg-repo-N)` for a repo colour index (0..11). */
-export function repoColorVar(index: number): string {
-  return `var(--dg-repo-${((index % 12) + 12) % 12})`;
-}
-
 /** `var(--dg-lane-N)` for an unbounded graph colour index. */
 export function laneColorVar(index: number): string {
   return `var(--dg-lane-${index % 10})`;

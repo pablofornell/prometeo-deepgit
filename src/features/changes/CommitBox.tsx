@@ -6,11 +6,11 @@
 import { For, type JSX, Show, createEffect, createMemo, createSignal, on, onCleanup } from "solid-js";
 import * as api from "../../api/tauri";
 import type { RepoInfo } from "../../api/types";
-import { Button, Checkbox, Icon, Splitter, plural, repoColorVar, toast } from "../../components/ui";
+import { Button, Checkbox, Icon, Splitter, plural, toast } from "../../components/ui";
 import * as actions from "../../state/actions";
 import { register } from "../../state/keymap";
 import { mainTab } from "../../state/selection";
-import { activeProject, summary } from "../../state/workspace";
+import { activeProject, repoColor, summary } from "../../state/workspace";
 import { SUBJECT_LIMIT, commitLabel, subjectLength } from "./model";
 
 export interface CommitTarget {
@@ -173,7 +173,7 @@ export function CommitBox(props: CommitBoxProps): JSX.Element {
             <For each={commitRepos()}>
               {(r) => (
                 <span class="dg-changes-target" title={`${r.name}: ${plural(props.targets().find((t) => t.repo.id === r.id)?.staged ?? 0, "staged file")}`}>
-                  <i class="dg-changes-target-dot" style={{ background: repoColorVar(r.color) }} />
+                  <i class="dg-changes-target-dot" style={{ background: repoColor(r) }} />
                   {r.name}
                 </span>
               )}

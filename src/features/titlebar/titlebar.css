@@ -18,7 +18,7 @@
   display: inline-flex; align-items: center; gap: var(--dg-space-3); height: var(--dg-toolbar-dropdown-height); padding: var(--dg-toolbar-dropdown-padding);
   border-radius: var(--dg-toolbar-dropdown-radius); max-width: var(--dg-toolbar-dropdown-max-width); min-width: 0; color: var(--dg-toolbar-fg);
 }
-.dg-titlebar-dd:hover, .dg-titlebar-dd.is-open { background: var(--dg-hover-bg); }
+.dg-titlebar-dd:hover, .dg-titlebar-dd.is-open { background-color: var(--dg-hover-bg); }  /* keeps a project tint (background-image) under the hover */
 .dg-titlebar-dd-main { font-weight: var(--dg-weight-semibold); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .dg-titlebar-dd-main.is-mono { font-family: var(--dg-font-mono); font-size: var(--dg-font-size-mono); }
 .dg-titlebar-dd-sub { color: var(--dg-text-secondary); font-size: var(--dg-font-size-medium); white-space: nowrap; flex: none; }

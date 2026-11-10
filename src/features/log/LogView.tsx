@@ -12,7 +12,7 @@ import { refsVersion } from "../../state/refs";
 import { loadPersisted, savePersisted } from "../../state/persist";
 import { mainTab, selectedCommit, setChangesRepoId, setMainTab, setSelectedCommit } from "../../state/selection";
 import { setSetting, settings } from "../../state/settings";
-import { activeProject, focusedRepo, refreshSummaries, repoById, selectOnlyRepo, selectedRepoIds, selectedRepos, summary, toggleRepo } from "../../state/workspace";
+import { activeProject, focusedRepo, refreshSummaries, repoById, repoColor, selectOnlyRepo, selectedRepoIds, selectedRepos, summary, toggleRepo } from "../../state/workspace";
 import { resetAuthors, mergeAuthors } from "./authors";
 import { OperationBanners, SkippedBanner } from "./Banner";
 import { DisplayMap } from "./dateGroups";
@@ -123,7 +123,7 @@ export function LogView(): JSX.Element {
       return n + s.staged + s.unstaged + s.untracked + s.conflicted;
     }, 0);
     const head = ctl.scan().heads.get(dirty[0].id);
-    return { repos: dirty.map((r) => ({ id: r.id, name: r.name, color: r.color })), files, lane: head?.lane ?? 0, headRow: head?.row ?? null };
+    return { repos: dirty, files, lane: head?.lane ?? 0, headRow: head?.row ?? null };
   });
 
   const map = createMemo(() => {
@@ -507,12 +507,11 @@ export function LogView(): JSX.Element {
     laneColor: (color, owner) => {
       if (multiRepo() && settings.laneColors === "repo") {
         const o = owner ?? ctl.colorOwner(color);
-        if (o) return `var(--dg-repo-${(repoById(o)?.color ?? 0) % 12})`;
+        if (o) return repoColor(repoById(o));
       }
       return `var(--dg-lane-${color % 10})`;
     },
-    repoColor: (id) => `var(--dg-repo-${(repoById(id)?.color ?? 0) % 12})`,
-    repoIdx: (id) => repoById(id)?.color ?? 0,
+    repo: (id) => repoById(id),
     repoName: (id) => repoById(id)?.name ?? id,
     isSelected,
     needle,

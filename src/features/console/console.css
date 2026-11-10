@@ -11,8 +11,8 @@
 
 /* one command */
 .dg-console-entry { flex: none; }
-.dg-console-row { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto auto; align-items: center; column-gap: var(--dg-space-5); width: 100%; min-height: var(--dg-line-height-code); box-sizing: border-box; margin: 0; padding: 0 var(--dg-space-3); border: 0; border-radius: var(--dg-space-2); background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
-.dg-console-row:hover { background: var(--dg-row-hover-bg); }
+.dg-console-row { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto auto; align-items: center; column-gap: var(--dg-space-5); width: 100%; min-height: var(--dg-line-height-code); box-sizing: border-box; margin: 0; padding: 0 var(--dg-space-3); border: 0; border-radius: var(--dg-space-2); background-color: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.dg-console-row:hover { background-color: var(--dg-row-hover-bg); }
 .dg-console-row:focus-visible { outline: var(--dg-focus-width) solid var(--dg-focus-ring); outline-offset: -2px; }
 .dg-console-entry.is-open > .dg-console-row { background: var(--dg-selection-muted-bg); }
 .dg-console-time { color: var(--dg-console-duration); white-space: nowrap; font-variant-numeric: tabular-nums; }

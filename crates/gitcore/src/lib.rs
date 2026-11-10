@@ -8,6 +8,7 @@ pub mod graph;
 pub mod log;
 pub mod model;
 pub mod ops;
+pub mod palette;
 pub mod refs;
 pub mod runner;
 pub mod state;

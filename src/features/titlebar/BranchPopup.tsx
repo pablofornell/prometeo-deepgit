@@ -369,7 +369,7 @@ function PopupBody(props: { onClose: () => void }): JSX.Element {
             onClick={() => activate(row)}
             {...common}
           >
-            <RepoSquare color={repo()?.color ?? 0} />
+            <RepoSquare repo={repo()} />
             <span class="dg-titlebar-brow-name">{repo()?.name}</span>
             <span class="dg-titlebar-pop-count">{cellLabel[cell().state]}</span>
             <AheadBehind ahead={cell().ahead} behind={cell().behind} />
