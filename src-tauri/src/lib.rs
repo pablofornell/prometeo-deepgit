@@ -138,6 +138,7 @@ pub fn run() {
             commands::conflict_versions,
             commands::accept_side,
             commands::save_resolution,
+            commands::project_rename,
         ])
         .build(tauri::generate_context!())
         .expect("error while building DeepGit")

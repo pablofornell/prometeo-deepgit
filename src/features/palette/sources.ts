@@ -33,6 +33,7 @@ interface ExtraAction { key: string; title: string; icon: IconName; group: strin
 const EXTRAS: ExtraAction[] = [
   { key: "x.addProject", title: "Add project…", icon: "plus", group: "Project", run: () => void addProject() },
   { key: "x.clone", title: "Clone repository…", icon: "repo", group: "Project", run: () => void actions.cloneRepository() },
+  { key: "x.renameProject", title: "Rename project…", icon: "rename", group: "Project", run: () => void actions.renameProject() },
   { key: "x.rescan", title: "Rescan project for repositories", icon: "refresh", group: "Project", run: () => { const p = activeProject(); if (p) void rescanProject(p.id); } },
   { key: "x.showLog", title: "Show log", icon: "log", group: "View", run: () => setMainTab("log") },
   { key: "x.allRepos", title: "Show all repositories in the log", icon: "repo", group: "View", run: selectAllRepos },

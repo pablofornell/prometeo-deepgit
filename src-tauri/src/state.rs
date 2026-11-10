@@ -294,6 +294,25 @@ impl AppState {
         }
         self.persist(&ws)
     }
+
+    /// Renames a project (see `workspace::rename_project`) and saves the workspace. When the save
+    /// fails, the old name comes back, so the app never shows a name the file does not have.
+    pub fn rename_project(&self, id: &str, name: &str) -> Result<Project, ApiError> {
+        let mut ws = lock(&self.workspace);
+        let old = ws
+            .projects
+            .iter()
+            .find(|p| p.id == id)
+            .map(|p| p.name.clone());
+        let updated = workspace::rename_project(&mut ws, id, name).map_err(api_error)?;
+        if let Err(e) = self.persist(&ws) {
+            if let (Some(p), Some(old)) = (ws.projects.iter_mut().find(|p| p.id == id), old) {
+                p.name = old;
+            }
+            return Err(e);
+        }
+        Ok(updated)
+    }
 }
 
 /// Removes and reports a remembered early cancel of `id` (stale ones do not count).
@@ -565,5 +584,62 @@ mod tests {
         st.remove_project(&added.id).unwrap();
         assert!(st.repo(&added.repos[0].id).is_err());
         assert!(st.remove_project(&added.id).is_err());
+    }
+
+    #[test]
+    fn a_renamed_project_keeps_its_id_and_name_across_rescans_and_restarts() {
+        let dir = tempfile::tempdir().unwrap();
+        let st = state(dir.path());
+        let proj = dir.path().join("proj");
+        init_repo(&proj);
+        let added = st.add_project(proj.to_str().unwrap()).unwrap();
+        assert_eq!(added.name, "proj");
+
+        let renamed = st.rename_project(&added.id, "  Client A ").unwrap();
+        assert_eq!(
+            (renamed.id.as_str(), renamed.name.as_str()),
+            (added.id.as_str(), "Client A")
+        );
+        assert_eq!(
+            st.rename_project("nope", "x").unwrap_err().message,
+            "unknown project"
+        );
+        assert_eq!(
+            st.rename_project(&added.id, "").unwrap_err().message,
+            "The project name cannot be empty."
+        );
+
+        // a second project cannot take the same name
+        let other = dir.path().join("other");
+        init_repo(&other);
+        let second = st.add_project(other.to_str().unwrap()).unwrap();
+        assert_eq!(
+            st.rename_project(&second.id, "client a")
+                .unwrap_err()
+                .message,
+            "Another project is already called \"Client A\"."
+        );
+
+        // a rescan (and a clone into the project) keeps the name and the id
+        init_repo(&proj.join("sub"));
+        let rescanned = st.rescan_project(&added.id).unwrap();
+        assert_eq!(
+            (rescanned.id.as_str(), rescanned.name.as_str()),
+            (added.id.as_str(), "Client A")
+        );
+        assert_eq!(rescanned.repos.len(), 2);
+        let ws = st.workspace_snapshot();
+        assert_eq!(ws.active_project_id.as_deref(), Some(added.id.as_str()));
+
+        // persisted: a new state over the same file has the name
+        let st2 = state(dir.path());
+        let back = st2.workspace_snapshot();
+        let p = back.projects.iter().find(|p| p.id == added.id).unwrap();
+        assert_eq!(p.name, "Client A");
+        // adding the same folder again returns the renamed project, not a new one
+        assert_eq!(
+            st2.add_project(proj.to_str().unwrap()).unwrap().name,
+            "Client A"
+        );
     }
 }

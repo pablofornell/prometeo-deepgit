@@ -62,10 +62,21 @@ A project with several repositories shows all of them together:
 
 Click the project switcher in the title bar. The menu has these items:
 
-- The list of your projects. Click a name to switch.
+- The list of your projects. Click a name to switch. Press `F2` on a project to rename it.
 - **Add project folder…**
+- **Rename \<project\>…**: gives the project another name (see below).
 - **Rescan \<project\>**: searches the folder again for repositories. Use it after you clone a new repository into the folder.
 - **Remove \<project\>…**: removes the project from the DeepGit list. The repositories stay on disk.
+
+### Rename a project
+
+A project is named after its folder. You can give it another name, for example to use projects as profiles ("Client A", "Open source"). Only the name in DeepGit changes: the folder, the repositories, the repository filter and the other saved settings of the project stay.
+
+- In the sidebar, double-click the project name in the project card, or select the card and press `F2`. Type the new name. `Enter` saves, `Esc` cancels. When you click somewhere else, a valid name is saved.
+- Or right-click the project card, or open the sidebar **More** menu, and choose **Rename project…**.
+- Or open the project switcher and choose **Rename \<project\>…** (or press `F2` on a project), or use **Rename project…** in Search Everywhere.
+
+The name cannot be empty, can have at most 80 characters, cannot contain tabs or new lines, and cannot be the name of another project (upper and lower case count as the same). A red message under the field says what is wrong. The new name is saved at once and stays after a restart and after a rescan.
 
 ---
 
@@ -728,7 +739,7 @@ What a result does:
 - **Repo**: shows only this repository in the log and focuses it.
 
 The palette remembers your last ten picks.
-Actions without a shortcut live only here, for example **Resolve conflicts…**, **Add project…**, **Rescan project for repositories**, **Toggle commit graph**, **Push all repositories…** and **Toggle dark / light theme**.
+Actions without a shortcut live only here, for example **Resolve conflicts…**, **Add project…**, **Rename project…**, **Rescan project for repositories**, **Toggle commit graph**, **Push all repositories…** and **Toggle dark / light theme**.
 
 ---
 

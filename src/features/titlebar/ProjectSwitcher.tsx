@@ -48,6 +48,7 @@ export function ProjectSwitcher(): JSX.Element {
         checked: p.id === active?.id,
         tooltip: p.path,
         onSelect: () => void setActiveProject(p.id),
+        onRename: () => void actions.renameProject(p.id),
       });
     }
     list.push(
@@ -57,6 +58,7 @@ export function ProjectSwitcher(): JSX.Element {
     );
     if (active) {
       list.push(
+        { label: `Rename ${active.name}…`, icon: "rename", shortcut: "F2", tooltip: "F2 on a project above renames that project", onSelect: () => void actions.renameProject(active.id), onRename: () => void actions.renameProject(active.id) },
         { label: `Rescan ${active.name}`, icon: "refresh", onSelect: () => void rescan(active.id, active.name) },
         { label: `Remove ${active.name}…`, icon: "delete", danger: true, onSelect: () => void remove(active.id, active.name) },
       );

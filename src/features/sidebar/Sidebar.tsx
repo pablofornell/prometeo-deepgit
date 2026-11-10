@@ -13,6 +13,7 @@ import {
   setFocusedRepoId, summary, toggleRepo,
 } from "../../state/workspace";
 import { nodeMenu } from "./menus";
+import { ProjectNameEditor } from "./ProjectNameEditor";
 import { buildTree, expandableIds, filterTree, ids, repoDot, stateLabel, type SidebarNode } from "./nodes";
 import { SyncStrip } from "./SyncStrip";
 import { cssPx } from "../../state/metrics";
@@ -187,9 +188,30 @@ export function Sidebar(): JSX.Element {
     }
   };
 
+  /** True while the project name in the card is an input (double-click, F2, "Rename project…"). */
+  const [renaming, setRenaming] = createSignal(false);
+  let card: HTMLDivElement | undefined;
+  const startRename = () => {
+    if (activeProject()) setRenaming(true);
+  };
+  const endRename = () => {
+    setRenaming(false);
+    card?.focus();
+  };
+  /** Right-click on the project card. */
+  const cardMenu = (): MenuItem[] => {
+    const p = activeProject();
+    if (!p) return [];
+    return [
+      { label: "Rename project…", icon: "rename", shortcut: "F2", onSelect: startRename },
+      { label: "Rescan project", icon: "refresh", onSelect: () => void rescanProject(p.id) },
+    ];
+  };
+
   const projectMenu = (anchor: HTMLElement) => {
     const p = activeProject();
     const items: MenuItem[] = [
+      { label: "Rename project…", icon: "rename", shortcut: "F2", disabled: !p, onSelect: startRename },
       { label: "Collapse all", icon: "collapse", onSelect: () => ex.clear() },
       { label: "Show all repositories in the log", icon: "eye", disabled: !isRepoFilterActive(), onSelect: selectAllRepos },
       { separator: true },
@@ -313,11 +335,36 @@ export function Sidebar(): JSX.Element {
 
       <Show when={project()}>
         {(p) => (
-          <div class="dg-sidebar-card">
+          <div
+            ref={card}
+            class="dg-sidebar-card"
+            tabindex={0}
+            aria-label={`Project ${p().name}. F2 to rename.`}
+            onKeyDown={(e) => {
+              if (e.key === "F2" && e.target === e.currentTarget) {
+                e.preventDefault();
+                startRename();
+              }
+            }}
+            onContextMenu={(e) => {
+              if (renaming()) return;
+              e.preventDefault();
+              openContextMenu(e, cardMenu());
+            }}
+          >
             <span class="dg-sidebar-badge" aria-hidden="true">{initials(p().name)}</span>
             <span class="dg-sidebar-card-text">
-              <b title={p().name}>{p().name}</b>
-              <span title={p().path}>{p().path} · {plural(p().repos.length, "repository", "repositories")}</span>
+              <Show
+                when={renaming()}
+                fallback={
+                  <b data-tip={`${p().name}\nDouble-click or F2 to rename`} onDblClick={startRename}>
+                    {p().name}
+                  </b>
+                }
+              >
+                <ProjectNameEditor projectId={p().id} name={p().name} onDone={endRename} />
+              </Show>
+              <span data-tip={p().path}>{p().path} · {plural(p().repos.length, "repository", "repositories")}</span>
             </span>
           </div>
         )}

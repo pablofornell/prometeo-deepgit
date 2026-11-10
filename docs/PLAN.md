@@ -218,6 +218,7 @@ with the same name in camelCase (e.g. `logOpen`).
 | `project_remove` | `projectId` | `()` |
 | `project_rescan` | `projectId` | `Project` |
 | `project_set_active` | `projectId` | `()` |
+| `project_rename` | `projectId`, `name: String` | `Project` (updated; saves the workspace atomically). The name is trimmed. Errors: `The project name cannot be empty.`, `The project name is too long: 80 characters at most.` (characters, not bytes), `The project name cannot contain control characters (tab, new line).`, `Another project is already called "<name>".` (other projects, case-insensitive, trimmed), `unknown project`. The id never changes (it comes from the path), and `project_rescan` keeps the name. The mock and the UI use the same rules (`src/api/projectName.ts`). |
 | `repo_summaries` | `repoIds: Vec<String>` | `Vec<RepoSummary>` (parallel) |
 
 ### 5.2 Log (server-side sessions; the UI only fetches visible rows)

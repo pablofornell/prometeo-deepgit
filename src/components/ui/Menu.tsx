@@ -44,6 +44,8 @@ export interface MenuItem {
   /** Tooltip (use it to say why an item is disabled). */
   tooltip?: string;
   onSelect?: () => void;
+  /** F2 on the active item closes the menu and calls this (rename the thing the row stands for). */
+  onRename?: () => void;
 }
 
 interface Level {
@@ -176,6 +178,15 @@ function onKey(e: KeyboardEvent): void {
     case "Tab":
       stop();
       break;
+    case "F2": {
+      const item = lvl.items[lvl.active];
+      if (!item?.onRename || !selectable(item)) break;
+      stop();
+      const rename = item.onRename;
+      closeMenu();
+      rename();
+      break;
+    }
   }
 }
 

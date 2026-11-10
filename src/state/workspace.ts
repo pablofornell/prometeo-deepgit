@@ -11,6 +11,7 @@
 import { batch, createMemo, createRoot, createSignal } from "solid-js";
 import { createStore, produce, reconcile } from "solid-js/store";
 import * as api from "../api/tauri";
+import { validateProjectName } from "../api/projectName";
 import type { CloneResult, Project, RepoInfo, RepoSummary } from "../api/types";
 import { subscribeRepoChanged } from "./events";
 import { loadPersisted, savePersisted } from "./persist";
@@ -125,6 +126,22 @@ export async function adoptClonedProject(result: CloneResult): Promise<void> {
     setFocusedRepoId(added.id);
   }
   await refreshSummaries();
+}
+
+/** Why `name` cannot be the new name of project `projectId` (the backend's rules, checked while the user types), or null. */
+export function projectNameError(projectId: string, name: string): string | null {
+  return validateProjectName(name, workspace.projects, projectId).error ?? null;
+}
+
+/**
+ * Renames a project; the backend validates the name and saves the workspace. The id does not change, so the log filter,
+ * the selection and every saved per-project state stay; the title bar, the sidebar, the switcher and Welcome show the new
+ * name at once. Rejects with the backend error.
+ */
+export async function renameProject(projectId: string, name: string): Promise<Project> {
+  const updated = await api.projectRename(projectId, name);
+  setWorkspace("projects", (p) => p.id === projectId, "name", updated.name);
+  return updated;
 }
 
 // ---------------------------------------------------------------- repo filter (log scope)

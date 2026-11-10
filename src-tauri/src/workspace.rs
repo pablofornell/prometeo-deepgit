@@ -134,6 +134,57 @@ pub fn all_repos(ws: &Workspace) -> Vec<RepoInfo> {
         .collect()
 }
 
+/// Longest project name, in characters.
+pub const PROJECT_NAME_MAX: usize = 80;
+
+/// Checks a new name for project `id` and returns it trimmed. Refused: empty, longer than
+/// `PROJECT_NAME_MAX` characters, control characters, or the name of another project (ignoring
+/// case and surrounding spaces). The browser mock (`src/api/projectName.ts`) has the same rules
+/// and messages.
+pub fn validate_project_name(ws: &Workspace, id: &str, name: &str) -> Result<String, String> {
+    let name = name.trim();
+    if name.is_empty() {
+        return Err("The project name cannot be empty.".into());
+    }
+    if name.chars().count() > PROJECT_NAME_MAX {
+        return Err(format!(
+            "The project name is too long: {PROJECT_NAME_MAX} characters at most."
+        ));
+    }
+    if name.chars().any(char::is_control) {
+        return Err("The project name cannot contain control characters (tab, new line).".into());
+    }
+    let lower = name.to_lowercase();
+    if let Some(other) = ws
+        .projects
+        .iter()
+        .find(|p| p.id != id && p.name.trim().to_lowercase() == lower)
+    {
+        return Err(format!(
+            "Another project is already called \"{}\".",
+            other.name.trim()
+        ));
+    }
+    Ok(name.to_string())
+}
+
+/// Renames project `id`. Only the name changes: the id (made from the path, never from the name),
+/// path, repos and colours stay, so every reference to the project still works, and a rescan keeps
+/// the name. Errors: `unknown project`, or the message of `validate_project_name`.
+pub fn rename_project(ws: &mut Workspace, id: &str, name: &str) -> Result<Project, String> {
+    if !ws.projects.iter().any(|p| p.id == id) {
+        return Err("unknown project".into());
+    }
+    let name = validate_project_name(ws, id, name)?;
+    let p = ws
+        .projects
+        .iter_mut()
+        .find(|p| p.id == id)
+        .ok_or("unknown project")?;
+    p.name = name;
+    Ok(p.clone())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -335,5 +386,74 @@ mod tests {
         let text = std::fs::read_to_string(&path).unwrap();
         assert!(!text.to_lowercase().contains("color"), "{text}");
         assert_eq!(load(&path).projects, ws.projects);
+    }
+
+    #[test]
+    fn project_names_are_validated() {
+        let mut ws = sample();
+        ws.projects[1].name = "  Payments ".into();
+        let check = |name: &str| validate_project_name(&ws, "a", name);
+        assert_eq!(check("  Work  ").unwrap(), "Work");
+        assert_eq!(
+            check(" \t ").unwrap_err(),
+            "The project name cannot be empty."
+        );
+        assert_eq!(check(&"x".repeat(80)).unwrap(), "x".repeat(80));
+        // 80 characters, not bytes
+        assert_eq!(check(&"é".repeat(80)).unwrap(), "é".repeat(80));
+        assert_eq!(
+            check(&"x".repeat(81)).unwrap_err(),
+            "The project name is too long: 80 characters at most."
+        );
+        assert_eq!(
+            check("two\nlines").unwrap_err(),
+            "The project name cannot contain control characters (tab, new line)."
+        );
+        assert_eq!(
+            check("a\tb").unwrap_err(),
+            "The project name cannot contain control characters (tab, new line)."
+        );
+        assert_eq!(
+            check("payments").unwrap_err(),
+            "Another project is already called \"Payments\"."
+        );
+        // its own name, in another case, is fine
+        assert_eq!(check("A").unwrap(), "A");
+    }
+
+    #[test]
+    fn rename_keeps_the_id_and_survives_a_rescan_and_a_reload() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("workspace.json");
+        let mut ws = sample();
+        let before = ws.projects[0].clone();
+        let renamed = rename_project(&mut ws, "a", " Client work ").unwrap();
+        assert_eq!(renamed.name, "Client work");
+        assert_eq!(
+            (&renamed.id, &renamed.path, &renamed.repos),
+            (&before.id, &before.path, &before.repos)
+        );
+        assert_eq!(ws.active_project_id.as_deref(), Some("a"));
+        assert_eq!(
+            rename_project(&mut ws, "zzz", "x").unwrap_err(),
+            "unknown project"
+        );
+        assert_eq!(
+            rename_project(&mut ws, "b", "client WORK").unwrap_err(),
+            "Another project is already called \"Client work\"."
+        );
+        assert_eq!(ws.projects[1].name, "b");
+
+        // a rescan finds the folder name again but keeps the user's name
+        let fresh = project("a");
+        assert_eq!(
+            replace_repos(&mut ws, "a", fresh).unwrap().name,
+            "Client work"
+        );
+
+        save(&path, &ws).unwrap();
+        let back = load(&path);
+        assert_eq!(back.projects[0].name, "Client work");
+        assert_eq!(back.projects[0].id, "a");
     }
 }

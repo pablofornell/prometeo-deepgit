@@ -11,6 +11,7 @@ import { NewBranchDialog } from "./NewBranchDialog";
 import { PushDialog } from "./PushDialog";
 import { RebaseDialog } from "./RebaseDialog";
 import { RenameBranchDialog } from "./RenameBranchDialog";
+import { RenameProjectDialog } from "./RenameProjectDialog";
 import { ResetDialog } from "./ResetDialog";
 import { StashDialog } from "./StashDialog";
 import { TagDialog } from "./TagDialog";
@@ -27,4 +28,5 @@ export function registerAllDialogs(): void {
   registerDialog("checkoutRemote", CheckoutRemoteDialog);
   registerDialog("clone", CloneDialog);
   registerDialog("auth", AuthDialog);
+  registerDialog("renameProject", RenameProjectDialog);
 }

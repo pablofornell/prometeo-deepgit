@@ -46,6 +46,14 @@ export interface RenameBranchResult {
   renameRemote: boolean;
 }
 
+export interface RenameProjectProps {
+  projectId: string;
+}
+export interface RenameProjectResult {
+  /** The new name, trimmed and valid. */
+  name: string;
+}
+
 export interface MergeProps {
   repoIds: string[];
   /** Branch (or commit) to merge in. */
@@ -184,6 +192,7 @@ export interface DialogRegistry {
   auth: { props: AuthProps; result: AuthDialogResult };
   conflicts: { props: ConflictsProps; result: ConflictsResult };
   mergeFile: { props: MergeFileProps; result: MergeFileResult };
+  renameProject: { props: RenameProjectProps; result: RenameProjectResult };
 }
 
 export type DialogName = keyof DialogRegistry;

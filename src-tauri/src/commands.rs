@@ -746,6 +746,16 @@ pub async fn save_resolution(
     .await
 }
 
+// ------------------------------------------------------------------ workspace (continued)
+
+/// Renames a project: trimmed, 1 to 80 characters, no control characters, not the name of another
+/// project (ignoring case). The id stays. Saves the workspace and returns the updated project.
+#[tauri::command]
+pub async fn project_rename(state: St<'_>, project_id: String, name: String) -> Res<Project> {
+    let st = state.inner().clone();
+    blocking(move || st.rename_project(&project_id, &name)).await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

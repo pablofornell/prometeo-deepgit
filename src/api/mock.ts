@@ -13,6 +13,7 @@ import {
   type MockCommit, type MockRepo, type Scenario,
 } from "./mockData";
 import { buildFileDiff, fileText, toFileChange } from "./mockDiff";
+import { validateProjectName } from "./projectName";
 import { entryOf, genericConflicts, currentOids, hasStage, isTextConflict, sideStages, versionsOf, type MockConflict } from "./mockConflicts";
 import type {
   CloneOpts, CloneProgress, CloneResult, CloneTarget, CommitDetails, CommitRow, ConflictEntry, ConflictLabels, ConflictVersions, ConsoleEntry, DiffSpec,
@@ -603,6 +604,15 @@ const handlers: Record<string, Handler> = {
       c.git(repo, ["status", "--porcelain=v2", "--branch", "--show-stash"], { stdout: `# branch.oid ${repo.head.oid}\n# branch.head ${repo.head.branch ?? "(detached)"}\n` });
       return buildSummary(repo);
     });
+  },
+  project_rename: (a) => {
+    const id = stringArg(a, "projectId", "project_rename");
+    const name = stringArg(a, "name", "project_rename");
+    const p = workspace.projects.find((x) => x.id === id) ?? fail("unknown project");
+    const check = validateProjectName(name, workspace.projects, id);
+    if (check.error !== undefined) fail(check.error);
+    p.name = check.name;
+    return structuredClone(p);
   },
 
   // ---- log
@@ -1373,6 +1383,14 @@ function stashRestore(a: Args, c: Ctx, drop: boolean): OpResult {
   }
   emitChanged(repo);
   return ok(drop ? `Dropped stash@{${idx}}` : "Applied");
+}
+
+/** A required `String` argument, refused like serde does when it is missing or not a string. */
+function stringArg(a: Args, key: string, cmd: string): string {
+  const v = a[key];
+  if (v === undefined) fail(`invalid args \`${key}\` for command \`${cmd}\`: command ${cmd} missing required key ${key}`);
+  if (typeof v !== "string") fail(`invalid args \`${key}\` for command \`${cmd}\`: invalid type`);
+  return v;
 }
 
 // ---------------------------------------------------------------- entry point

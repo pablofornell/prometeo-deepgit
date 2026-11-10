@@ -28,7 +28,7 @@ import { beginRepoOp } from "./repoBusy";
 import { remoteCounterpart, splitRemoteRef } from "./remoteRefs";
 import { cachedRefs, ensureRefs, hasLocalBranch, hasRemoteBranch, refreshRefs } from "./refs";
 import { setChangesRepoId, setMainTab } from "./selection";
-import { activeProject, adoptClonedProject, projectRepos, refreshSummaries, repoById, summary } from "./workspace";
+import { activeProject, adoptClonedProject, projectRepos, refreshSummaries, renameProject as saveProjectName, repoById, summary, workspace } from "./workspace";
 
 // ---------------------------------------------------------------- result type
 
@@ -912,4 +912,17 @@ export async function openMerge(repoId: string, path: string, opts: { offerConti
   const r = await showDialog("mergeFile", { repoId, path });
   if (r?.resolved && opts.offerContinue !== false) await offerContinue(repoId);
   return r?.resolved ?? false;
+}
+
+/** Renames a project (dialog "renameProject"; the active project when no id is given). The sidebar card renames in place instead. */
+export async function renameProject(projectId?: string): Promise<void> {
+  const id = projectId ?? activeProject()?.id;
+  if (!id || !workspace.projects.some((p) => p.id === id)) return;
+  const r = await showDialog("renameProject", { projectId: id });
+  if (!r) return;
+  try {
+    await saveProjectName(id, r.name);
+  } catch (e) {
+    toast({ kind: "error", title: "Could not rename the project", body: toApiError(e).message });
+  }
 }

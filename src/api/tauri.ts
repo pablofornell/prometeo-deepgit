@@ -68,6 +68,8 @@ export const projectAdd = (path: string) => invoke<Project>("project_add", { pat
 export const projectRemove = (projectId: string) => invoke<void>("project_remove", { projectId });
 export const projectRescan = (projectId: string) => invoke<Project>("project_rescan", { projectId });
 export const projectSetActive = (projectId: string) => invoke<void>("project_set_active", { projectId });
+/** Renames a project (trimmed; refused: empty, over 80 characters, control characters, another project's name). The id stays. */
+export const projectRename = (projectId: string, name: string) => invoke<Project>("project_rename", { projectId, name });
 export const repoSummaries = (repoIds: string[]) => invoke<RepoSummary[]>("repo_summaries", { repoIds });
 
 // ---------------------------------------------------------------- 5.2 log sessions
