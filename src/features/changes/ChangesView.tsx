@@ -16,8 +16,8 @@ import { confirmAction } from "../../state/dialogs";
 import { notifyRepoChanged, repoVersion } from "../../state/events";
 import { register } from "../../state/keymap";
 import { loadPersisted, savePersisted } from "../../state/persist";
-import { changesRepoId, mainTab, selectFile, selectedFile, setChangesRepoId } from "../../state/selection";
-import { projectRepos, repoById, selectedRepos, summary } from "../../state/workspace";
+import { changesRepoId, changesScopeRepos, mainTab, selectFile, selectedFile, setChangesRepoId } from "../../state/selection";
+import { projectRepos, repoById, summary } from "../../state/workspace";
 import { CommitBox, DEFAULT_HEIGHT, type CommitTarget } from "./CommitBox";
 import {
   buildRows, isSelectableKey, nearestSurvivor, rangeKeys, repoIdOfKey, rowItems, sectionFiles, selectedItems,
@@ -45,14 +45,13 @@ export function ChangesView(): JSX.Element {
 
   // ------------------------------------------------------------ data
 
+  /** Repos the view looks at: the one repo picked (sidebar, Uncommitted changes row), else the repo filter (project level). */
+  const scope = createMemo(() => changesScopeRepos());
+  /** The single picked repo, only while the project has other repos to hide ("Showing only X"). */
   const focusRepo = createMemo(() => {
     const id = changesRepoId();
-    return id ? repoById(id) : undefined;
-  });
-  /** Repos the view looks at: the focused repo, else the repo filter. */
-  const scope = createMemo(() => {
-    const f = focusRepo();
-    return f ? [f] : selectedRepos();
+    const only = scope();
+    return id && projectRepos().length > 1 && only.length === 1 && only[0].id === id ? only[0] : undefined;
   });
   const scopeIds = createMemo(() => scope().map((r) => r.id), [], { equals: (a, b) => a.length === b.length && a.every((v, i) => v === b[i]) });
 

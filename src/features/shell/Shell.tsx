@@ -17,8 +17,8 @@ import { Sidebar } from "../sidebar/Sidebar";
 import { StatusBar } from "../statusbar/StatusBar";
 import { TitleBar } from "../titlebar/TitleBar";
 import { bottomTool, openBottomTool, setSidebarVisible, sidebarVisible, toggleBottomTool, toggleSidebar, type BottomTool } from "../../state/layout";
-import { detailsTab, mainTab, setDetailsTab, setMainTab } from "../../state/selection";
-import { activeProject, projectTotals, selectedRepos } from "../../state/workspace";
+import { changesScopeCount, detailsTab, mainTab, setDetailsTab, setMainTab } from "../../state/selection";
+import { activeProject, selectedRepos } from "../../state/workspace";
 import { keysFor, formatKeys, register } from "../../state/keymap";
 import { loadPersisted, savePersisted } from "../../state/persist";
 import { DEFAULT_RATIOS, allocate, maxBottom, ratioFor, sanitizeRatios, type Mins, type Ratios } from "./heights";
@@ -150,7 +150,7 @@ export function Shell(): JSX.Element {
       <div class="dg-shell-main">
         <nav class="dg-shell-stripe" aria-label="Tool windows">
           <StripeButton icon="project" label="Project" keys={keyOf("tool.sidebar")} active={sidebarVisible()} onClick={toggleSidebar} />
-          <StripeButton icon="changes" label="Local changes" keys={keyOf("tool.changes")} active={mainTab() === "changes"} count={projectTotals().changes} onClick={() => setMainTab(mainTab() === "changes" ? "log" : "changes")} />
+          <StripeButton icon="changes" label="Local changes" keys={keyOf("tool.changes")} active={mainTab() === "changes"} count={changesScopeCount()} onClick={() => setMainTab(mainTab() === "changes" ? "log" : "changes")} />
           <StripeButton icon="matrix" label="Branch matrix" keys={keyOf("tool.matrix")} active={bottomTool() === "matrix"} onClick={() => toggleBottomTool("matrix")} />
           <StripeButton icon="stash" label="Stashes" keys={keyOf("tool.stashes")} onClick={() => setSidebarVisible(true)} />
           <span class="dg-grow" />
@@ -182,8 +182,8 @@ export function Shell(): JSX.Element {
                   </button>
                   <button type="button" role="tab" aria-selected={mainTab() === "changes"} class="dg-shell-tab" classList={{ "is-on": mainTab() === "changes" }} onClick={() => setMainTab("changes")}>
                     Local changes
-                    <Show when={projectTotals().changes > 0}>
-                      <span class="dg-shell-tab-sub">{projectTotals().changes}</span>
+                    <Show when={changesScopeCount() > 0}>
+                      <span class="dg-shell-tab-sub">{changesScopeCount()}</span>
                     </Show>
                   </button>
                   <span class="dg-grow" />

@@ -6,9 +6,10 @@
  *   selectFile({ repoId, spec: { kind: "commit", oid }, path });
  *   <Show when={selectedFile()}>{(f) => <DiffViewer repoId={f().repoId} spec={f().spec} path={f().path} />}</Show>
  */
-import { createSignal } from "solid-js";
-import type { DiffSpec } from "../api/types";
-import { onActiveProjectChanged, setFocusedRepoId } from "./workspace";
+import { createEffect, createRoot, createSignal, on } from "solid-js";
+import type { DiffSpec, RepoInfo } from "../api/types";
+import { changesCount, changesScope } from "./changesScope";
+import { onActiveProjectChanged, projectRepos, selectedRepoIds, selectedRepos, setFocusedRepoId, summary } from "./workspace";
 
 export interface SelectedCommit {
   repoId: string;
@@ -42,6 +43,14 @@ export const mainTab = tab;
 export const changesRepoId = changesRepo;
 /** Active tab of the right column (reactive). */
 export const detailsTab = dTab;
+
+/**
+ * Repos the Local changes view shows (reactive): the single repo picked in the sidebar / the Uncommitted changes row,
+ * else the repos that pass the repo filter (the project-level view).
+ */
+export const changesScopeRepos = (): RepoInfo[] => changesScope(projectRepos(), selectedRepos(), changesRepo());
+/** Changed files in `changesScopeRepos()` (reactive): the number the Local changes badges show. */
+export const changesScopeCount = (): number => changesCount(changesScopeRepos(), summary);
 
 /**
  * Selects a commit (or none) and focuses its repo. The selected file stays: `CommitDetails` re-points it to the new
@@ -90,6 +99,20 @@ export function clearSelection(): void {
   setFile(null);
   setDTab("files");
 }
+
+// Changing the repo filter (show all, hide a repo, only this one) goes back to the project-level Local changes view;
+// otherwise a repo picked earlier would keep hiding the others after the user asked to see them.
+createRoot(() => {
+  let last = selectedRepoIds().join("\0");
+  createEffect(
+    on(selectedRepoIds, (ids) => {
+      const key = ids.join("\0");
+      if (key === last) return;
+      last = key;
+      setChangesRepo(null);
+    }, { defer: true }),
+  );
+});
 
 // A commit, file or changes repo of the old project means nothing in the new one.
 onActiveProjectChanged(() => {

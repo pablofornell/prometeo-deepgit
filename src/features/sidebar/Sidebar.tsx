@@ -8,6 +8,7 @@ import * as actions from "../../state/actions";
 import { formatDate, fullDate } from "../../state/dates";
 import { setSidebarVisible } from "../../state/layout";
 import { repoRefs } from "../../state/refs";
+import { setChangesRepoId } from "../../state/selection";
 import {
   repoById, activeProject, addProject, focusedRepoIdSignal, isRepoFilterActive, projectRepos, rescanProject, selectAllRepos, selectOnlyRepo, selectedRepoIds,
   setFocusedRepoId, summary, toggleRepo,
@@ -127,6 +128,8 @@ export function Sidebar(): JSX.Element {
     if (n.kind === "loading") return;
     setSelected(n.id);
     setFocusedRepoId(n.repoId);
+    // Local changes follows the repo picked here; a single-repo project has nothing to narrow
+    if (projectRepos().length > 1) setChangesRepoId(n.repoId);
     if (n.kind === "more") setMoreOpen(new Set([...moreOpen(), n.groupId]));
   };
 

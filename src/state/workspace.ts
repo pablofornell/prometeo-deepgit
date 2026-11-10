@@ -13,6 +13,7 @@ import { createStore, produce, reconcile } from "solid-js/store";
 import * as api from "../api/tauri";
 import { validateProjectName } from "../api/projectName";
 import type { CloneResult, Project, RepoInfo, RepoSummary } from "../api/types";
+import { dirtyCount } from "./changesScope";
 import { subscribeRepoChanged } from "./events";
 import { loadPersisted, savePersisted } from "./persist";
 
@@ -256,7 +257,7 @@ export const projectTotals = createRoot(() =>
       if (!s) continue;
       ahead += s.ahead;
       behind += s.behind;
-      changes += s.staged + s.unstaged + s.untracked + s.conflicted;
+      changes += dirtyCount(s);
       conflicted += s.conflicted;
       if (s.state !== "clean") operations++;
     }
