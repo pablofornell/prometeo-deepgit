@@ -7,6 +7,9 @@
 //!
 //! The tests never touch the user's git configuration or key store: HOME and the git config
 //! variables point to an empty temp dir, so no credential helper runs.
+//!
+//! Unix only for now: `git http-backend` is run as a CGI program by the small server below, and
+//! the file was never run on Windows.
 
 #![cfg(unix)]
 

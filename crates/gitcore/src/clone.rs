@@ -614,6 +614,7 @@ mod tests {
         let e = plan_clone("u", parent, "file", &o).unwrap_err().to_string();
         assert!(e.contains("not a folder"), "{e}");
 
+        // Unix only: making a symlink on Windows needs a privilege a normal user does not have.
         #[cfg(unix)]
         {
             std::os::unix::fs::symlink(dir.path().join("empty"), dir.path().join("link")).unwrap();

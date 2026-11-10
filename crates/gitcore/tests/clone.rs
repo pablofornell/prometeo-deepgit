@@ -294,6 +294,9 @@ fn the_clone_is_reported_to_the_console_without_a_repo() {
 }
 
 // ---------------------------------------------------------------- cancel and timeout
+//
+// Unix only: a `#!/bin/sh` script stands in for `git`, and Windows cannot run a script as a
+// program. Cancel and timeout of a clone (`kill_tree` with `taskkill`) stay untested on Windows.
 
 /// A `git` that starts a clone (makes the folder, writes a file, prints one progress line) and then
 /// waits for 30 s, like a slow server.

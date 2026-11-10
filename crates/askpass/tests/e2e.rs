@@ -4,6 +4,10 @@
 //!
 //! `git credential fill` is the way to get a genuine git prompt without a server: with no
 //! credential helper, git asks "Username for ..." and "Password for ..." through `GIT_ASKPASS`.
+//!
+//! Unix only for now: some tests need a Unix socket or `setsid`, and the file was never run on
+//! Windows. The helper and the broker over loopback TCP (the Windows transport) have no
+//! end-to-end test there.
 
 #![cfg(unix)]
 

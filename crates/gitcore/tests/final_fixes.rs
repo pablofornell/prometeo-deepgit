@@ -233,6 +233,9 @@ fn deleting_a_remote_branch_by_its_full_name_works() {
 }
 
 // ---------------------------------------------------------------- 6/7. network timeouts
+//
+// Unix only: the remote's transport is a `#!/bin/sh` script that git runs as a program, which
+// Windows cannot do. The time limits of network commands stay untested on Windows.
 
 #[cfg(unix)]
 fn ext_remote(r: &TestRepo, script_body: &str) {

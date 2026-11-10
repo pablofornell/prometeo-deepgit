@@ -719,6 +719,7 @@ fn f10_commit_with_nothing_staged_maps_to_the_friendly_message() {
 
 // ---------------------------------------------------------------- 11. file_content
 
+// Unix only: making a symlink on Windows needs a privilege that a normal user does not have.
 #[cfg(unix)]
 #[test]
 fn f11_file_content_does_not_follow_symlinks_out_of_the_repo() {
@@ -785,6 +786,9 @@ fn f12_a_failure_with_nothing_in_progress_is_still_an_error() {
 }
 
 // ---------------------------------------------------------------- 13. hangs
+//
+// Unix only: the remote's transport is a `#!/bin/sh` script that git runs as a program, which
+// Windows cannot do.
 
 #[cfg(unix)]
 fn ext_remote(r: &TestRepo, script_body: &str) -> std::path::PathBuf {

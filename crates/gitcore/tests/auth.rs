@@ -1,6 +1,10 @@
 //! The runner side of authentication: what a network command gets in its environment, that it
 //! runs in its own session, that the broker hears the outcome, and that an open prompt pauses
 //! the inactivity timeout. A fake broker stands in for the app.
+//!
+//! Unix only: the remote's transport is a `#!/bin/sh` script that git runs as a program, which
+//! Windows cannot do. The runner code under test is the same there, apart from the session
+//! (`setsid`) and `kill_tree`, which stay untested on Windows.
 #![cfg(unix)]
 
 mod common;

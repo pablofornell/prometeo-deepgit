@@ -708,20 +708,17 @@ mod live_tests {
             .collect()
     }
 
-    /// Waits until the watcher has been quiet for a second (at most 10 s) and returns how many
-    /// notifications came. Windows reports that a folder changed (a file was made inside it) to
-    /// the watch of the folder above, and it can do so late: after the notification for the file
-    /// itself, and for a change made right before the watch was set up. Such a notification is
-    /// one refresh too many, not a missed one, so the steps below wait for quiet first.
-    fn settle(rx: &mpsc::Receiver<String>) -> usize {
+    /// Waits until the watcher has been quiet for a second (at most 10 s). Windows reports that a folder changed (something was made inside it)
+    /// to the watch of the folder above, and it can do so late, also for a change made right
+    /// before the watch was set up. Seen in CI run 42795486426: the test makes `.git/refs/heads`,
+    /// the watches are set up, and then the watch of `.git` reports `.git\refs`. Such a
+    /// notification is one refresh too many, not a missed one, so the steps that expect silence
+    /// wait for quiet first.
+    fn settle(rx: &mpsc::Receiver<String>) {
         let start = std::time::Instant::now();
-        let mut seen = 0;
         while start.elapsed() < Duration::from_secs(10)
             && rx.recv_timeout(Duration::from_millis(1000)).is_ok()
-        {
-            seen += 1;
-        }
-        seen
+        {}
     }
 
     #[test]
@@ -750,17 +747,7 @@ mod live_tests {
                 .iter()
                 .any(|d| d.starts_with(root.join("node_modules"))));
         }
-        let early = settle(&rx);
-        {
-            // Not through `eprintln!`: the test harness hides that when the test passes, and this
-            // line is the only way to see what a system without a developer machine reports.
-            use std::io::Write;
-            let _ = writeln!(
-                std::io::stderr(),
-                "watcher test: {early} notification(s) right after the watches were set up, for {:?}",
-                causes(&root)
-            );
-        }
+        settle(&rx);
         // Activity in an ignored tree is invisible.
         std::fs::write(root.join("node_modules/pkg/x.js"), "x").unwrap();
         assert!(
