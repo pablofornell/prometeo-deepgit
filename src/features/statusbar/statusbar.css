@@ -9,14 +9,14 @@
 .dg-statusbar-fill { flex: 1; min-width: 0; }
 .dg-statusbar-widget { display: inline-flex; align-items: center; gap: var(--dg-space-3); height: var(--dg-statusbar-widget-height); padding: var(--dg-statusbar-widget-padding); border-radius: 4px; white-space: nowrap; color: inherit; min-width: 0; flex: none; }
 button.dg-statusbar-widget:hover { background: var(--dg-statusbar-hover-bg); color: var(--dg-statusbar-hover-fg); }
-.dg-statusbar-widget .dg-icon { color: currentColor; width: 14px; height: 14px; flex: none; }
+.dg-statusbar-widget .dg-icon { color: currentColor; width: calc(14 * var(--dg-u)); height: calc(14 * var(--dg-u)); flex: none; }
 .dg-statusbar-ok { color: var(--dg-text-success) !important; }
 .dg-statusbar-bad { color: var(--dg-text-error) !important; }
 .dg-statusbar-dim { color: var(--dg-text-secondary); flex: none; font-variant-numeric: tabular-nums; }
 
 /* ---- command ticker */
 .dg-statusbar-ticker { flex: 0 1 520px; }
-.dg-statusbar-cmd { font-family: var(--dg-font-mono); font-size: 11.5px; color: var(--dg-text-muted); min-width: 0; overflow: hidden; white-space: nowrap; }
+.dg-statusbar-cmd { font-family: var(--dg-font-mono); font-size: var(--dg-font-size-mono-small); color: var(--dg-text-muted); min-width: 0; overflow: hidden; white-space: nowrap; }
 .dg-statusbar-cmd-repo { margin-right: var(--dg-space-3); }
 
 /* ---- progress */

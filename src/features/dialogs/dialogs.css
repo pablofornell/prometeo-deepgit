@@ -5,10 +5,10 @@
 .dg-dialogs-links { display: inline-flex; gap: var(--dg-space-4); }
 .dg-dialogs-link { font-size: var(--dg-font-size-medium); color: var(--dg-text-link); border-radius: 3px; }
 .dg-dialogs-link:hover { text-decoration: underline; }
-.dg-dialogs-error { font-size: var(--dg-font-size-medium); color: var(--dg-text-error); line-height: 16px; }
-.dg-dialogs-hint { font-size: var(--dg-font-size-medium); color: var(--dg-text-secondary); line-height: 16px; }
+.dg-dialogs-error { font-size: var(--dg-font-size-medium); color: var(--dg-text-error); line-height: calc(16 * var(--dg-u)); }
+.dg-dialogs-hint { font-size: var(--dg-font-size-medium); color: var(--dg-text-secondary); line-height: calc(16 * var(--dg-u)); }
 .dg-dialogs-select { width: 100%; }
-.dg-dialogs-text { line-height: 18px; color: var(--dg-text-muted); }
+.dg-dialogs-text { line-height: calc(18 * var(--dg-u)); color: var(--dg-text-muted); }
 .dg-dialogs-text strong { color: var(--dg-text); font-weight: var(--dg-weight-semibold); }
 
 .dg-dialogs-value {
@@ -19,7 +19,7 @@
 .dg-dialogs-value-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dg-text); }
 .dg-dialogs-pair { display: grid; grid-template-columns: 1fr 1fr; gap: var(--dg-space-5); }
 
-.dg-dialogs-note { display: flex; gap: var(--dg-space-4); align-items: flex-start; padding: var(--dg-space-3) var(--dg-space-4); border-radius: var(--dg-banner-radius); line-height: 16px; font-size: var(--dg-font-size-medium); }
+.dg-dialogs-note { display: flex; gap: var(--dg-space-4); align-items: flex-start; padding: var(--dg-space-3) var(--dg-space-4); border-radius: var(--dg-banner-radius); line-height: calc(16 * var(--dg-u)); font-size: var(--dg-font-size-medium); }
 .dg-dialogs-note .dg-icon { margin-top: 1px; }
 .dg-dialogs-note.is-info { background: var(--dg-banner-info-bg); box-shadow: inset 0 0 0 1px var(--dg-banner-info-border); }
 .dg-dialogs-note.is-warning { background: var(--dg-banner-warning-bg); box-shadow: inset 0 0 0 1px var(--dg-banner-warning-border); }
@@ -28,7 +28,7 @@
 .dg-dialogs-note.is-error .dg-icon { color: var(--dg-text-error); }
 
 .dg-dialogs-textarea {
-  width: 100%; min-height: 56px; padding: var(--dg-space-3) var(--dg-space-4); border: 0; outline: 0; resize: vertical; line-height: 18px;
+  width: 100%; min-height: 56px; padding: var(--dg-space-3) var(--dg-space-4); border: 0; outline: 0; resize: vertical; line-height: calc(18 * var(--dg-u));
   border-radius: var(--dg-input-radius); background: var(--dg-input-bg); color: var(--dg-input-fg); box-shadow: inset 0 0 0 1px var(--dg-input-border);
 }
 .dg-dialogs-textarea:focus { box-shadow: inset 0 0 0 var(--dg-focus-width) var(--dg-input-focus-border); }
@@ -48,20 +48,20 @@
 .dg-dialogs-radio.is-on.is-danger .dg-dialogs-radio-dot { background: var(--dg-button-danger-bg); }
 .dg-dialogs-radio-input:focus-visible + .dg-dialogs-radio-dot { outline: var(--dg-focus-width) solid var(--dg-focus-ring); outline-offset: 1px; }
 .dg-dialogs-radio-text { display: flex; flex-direction: column; min-width: 0; }
-.dg-dialogs-radio-label { line-height: 18px; }
+.dg-dialogs-radio-label { line-height: calc(18 * var(--dg-u)); }
 .dg-dialogs-radio.is-danger .dg-dialogs-radio-label { color: var(--dg-text-error); }
-.dg-dialogs-radio-desc { font-size: var(--dg-font-size-medium); line-height: 16px; color: var(--dg-text-secondary); }
+.dg-dialogs-radio-desc { font-size: var(--dg-font-size-medium); line-height: calc(16 * var(--dg-u)); color: var(--dg-text-secondary); }
 
 /* repo lists */
 .dg-dialogs-checklist, .dg-dialogs-rows {
   display: flex; flex-direction: column; gap: var(--dg-space-1); max-height: 168px; overflow: auto; padding: var(--dg-space-2) var(--dg-space-3);
   border-radius: var(--dg-input-radius); box-shadow: inset 0 0 0 1px var(--dg-separator);
 }
-.dg-dialogs-checklist .dg-check { min-height: 24px; }
+.dg-dialogs-checklist .dg-check { min-height: calc(24 * var(--dg-u)); }
 .dg-dialogs-repo { display: inline-flex; align-items: center; gap: var(--dg-space-3); min-width: 0; }
 .dg-dialogs-repo-name { font-weight: var(--dg-weight-medium); white-space: nowrap; }
 .dg-dialogs-repo-detail, .dg-dialogs-row-detail { color: var(--dg-text-secondary); font-size: var(--dg-font-size-medium); }
-.dg-dialogs-row { display: flex; align-items: center; gap: var(--dg-space-4); min-height: 24px; min-width: 0; }
+.dg-dialogs-row { display: flex; align-items: center; gap: var(--dg-space-4); min-height: calc(24 * var(--dg-u)); min-width: 0; }
 .dg-dialogs-row-detail { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--dg-space-3); overflow: hidden; white-space: nowrap; }
 .dg-dialogs-row-detail > .dg-dialogs-ellipsis { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .dg-dialogs-row-trailing { flex: none; color: var(--dg-text-secondary); font-size: var(--dg-font-size-medium); }
@@ -69,7 +69,7 @@
 
 /* push: commits to push */
 .dg-dialogs-commits { display: flex; flex-direction: column; padding: var(--dg-space-2) var(--dg-space-3); border-radius: var(--dg-input-radius); box-shadow: inset 0 0 0 1px var(--dg-separator); max-height: 140px; overflow: auto; }
-.dg-dialogs-commit { display: flex; gap: var(--dg-space-4); min-height: 22px; align-items: center; }
+.dg-dialogs-commit { display: flex; gap: var(--dg-space-4); min-height: calc(22 * var(--dg-u)); align-items: center; }
 .dg-dialogs-commit-subject { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dg-dialogs-commit-hash { flex: none; font-family: var(--dg-font-mono); font-size: var(--dg-font-size-mono); color: var(--dg-text-secondary); }
 .dg-dialogs-options { display: flex; flex-direction: column; gap: var(--dg-space-3); }

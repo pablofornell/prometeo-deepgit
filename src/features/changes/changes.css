@@ -19,7 +19,7 @@
 .dg-changes-banner-icon { flex: none; color: var(--dg-text-warning); }
 .dg-changes-banner.is-resolved .dg-changes-banner-icon { color: var(--dg-text-success); }
 .dg-changes-banner.is-error .dg-changes-banner-icon { color: var(--dg-text-error); }
-.dg-changes-banner-text { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; column-gap: var(--dg-space-3); line-height: 18px; }
+.dg-changes-banner-text { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; column-gap: var(--dg-space-3); line-height: calc(18 * var(--dg-u)); }
 .dg-changes-banner-text strong { font-weight: var(--dg-weight-semibold); }
 .dg-changes-banner-repo { color: var(--dg-text-muted); }
 .dg-changes-banner-sub { flex-basis: 100%; color: var(--dg-text-muted); font-size: var(--dg-font-size-medium); }

@@ -1235,7 +1235,11 @@ These features make DeepGit different from Fork and from IntelliJ. Build each on
 2. Use roles: `tree` / `treeitem` for the sidebar and file tree, `grid` / `row` / `gridcell` for the log, `dialog` with `aria-modal` for dialogs, `status` with `aria-live="polite"` for toasts and the ticker.
 3. Every icon button has an `aria-label` and a tooltip with the shortcut.
 4. The graph SVG has `aria-hidden="true"`. Each log row has an accessible name: "Add idempotency key to refund endpoint, api-gateway, Lucía Martín, today 10:42, HEAD, feature/PAY-2318-refunds".
-5. UI scale: support 90 % to 150 % with `Ctrl+=` / `Ctrl+-`. All tokens are in px; scale with CSS `zoom` on the root.
+5. UI scale and font size (Settings > Appearance, implemented in `src/state/settings.ts` and `src/state/appearance.ts`):
+   - **UI scale** 80 % to 200 % (step 10 %, default 100 %) with `Ctrl+=` / `Ctrl+-` / `Ctrl+0`. In the desktop app it is the webview zoom (true page zoom). In a browser it is CSS `zoom` on `<html>`. All tokens stay in px.
+   - **Font size** 10 to 20 px (default 13). One base variable `--dg-font-base` drives all `--dg-font-size-*` tokens. `--dg-u` (= 1 px at 13 px) scales every size that depends on text (row heights, controls, icons, pills): write it as `calc(N * var(--dg-u))`, or `round(calc(N * var(--dg-u)), 1px)` when JavaScript reads the token with `cssPx()` (`src/state/metrics.ts`). Do not hard-code font sizes or text-line heights in px.
+   - **Editor font size** (`--dg-editor-font-base`) drives `--dg-font-size-mono` and `--dg-line-height-code`.
+   - `index.html` sets these variables before first paint.
 
 ---
 

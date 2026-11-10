@@ -126,6 +126,11 @@ export interface CheckoutRemoteResult {
   localName: string;
 }
 
+export interface SettingsProps {
+  /** Id of the section to show (`appearance`, `log`, ...); default the first one. */
+  section?: string;
+}
+
 /** Props and result of every dialog name. */
 export interface DialogRegistry {
   newBranch: { props: NewBranchProps; result: NewBranchResult };
@@ -138,6 +143,7 @@ export interface DialogRegistry {
   stash: { props: StashProps; result: StashResult };
   tag: { props: TagProps; result: TagResult };
   checkoutRemote: { props: CheckoutRemoteProps; result: CheckoutRemoteResult };
+  settings: { props: SettingsProps; result: void };
 }
 
 export type DialogName = keyof DialogRegistry;

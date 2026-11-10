@@ -125,6 +125,33 @@ describe("keymap", () => {
     expect(blockedInInput(["Shift", "Shift"])).toBe(false);
   });
 
+  it("matches the zoom keys by character: Ctrl+=, Ctrl++ (numpad too), Ctrl+- on any layout, Ctrl+0, also in text fields", async () => {
+    vi.resetModules();
+    const km = await import("./keymap");
+    km.installKeymap();
+    const hits: string[] = [];
+    const opts = { allowInInput: true, allowInOverlay: true };
+    km.register("in", ["Ctrl+=", "Ctrl+Plus", "Ctrl+Shift+="], () => void hits.push("in"), opts);
+    km.register("out", ["Ctrl+-"], () => void hits.push("out"), opts);
+    km.register("reset", ["Ctrl+0"], () => void hits.push("reset"), opts);
+    const input = { tagName: "INPUT", isContentEditable: false };
+    key({ key: "=", code: "Equal", ctrlKey: true }); // US: Ctrl+=
+    key({ key: "+", code: "Equal", ctrlKey: true, shiftKey: true }); // US: Ctrl+Shift+=
+    key({ key: "+", code: "BracketRight", ctrlKey: true }); // Spanish: the + key
+    key({ key: "+", code: "NumpadAdd", ctrlKey: true }); // numpad +
+    key({ key: "-", code: "Minus", ctrlKey: true }); // US
+    key({ key: "-", code: "Slash", ctrlKey: true }); // Spanish: the - key is where US has /
+    key({ key: "-", code: "NumpadSubtract", ctrlKey: true });
+    key({ key: "0", code: "Digit0", ctrlKey: true, target: input });
+    key({ key: "0", code: "Numpad0", ctrlKey: true });
+    key({ key: "-", code: "Minus", ctrlKey: true, target: input });
+    expect(hits).toEqual(["in", "in", "in", "in", "out", "out", "out", "reset", "reset", "out"]);
+    const release = km.openOverlay();
+    key({ key: "0", code: "Digit0", ctrlKey: true });
+    release();
+    expect(hits.at(-1)).toBe("reset");
+  });
+
   it("maps only Cmd to Ctrl on macOS, Ctrl stays Ctrl elsewhere", async () => {
     vi.resetModules();
     const { eventToken } = await import("./keymap");

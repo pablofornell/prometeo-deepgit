@@ -8,8 +8,8 @@
  *   onCleanup(off);
  *
  * Key syntax: modifiers `Ctrl` (= Cmd on macOS; physical Ctrl stays Ctrl elsewhere), `Alt`, `Shift`, `Meta` joined by `+`, then the key:
- * a letter or digit (`K`, `9`), a symbol (`` ` ``, `,`, `[`), or a name (`Enter`, `Esc`, `Space`, `Delete`,
- * `Backspace`, `Tab`, `Up`, `Down`, `Left`, `Right`, `PageUp`, `PageDown`, `Home`, `End`, `F1`..`F12`).
+ * a letter or digit (`K`, `9`), a symbol (`` ` ``, `,`, `[`, `-`, `=`), or a name (`Enter`, `Esc`, `Space`, `Delete`,
+ * `Backspace`, `Tab`, `Up`, `Down`, `Left`, `Right`, `PageUp`, `PageDown`, `Home`, `End`, `F1`..`F12`, `Plus` = the "+" character with or without Shift).
  * Space-separated tokens are a sequence typed within 300 ms: `Shift Shift` is a double tap.
  *
  * Plain keys and Ctrl/Cmd chords do not fire while an input, textarea or editable element has focus,
@@ -124,14 +124,19 @@ export function eventToken(e: KeyEventLike, mac: boolean = isMac): string | null
   if (e.key === "Alt") return "Alt";
   if (e.key === "Meta") return mac ? "Ctrl" : "Meta";
   let key: string;
-  if (/^Key[A-Z]$/.test(e.code)) key = e.code.slice(3);
+  // "+" and "-" are matched by the character, not the physical key: on many layouts (Spanish, German, ...) they are
+  // not where a US keyboard has them. "+" is named `Plus` and ignores Shift (Shift is how most layouts type it).
+  const plus = e.key === "+";
+  if (plus) key = "Plus";
+  else if (e.key === "-") key = "-";
+  else if (/^Key[A-Z]$/.test(e.code)) key = e.code.slice(3);
   else if (/^Digit\d$/.test(e.code)) key = e.code.slice(5);
   else if (CODE_SYMBOLS[e.code]) key = CODE_SYMBOLS[e.code];
   else key = NAMES[e.key] ?? (e.key.length === 1 ? e.key.toUpperCase() : e.key);
   const mods: string[] = [];
   if (mac ? e.metaKey : e.ctrlKey) mods.push("Ctrl");
   if (e.altKey) mods.push("Alt");
-  if (e.shiftKey) mods.push("Shift");
+  if (e.shiftKey && !plus) mods.push("Shift");
   if (mac ? e.ctrlKey : e.metaKey) mods.push("Meta");
   return [...mods, key].join("+");
 }

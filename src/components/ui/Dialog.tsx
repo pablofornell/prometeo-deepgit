@@ -85,8 +85,8 @@ export interface DialogProps {
   primary?: DialogAction;
   /** Cancel button label (default "Cancel"). */
   cancelLabel?: string;
-  /** 480 px (default) or 640 px. */
-  width?: "normal" | "wide";
+  /** 480 px (default), 640 px, or "large" (Settings: up to 1040 x 700 px, the body fills the frame). */
+  width?: "normal" | "wide" | "large";
   /** The git command(s) this dialog will run: shown in a mono strip (DESIGN.md 11.7). Update it as options change. */
   command?: string | string[];
   /** Content at the left of the footer (e.g. a checkbox). */
@@ -139,7 +139,7 @@ export function Dialog(props: DialogProps): JSX.Element {
     <div class="dg-scrim" onKeyDown={onKeyDown} onMouseDown={(e) => e.target === e.currentTarget && e.preventDefault()}>
       <div
         ref={box}
-        class={"dg-dialog" + (props.width === "wide" ? " dg-dialog-wide" : "")}
+        class={"dg-dialog" + (props.width === "wide" ? " dg-dialog-wide" : props.width === "large" ? " dg-dialog-large" : "")}
         role="dialog"
         aria-modal="true"
         aria-label={props.title}

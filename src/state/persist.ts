@@ -22,3 +22,12 @@ export function savePersisted<T>(key: string, value: T): void {
     /* ignore */
   }
 }
+
+/** Deletes `deepgit.ui.<key>` (the setting falls back to its default). */
+export function removePersisted(key: string): void {
+  try {
+    localStorage.removeItem(PREFIX + key);
+  } catch {
+    /* ignore */
+  }
+}

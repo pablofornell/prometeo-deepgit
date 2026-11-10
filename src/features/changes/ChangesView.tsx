@@ -27,7 +27,7 @@ import { discardItems, discardable, stageItems, toggleStage, unstageItems } from
 import { DirRowView, FileRowView, RepoRowView, SectionRowView, type DirRow, type FileRow, type RowCtl, type SectionRow } from "./Rows";
 import "./changes.css";
 
-const ROW_H = 24;
+const rowH = (): number => cssPx("--dg-file-row-height", 24);
 
 const OP_LABEL: Partial<Record<RepoStateKind, string>> = { merging: "Merge", rebasing: "Rebase", cherryPicking: "Cherry-pick", reverting: "Revert" };
 const OP_ARG: Partial<Record<RepoStateKind, string>> = { merging: "merge", rebasing: "rebase", cherryPicking: "cherry-pick", reverting: "revert" };
@@ -183,7 +183,7 @@ export function ChangesView(): JSX.Element {
     const rs = rows();
     if (rs.length === 0) return;
     const cur = cursorIndex();
-    const page = Math.max(1, Math.floor((listApi?.element()?.clientHeight ?? 0) / ROW_H) - 1);
+    const page = Math.max(1, Math.floor((listApi?.element()?.clientHeight ?? 0) / rowH()) - 1);
     const go = (to: number) => {
       e.preventDefault();
       moveTo(to, e.shiftKey);
@@ -546,7 +546,7 @@ export function ChangesView(): JSX.Element {
             role="tree"
             ariaLabel="Local changes"
             count={rows().length}
-            rowHeight={ROW_H}
+            rowHeight={rowH()}
             selectedIndex={cursorIndex()}
             onKeyDown={onListKey}
             apiRef={(a) => {

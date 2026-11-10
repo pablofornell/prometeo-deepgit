@@ -21,7 +21,7 @@
 .dg-diff-grow { flex: 1; min-width: 0; }
 .dg-diff-nav { display: inline-flex; align-items: center; gap: 2px; color: var(--dg-text-muted); font-size: var(--dg-font-size-medium); flex: none; }
 .dg-diff-nav-text { padding: 0 4px; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.dg-diff-vsep { width: 1px; height: 18px; background: var(--dg-separator); margin: 0 4px; flex: none; }
+.dg-diff-vsep { width: 1px; height: calc(18 * var(--dg-u)); background: var(--dg-separator); margin: 0 4px; flex: none; }
 
 /* ---- states ---- */
 .dg-diff-center { flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--dg-text-secondary); }
@@ -92,7 +92,7 @@
 .dg-diff-hunk .dg-diff-code { color: var(--dg-diff-hunk-header-fg); display: flex; align-items: center; }
 .dg-diff-hunk-actions { margin-left: auto; position: sticky; right: var(--dg-island-gap); display: inline-flex; gap: 4px; padding-left: 8px; font-family: var(--dg-font-ui); }
 .dg-diff-hbtn {
-  display: inline-flex; align-items: center; gap: 3px; height: 16px; padding: 0 6px; border-radius: var(--dg-pill-radius); line-height: 1;
+  display: inline-flex; align-items: center; gap: 3px; height: calc(16 * var(--dg-u)); padding: 0 6px; border-radius: var(--dg-pill-radius); line-height: 1;
   font-size: var(--dg-font-size-small); color: var(--dg-text); background: var(--dg-chip-bg); box-shadow: inset 0 0 0 1px var(--dg-chip-border);
 }
 .dg-diff-hbtn .dg-icon { color: currentColor; }

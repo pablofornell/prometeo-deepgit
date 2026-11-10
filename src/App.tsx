@@ -7,6 +7,7 @@ import { Gallery } from "./components/ui/Gallery";
 import { DialogHost, MenuHost, ToastHost, TooltipHost } from "./components/ui";
 import { registerAllDialogs } from "./features/dialogs";
 import { SearchEverywhere } from "./features/palette/SearchEverywhere";
+import { SettingsHost, registerSettings } from "./features/settings";
 import { Shell } from "./features/shell/Shell";
 import { Welcome } from "./features/welcome/Welcome";
 import { startEvents } from "./state/events";
@@ -20,6 +21,7 @@ export default function App(): JSX.Element {
     initSettings();
     startEvents();
     registerAllDialogs();
+    registerSettings();
     registerGlobalShortcuts();
     onCleanup(installKeymap());
     void loadWorkspace();
@@ -39,6 +41,7 @@ export default function App(): JSX.Element {
       <MenuHost />
       <DialogHost />
       <ToastHost />
+      <SettingsHost />
       <TooltipHost />
     </>
   );

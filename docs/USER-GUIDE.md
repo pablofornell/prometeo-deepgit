@@ -660,17 +660,62 @@ Copy a command from the console to repeat it in a terminal.
 
 ![Light theme](screenshots/light.png)
 
-Click the gear in the title bar, or press `Ctrl+Alt+S` or `Ctrl+,`.
+Press `Ctrl+Alt+S` or `Ctrl+,` to open **Settings**. You can also click the gear in the title bar and choose **Settings…**, or type "settings" in Search Everywhere.
+
+Settings is a large window. The list of pages is at the left. Type in the **Filter sections** field to find a page by name or by a word like "font" or "zoom". The page is at the right. Use `Up` and `Down` in the list to change page.
+
+Every change applies **at once**. There is no OK button. Press `Esc` or click **Close** when you are done. DeepGit remembers all settings between sessions.
+
+### Reset
+
+- **Reset to defaults** (top right of a page) puts the settings of that page back to their default values.
+- **Reset all** (bottom left) puts every setting back to its default value. DeepGit asks you to confirm first.
+
+### Appearance
 
 | Setting | Values |
 |---|---|
-| **Theme** | Dark, Light, Follow the system |
-| **Show commit graph** | On or off |
-| **Colour lanes by repository** | On: repository colours. Off: colours by branch. |
-| **Comfortable rows** | 28 px log rows instead of 24 px |
-| **Show background commands in the console** | On or off |
+| **Color theme** | Dark, Light, System (follows the operating system) |
+| **Font size** | 10 to 20 px, default 13. Use the slider or the `-` and `+` buttons, or type a number. |
+| **Editor font size** | 10 to 20 px. Diff, console and commit hashes. By default it follows the font size. Clear **Follow the font size** to choose a value. |
+| **UI scale** | 80% to 200% in steps of 10%, default 100%. Zooms the whole window. |
+| **Comfortable rows** | Taller rows in the log |
+| **Date format** | Relative (4 min ago) or Absolute (10 Nov 2026 10:42) |
 
+The preview under **UI scale** shows the sizes you choose.
+
+**Font size** makes the text bigger. Rows, buttons, icons and bars grow with it, so the text does not get cut off. **UI scale** is different: it zooms everything, including lines and spaces.
+If your eyes get tired, try **Font size** 15 or 16 first.
+
+In the log, the column widths stay the same when you change the font size. If a name is cut off, drag the column border, or right-click the column header and choose **Reset column widths**.
+
+### Log
+
+| Setting | Values |
+|---|---|
+| **Show the commit graph** | On or off |
+| **Lane colors** | By repository, or by branch |
+
+### Console
+
+| Setting | Values |
+|---|---|
+| **Show background commands** | Show the commands that DeepGit runs by itself (status, log, ...). Off: only your commands. |
+
+### Quick settings in the gear menu
+
+The gear menu keeps the most used switches: theme, commit graph, lane colours, comfortable rows and background commands.
 You can also click the theme name (**Dark** or **Light**) at the right end of the status bar to switch the theme.
+
+### Zoom keys
+
+| Key | Action |
+|---|---|
+| `Ctrl+=` or `Ctrl++` | Zoom in (UI scale +10%) |
+| `Ctrl+-` | Zoom out (UI scale -10%) |
+| `Ctrl+0` | Reset the UI scale to 100% |
+
+The numeric keypad `+` and `-` work too. A short message shows the new value. The keys work in text fields and while Settings is open.
 
 Other choices that DeepGit remembers:
 
@@ -704,6 +749,7 @@ While a menu, popup or dialog is open, most shortcuts do not work.
 | `Ctrl+Alt+Z` | Stash changes (focused repository) |
 | `Ctrl+R` | Refresh |
 | `Ctrl+Alt+S` or `Ctrl+,` | Settings |
+| `Ctrl+=` or `Ctrl++`, `Ctrl+-`, `Ctrl+0` | Zoom in, zoom out, reset zoom (UI scale). These work in text fields and in dialogs. |
 
 ### Tool windows
 
@@ -870,6 +916,7 @@ DeepGit does not store passwords or tokens.
 Close DeepGit first.
 
 - **Window position and size**: delete `~/.config/dev.prometeo.deepgit/.window-state.json`.
+- **Font size, UI scale or any other setting**: open **Settings** and click **Reset all**. If the window is unreadable, press `Ctrl+0` to reset the zoom.
 - **Panel sizes, theme, columns and other interface settings**: delete the folder `~/.local/share/dev.prometeo.deepgit/`. This also removes commit message drafts.
 - **All projects**: delete `~/.config/dev.prometeo.deepgit/workspace.json`.
 

@@ -1,4 +1,5 @@
 import { type Accessor, For, type JSX, Show, createMemo, createSignal } from "solid-js";
+import { cssPx } from "../../state/metrics";
 import { Icon } from "./Icon";
 import { VirtualList, type VirtualListApi } from "./VirtualList";
 
@@ -32,7 +33,7 @@ export interface TreeProps<T> {
   /** Double-click or Enter. Without it, Enter / double-click toggles folders. */
   onActivate?: (node: T, id: string) => void;
   onContextMenu?: (node: T, e: MouseEvent) => void;
-  /** Row height in px (default 24 = `--dg-tree-row-height`). */
+  /** Row height in px (default: the value of `--dg-tree-row-height`, which follows the font size). */
   rowHeight?: number;
   /** Indent per level in px (default 16). */
   indent?: number;
@@ -61,7 +62,7 @@ interface Flat<T> {
  *     renderNode={(r, info) => <><Icon name="repo" /> <span>{r.name}</span></>} />
  */
 export function Tree<T>(props: TreeProps<T>): JSX.Element {
-  const rowH = () => props.rowHeight ?? 24;
+  const rowH = () => props.rowHeight ?? cssPx("--dg-tree-row-height", 24);
   const indent = () => props.indent ?? 16;
   let listApi: VirtualListApi | undefined;
 

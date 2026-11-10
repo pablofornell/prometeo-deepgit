@@ -14,36 +14,46 @@
   /* ---- Fonts ---- */
   --dg-font-ui: "Inter", system-ui, -apple-system, "Segoe UI", "Cantarell", sans-serif;
   --dg-font-mono: "JetBrains Mono", ui-monospace, "DejaVu Sans Mono", "Menlo", monospace;
-  --dg-font-size: 13px;            /* default UI text */
-  --dg-font-size-medium: 12px;     /* secondary UI text, log columns author/date */
-  --dg-font-size-small: 11px;      /* badges, pills, status letters, counters */
-  --dg-font-size-h4: 14px;         /* commit subject in details panel, dialog titles */
-  --dg-font-size-h3: 16px;         /* empty-state headings */
-  --dg-font-size-h2: 18px;         /* onboarding heading */
-  --dg-font-size-h1: 22px;         /* welcome title */
-  --dg-font-size-mono: 12px;       /* hashes, console, diff code */
-  --dg-line-height-ui: 16px;
-  --dg-line-height-code: 20px;     /* diff line height */
+  /* Sizes derive from ONE base (Settings > Appearance). `--dg-font-base`, `--dg-text-scale` and `--dg-editor-font-base`
+     are written on <html> by state/settings.ts (and by index.html before first paint); the values here are the defaults.
+     `--dg-u` is "1 px at the default 13 px font": write every text-dependent size as `calc(N * var(--dg-u))`, or
+     `round(calc(N * var(--dg-u)), 1px)` when JavaScript reads it (virtual rows, graph). */
+  --dg-font-base: 13px;
+  --dg-text-scale: 1;              /* font-base / 13 */
+  --dg-editor-font-base: 12px;
+  --dg-ui-scale: 1;                /* page zoom, only used where a minimum size must shrink with it */
+  --dg-u: calc(1px * var(--dg-text-scale));
+  --dg-font-size: var(--dg-font-base);                                   /* default UI text */
+  --dg-font-size-medium: max(10px, round(calc(12 * var(--dg-u)), 1px)); /* secondary UI text, log columns author/date */
+  --dg-font-size-small: max(9px, round(calc(11 * var(--dg-u)), 1px));   /* badges, pills, status letters, counters */
+  --dg-font-size-h4: round(calc(14 * var(--dg-u)), 1px);                /* commit subject in details panel, dialog titles */
+  --dg-font-size-h3: round(calc(16 * var(--dg-u)), 1px);                /* empty-state headings */
+  --dg-font-size-h2: round(calc(18 * var(--dg-u)), 1px);                /* onboarding heading */
+  --dg-font-size-h1: round(calc(22 * var(--dg-u)), 1px);                /* welcome title */
+  --dg-font-size-micro: max(8px, round(calc(10 * var(--dg-u)), 1px));   /* counters inside 14 px dots */
+  --dg-font-size-mono: var(--dg-editor-font-base);                       /* hashes, console, diff code */
+  --dg-line-height-ui: round(calc(16 * var(--dg-u)), 1px);
+  --dg-line-height-code: round(calc(var(--dg-editor-font-base) * 5 / 3), 1px); /* diff line height: 20 px at 12 px */
   --dg-weight-regular: 400;
   --dg-weight-medium: 500;
   --dg-weight-semibold: 600;
 
   /* ---- Window (Islands) ---- */
-  --dg-titlebar-height: 40px;
-  --dg-toolbar-button-size: 30px;
-  --dg-toolbar-icon-size: 16px;
+  --dg-titlebar-height: round(calc(40 * var(--dg-u)), 1px);
+  --dg-toolbar-button-size: round(calc(30 * var(--dg-u)), 1px);
+  --dg-toolbar-icon-size: round(calc(16 * var(--dg-u)), 1px);
   --dg-toolbar-button-radius: 6px;
   --dg-toolbar-dropdown-radius: 6px;
-  --dg-toolbar-dropdown-height: 30px;
+  --dg-toolbar-dropdown-height: round(calc(30 * var(--dg-u)), 1px);
   --dg-toolbar-dropdown-padding: 0 6px 0 10px;
   --dg-toolbar-dropdown-max-width: 350px;
   --dg-island-radius: 10px;
   --dg-island-gap: 6px;            /* gap between two islands */
   --dg-island-outer-gap: 3px;      /* gap between island and window edge / stripe */
-  --dg-stripe-width: 40px;
-  --dg-stripe-button-size: 30px;
+  --dg-stripe-width: round(calc(40 * var(--dg-u)), 1px);
+  --dg-stripe-button-size: round(calc(30 * var(--dg-u)), 1px);
   --dg-stripe-button-radius: 6px;
-  --dg-statusbar-height: 28px;
+  --dg-statusbar-height: round(calc(28 * var(--dg-u)), 1px);
   --dg-statusbar-widget-padding: 0 8px;
 
   /* ---- Panels ---- */
@@ -56,33 +66,33 @@
   --dg-diff-min-height: 160px;
   --dg-log-min-width: 480px;
   --dg-splitter-hit: 6px;          /* invisible drag zone = island gap */
-  --dg-panel-header-height: 36px;  /* island header (title + actions) */
+  --dg-panel-header-height: round(calc(36 * var(--dg-u)), 1px);  /* island header (title + actions) */
   --dg-panel-header-padding: 0 8px 0 12px;
 
   /* ---- Rows ---- */
-  --dg-tree-row-height: 24px;
+  --dg-tree-row-height: round(calc(24 * var(--dg-u)), 1px);
   --dg-tree-indent: 16px;
   --dg-tree-padding-x: 8px;
   --dg-tree-selection-radius: 4px;
-  --dg-tree-icon-size: 16px;
+  --dg-tree-icon-size: round(calc(16 * var(--dg-u)), 1px);
   --dg-tree-icon-gap: 6px;
-  --dg-log-row-height: 24px;       /* compact (default) */
-  --dg-log-row-height-comfortable: 28px;
-  --dg-log-header-height: 26px;
-  --dg-log-lane-width: 14px;       /* horizontal distance between graph lanes */
-  --dg-log-node-radius: 4px;       /* commit dot radius (8px dot) */
-  --dg-log-head-node-radius: 5px;  /* HEAD dot radius incl. ring */
+  --dg-log-row-height: round(calc(24 * var(--dg-u)), 1px);       /* compact (default) */
+  --dg-log-row-height-comfortable: round(calc(28 * var(--dg-u)), 1px);
+  --dg-log-header-height: round(calc(26 * var(--dg-u)), 1px);
+  --dg-log-lane-width: round(calc(14 * var(--dg-u)), 1px);       /* horizontal distance between graph lanes */
+  --dg-log-node-radius: round(calc(4 * var(--dg-u)), 1px);       /* commit dot radius (8px dot) */
+  --dg-log-head-node-radius: round(calc(5 * var(--dg-u)), 1px);  /* HEAD dot radius incl. ring */
   --dg-log-edge-width: 2px;
   --dg-log-graph-pad-left: 10px;   /* left padding before lane 0 centre minus half lane */
   --dg-repo-spine-width: 3px;
-  --dg-filter-bar-height: 32px;   /* 24 px controls + 8 px bottom padding */
-  --dg-file-row-height: 24px;
-  --dg-diff-gutter-width: 44px;    /* one line-number column */
-  --dg-diff-marker-width: 16px;    /* +/- column in unified mode */
+  --dg-filter-bar-height: round(calc(32 * var(--dg-u)), 1px);   /* 24 px controls + 8 px bottom padding */
+  --dg-file-row-height: round(calc(24 * var(--dg-u)), 1px);
+  --dg-diff-gutter-width: round(calc(var(--dg-editor-font-base) * 11 / 3), 1px);    /* one line-number column */
+  --dg-diff-marker-width: round(calc(var(--dg-editor-font-base) * 4 / 3), 1px);    /* +/- column in unified mode */
 
   /* ---- Controls ---- */
-  --dg-control-height: 28px;
-  --dg-control-height-small: 24px; /* filter chips, inline buttons */
+  --dg-control-height: round(calc(28 * var(--dg-u)), 1px);
+  --dg-control-height-small: round(calc(24 * var(--dg-u)), 1px); /* filter chips, inline buttons */
   --dg-button-min-width: 72px;
   --dg-button-radius: 4px;
   --dg-button-padding-x: 14px;
@@ -90,34 +100,34 @@
   --dg-input-padding: 0 8px;
   --dg-focus-width: 2px;
   --dg-border-width: 1px;
-  --dg-checkbox-size: 16px;
+  --dg-checkbox-size: round(calc(16 * var(--dg-u)), 1px);
   --dg-checkbox-radius: 3px;
-  --dg-action-button-size: 22px;
+  --dg-action-button-size: round(calc(22 * var(--dg-u)), 1px);
   --dg-action-button-radius: 4px;
-  --dg-pill-height: 16px;          /* ref pill */
+  --dg-pill-height: round(calc(16 * var(--dg-u)), 1px);          /* ref pill */
   --dg-pill-radius: 4px;
   --dg-pill-padding-x: 5px;
-  --dg-badge-height: 16px;         /* ahead/behind capsule, counters */
+  --dg-badge-height: round(calc(16 * var(--dg-u)), 1px);         /* ahead/behind capsule, counters */
   --dg-badge-radius: 8px;
-  --dg-avatar-size: 18px;          /* log row */
-  --dg-avatar-size-large: 32px;    /* details panel */
-  --dg-chip-repo-height: 16px;
+  --dg-avatar-size: round(calc(18 * var(--dg-u)), 1px);          /* log row */
+  --dg-avatar-size-large: round(calc(32 * var(--dg-u)), 1px);    /* details panel */
+  --dg-chip-repo-height: round(calc(16 * var(--dg-u)), 1px);
 
   /* ---- Popups, menus, dialogs ---- */
   --dg-popup-radius: 8px;
-  --dg-popup-item-height: 24px;
+  --dg-popup-item-height: round(calc(24 * var(--dg-u)), 1px);
   --dg-popup-selection-radius: 4px;
   --dg-menu-padding-y: 6px;
   --dg-menu-item-padding-x: 8px;
   --dg-menu-separator-height: 9px;
-  --dg-palette-width: 640px;
+  --dg-palette-width: round(calc(640 * var(--dg-u)), 1px);
   --dg-palette-max-height: 480px;
-  --dg-palette-input-height: 40px;
-  --dg-palette-row-height: 28px;
+  --dg-palette-input-height: round(calc(40 * var(--dg-u)), 1px);
+  --dg-palette-row-height: round(calc(28 * var(--dg-u)), 1px);
   --dg-dialog-radius: 10px;
   --dg-dialog-padding: 16px 20px;
-  --dg-dialog-width: 480px;
-  --dg-dialog-width-wide: 640px;
+  --dg-dialog-width: round(calc(480 * var(--dg-u)), 1px);
+  --dg-dialog-width-wide: round(calc(640 * var(--dg-u)), 1px);
 
   /* ---- Feedback ---- */
   --dg-tooltip-radius: 6px;
@@ -125,7 +135,7 @@
   --dg-notification-radius: 8px;
   --dg-notification-width: 384px;
   --dg-banner-radius: 6px;
-  --dg-banner-height: 36px;
+  --dg-banner-height: round(calc(36 * var(--dg-u)), 1px);
   --dg-scrollbar-width: 10px;
   --dg-scrollbar-width-hover: 14px;
   --dg-ruler-mark-height: 3px;     /* overview ruler mark */

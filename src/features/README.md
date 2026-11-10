@@ -15,6 +15,7 @@ Each folder in `src/features/` is one feature with **one root component** (names
 | `matrix/` | `BranchMatrix()` | Bottom tool window. |
 | `statusbar/` | `StatusBar()` | 28 px bar. |
 | `welcome/` | `Welcome()` | Shown when the workspace has no project. Keep the drag bar + `WindowControls`. |
+| `settings/` | `SettingsDialog`, `registerSettings()`, `SettingsHost` | Settings window and zoom keys. Sections are plain files, see "Settings sections" below. |
 | `dialogs/` | `registerAllDialogs()` | Add `registerDialog(name, Component)` lines. |
 | `shell/` | `Shell()` | Window layout. Owned by the foundation, not by feature agents. |
 
@@ -33,6 +34,12 @@ feature. Cross-feature communication goes through `state/` (selection, layout, a
   modifier class of your own.
 - Only `--dg-*` tokens (`src/theme/tokens.css`, spec in `docs/design/DESIGN.md`). **No hard-coded colours, sizes of
   chrome or durations.** Need a value that does not exist? Add it to `src/theme/extra.css` and say so in your report.
+- **Sizes follow the user's font size** (Settings > Appearance, 10 to 20 px). Never write a font size or a text-line height in px.
+  Use the `--dg-font-size-*` tokens. For any other size that depends on text (row, control, icon, pill, badge height), use a token
+  that already exists, or write `calc(N * var(--dg-u))` (`--dg-u` is 1 px at the default 13 px font). When JavaScript needs the number
+  (virtual list row height, canvas/SVG maths), read it with `cssPx("--dg-...", fallback)` from `state/metrics.ts` inside a memo or
+  effect: it re-runs when the font size changes, and the token must be `round(calc(N * var(--dg-u)), 1px)`. Never keep a row height as a
+  px constant in TypeScript. Icon sizes (`<Icon size={14}>`) are px at the default font and scale on their own.
 - Repo colour: `var(--dg-repo-N)` via `repoColor(repo)` (state/workspace) or `repoColorVar(index)`; lane colour:
   `laneColorVar(i)` (`i % 10` is done for you). Never use them for anything else.
 - No transitions on hover/selection (DESIGN.md section 7). Respect `prefers-reduced-motion` by using the `--dg-dur-*` tokens.
@@ -44,7 +51,9 @@ feature. Cross-feature communication goes through `state/` (selection, layout, a
 | `workspace.ts` | `workspace` (store), `activeProject()`, `projectRepos()`, `repoById(id)`, `repoColor(repo)`, `selectedRepoIds()` / `selectedRepos()` (the repo filter), `setSelectedRepoIds`, `toggleRepo`, `selectOnlyRepo`, `selectAllRepos`, `isRepoFilterActive()`, `focusedRepo()` / `setFocusedRepoId` (target of single-repo commands), `summary(repoId)` (reactive `RepoSummary`), `projectTotals()` (ahead/behind/changes/operations), `refreshSummaries(ids?)`, `addProject`, `setActiveProject`, `removeProject`, `rescanProject`. Summaries refresh themselves on `repo-changed` (throttled). |
 | `refs.ts` | `repoRefs(repoId)` -> accessor of `Refs` (first read loads it), `refreshRefs`, `ensureRefs(ids)`, `cachedRefs`, `hasLocalBranch`, `hasRemoteBranch`. Auto-refresh on `repo-changed`. |
 | `selection.ts` | `selectedCommit()` / `setSelectedCommit({repoId, oid})`, `selectedFile()` / `selectFile({repoId, spec, path, oldPath?})`, `mainTab()` / `setMainTab("log" \| "changes")`, `changesRepoId()` / `setChangesRepoId`, `clearSelection()`. |
-| `settings.ts` | `settings` store (`theme`, `dateFormat`, `diffMode`, `showGraph`, `laneColors`, `comfortableRows`, `showBackgroundCommands`), `setSetting(key, value)` (persisted as `deepgit.ui.<key>`), `toggleTheme()`, `resolvedTheme()`. |
+| `settings.ts` | `settings` store (`theme`, `dateFormat`, `diffMode`, `showGraph`, `laneColors`, `comfortableRows`, `showBackgroundCommands`, `fontSize`, `editorFontSize`, `uiScale`), `setSetting(key, value)` (validated, persisted as `deepgit.ui.<key>`), `resetSettings(keys?)`, `SETTING_DEFAULTS`, `zoomUi(+1 \| -1)`, `toggleTheme()`, `resolvedTheme()`. Add a key: extend `Settings`, `SETTING_DEFAULTS` and `SANITIZERS`. |
+| `appearance.ts` | Pure maths of font size / editor size / UI scale: limits, `sanitize*`, `appearanceVars()` (the CSS variables). `index.html` repeats it before first paint; `prepaint.test.ts` checks both agree. |
+| `metrics.ts` | `cssPx(token, fallback)` (resolved px of a CSS token, reactive to font-size changes), `appearanceRev()`. |
 | `layout.ts` | `sidebarVisible()`, `diffVisible()`, `bottomTool()` ("console" \| "matrix" \| null), `toggleSidebar`, `toggleDiff`, `openBottomTool(tool)`, `toggleBottomTool(tool)`. |
 | `console.ts` | `consoleEntries()` (ring of 500 `ConsoleEntry`), `lastUserEntry()` (ticker), `lastConsoleEntry()`, `isBackgroundEntry(e)`, `clearConsole()`, `formatCommand(e)`. |
 | `events.ts` | `repoVersion(repoId)` / `anyRepoVersion()` (reactive counters bumped on every change), `subscribeRepoChanged(cb)`, `notifyRepoChanged(id)`. Never call `onRepoChanged` / `onGitConsole` yourself. |
@@ -92,7 +101,7 @@ summary refresh are done for you. To add a new action, add it to `actions.ts` wi
 
 `registerDialog(name, Component)` and `showDialog(name, props) -> Promise<result | undefined>` (undefined = cancelled).
 Names and their `props` / `result` types are in `DialogRegistry`: `newBranch`, `renameBranch`, `merge`, `rebase`, `reset`,
-`confirm` (done), `push`, `stash`, `tag`, `checkoutRemote`. Until a name is registered `showDialog` falls back to
+`confirm` (done), `push`, `stash`, `tag`, `checkoutRemote`, `settings` (`features/settings`, props `{ section? }`). Until a name is registered `showDialog` falls back to
 `window.prompt` / `confirm`. A dialog component receives its props plus `close(result?)`:
 
 ```tsx
@@ -136,6 +145,50 @@ Open `http://localhost:1420/#gallery` for a live catalogue of everything below.
 Git-specific: `RepoChip`, `RepoSquare`, `RefPill` / `RefPills` (split HEAD pill, synced pill, +N), `AheadBehind`, `StatusLetter`.
 Helpers: `formatLogDate`, `formatRelative`, `formatDateTime`, `shortOid`, `initials`, `fnv1a`, `splitPath`, `statusLetter`,
 `statusColorVar`, `fileIconFor(path)`, `copyText`, `plural`, `joinNames`.
+
+## Settings sections (`features/settings/`)
+
+The Settings window (`Ctrl+,`, gear menu, Search Everywhere) lists **sections**. A section is **one new file** in
+`src/features/settings/sections/`. The dialog loads every `*.tsx` of that folder (`import.meta.glob`), so you change nothing else.
+
+```tsx
+// src/features/settings/sections/Git.tsx
+import { Checkbox } from "../../../components/ui";
+import { resetSettings, setSetting, settings } from "../../../state/settings";
+import { registerSettingsSection } from "../registry";
+import { Row, Section, SizeControl } from "../widgets";
+
+function GitSection() {
+  return (
+    <Section title="Fetch">
+      <Row label="Fetch automatically" hint="Every few minutes.">
+        <Checkbox checked={settings.autoFetch} ariaLabel="Fetch automatically" onChange={(v) => setSetting("autoFetch", v)} />
+      </Row>
+    </Section>
+  );
+}
+
+registerSettingsSection({ id: "git", title: "Git", order: 40, icon: "fetch", keywords: ["fetch", "pull", "prune"], component: GitSection,
+                          reset: () => resetSettings(["autoFetch"]) });
+```
+
+`registerSettingsSection({ id, title, order, keywords?, icon?, component, reset? })` (`features/settings/registry.ts`):
+
+| Field | Meaning |
+|---|---|
+| `id` | Stable lower-case id. Same id again replaces the section. `showDialog("settings", { section: "git" })` opens it. |
+| `title` | Entry in the left list and heading of the page. |
+| `order` | Sort key, ascending. Shipped: Appearance 10, Log 20, Console 30. Use 40 for Git, 50 for Colors. |
+| `keywords` | Extra words that the filter field matches (names of the controls). |
+| `icon` | Optional `IconName`. |
+| `component` | The page, no props. Use `Section`, `Row`, `NumberField`, `SizeControl` from `widgets.tsx` and the `components/ui` controls. |
+| `reset` | Optional. Puts the page back to defaults. It adds the **Reset to defaults** button and runs on **Reset all**. |
+
+Rules: apply changes **live** (write to the store in the handler; there is no OK or Save). Store values with `setSetting` (add the key to
+`Settings`, `SETTING_DEFAULTS` and `SANITIZERS` in `state/settings.ts`; every stored value is validated) or in your own store that
+validates what it reads. Do not import another feature from a section.
+
+Zoom keys (`Ctrl+=`, `Ctrl++`, `Ctrl+-`, `Ctrl+0`) are registered in `features/settings/index.ts`; do not reuse them.
 
 ## Tests and verification
 

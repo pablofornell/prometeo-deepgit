@@ -6,10 +6,16 @@
  *   setSetting("diffMode", "unified");
  *
  * `theme` is "dark" | "light" | "system"; `index.html` applies it before first paint with the same
- * rule as `applyTheme()`.
+ * rule as `applyTheme()`. The same is true for the sizes (`fontSize`, `editorFontSize`, `uiScale`): see
+ * `state/appearance.ts` for the maths and `applyAppearance()` below for what they change.
+ *
+ * Every stored value is validated on load and on `setSetting` (unknown strings, NaN and out-of-range numbers fall
+ * back to the default or are clamped). `resetSettings()` removes the stored values.
  */
 import { createStore } from "solid-js/store";
-import { loadPersisted, savePersisted } from "./persist";
+import { UI_SCALE_DEFAULT, appearanceVars, sanitizeEditorFontSize, sanitizeFontSize, sanitizeUiScale, stepUiScale, FONT_SIZE_DEFAULT } from "./appearance";
+import { bumpAppearance } from "./metrics";
+import { loadPersisted, removePersisted, savePersisted } from "./persist";
 
 export type ThemePref = "dark" | "light" | "system";
 export type DateFormat = "relative" | "absolute";
@@ -25,13 +31,19 @@ export interface Settings {
   showGraph: boolean;
   /** Lane colours in the combined log (DESIGN.md 11.6). */
   laneColors: LaneColorMode;
-  /** 28 px rows instead of 24 px. */
+  /** Taller rows in the log (the compact height plus 4 px at the default font size). */
   comfortableRows: boolean;
   /** Show background git commands (status, log, ...) in the console. */
   showBackgroundCommands: boolean;
+  /** UI font size in px, 10..20. All text sizes and the heights that depend on text derive from it. */
+  fontSize: number;
+  /** Mono font size (diff, console, hashes) in px, 10..20; `null` follows `fontSize`. */
+  editorFontSize: number | null;
+  /** Page zoom in percent, 80..200 in steps of 10. */
+  uiScale: number;
 }
 
-const DEFAULTS: Settings = {
+export const SETTING_DEFAULTS: Readonly<Settings> = {
   theme: "dark",
   dateFormat: "relative",
   diffMode: "sideBySide",
@@ -39,21 +51,60 @@ const DEFAULTS: Settings = {
   laneColors: "repo",
   comfortableRows: false,
   showBackgroundCommands: false,
+  fontSize: FONT_SIZE_DEFAULT,
+  editorFontSize: null,
+  uiScale: UI_SCALE_DEFAULT,
 };
 
+const oneOf =
+  <T extends string>(...allowed: T[]) =>
+  (fallback: T) =>
+  (v: unknown): T =>
+    allowed.includes(v as T) ? (v as T) : fallback;
+
+/** One validator per key: returns a valid value for any input. */
+export const SANITIZERS: { [K in keyof Settings]: (v: unknown) => Settings[K] } = {
+  theme: oneOf<ThemePref>("dark", "light", "system")(SETTING_DEFAULTS.theme),
+  dateFormat: oneOf<DateFormat>("relative", "absolute")(SETTING_DEFAULTS.dateFormat),
+  diffMode: oneOf<DiffMode>("sideBySide", "unified")(SETTING_DEFAULTS.diffMode),
+  showGraph: (v) => (typeof v === "boolean" ? v : SETTING_DEFAULTS.showGraph),
+  laneColors: oneOf<LaneColorMode>("repo", "branch")(SETTING_DEFAULTS.laneColors),
+  comfortableRows: (v) => (typeof v === "boolean" ? v : SETTING_DEFAULTS.comfortableRows),
+  showBackgroundCommands: (v) => (typeof v === "boolean" ? v : SETTING_DEFAULTS.showBackgroundCommands),
+  fontSize: sanitizeFontSize,
+  editorFontSize: sanitizeEditorFontSize,
+  uiScale: sanitizeUiScale,
+};
+
+const KEYS = Object.keys(SETTING_DEFAULTS) as (keyof Settings)[];
+
 const initial = {} as Settings;
-for (const k of Object.keys(DEFAULTS) as (keyof Settings)[]) {
-  (initial as unknown as Record<string, unknown>)[k] = loadPersisted(k, DEFAULTS[k]);
+for (const k of KEYS) {
+  (initial as unknown as Record<string, unknown>)[k] = SANITIZERS[k](loadPersisted<unknown>(k, SETTING_DEFAULTS[k]));
 }
 
 const [settings, setStore] = createStore<Settings>(initial);
 export { settings };
 
-/** Changes one setting and persists it. */
+const APPEARANCE_KEYS: (keyof Settings)[] = ["fontSize", "editorFontSize", "uiScale"];
+
+/** Changes one setting (validated) and persists it. */
 export function setSetting<K extends keyof Settings>(key: K, value: Settings[K]): void {
-  setStore(key, value as never);
-  savePersisted(key, value);
+  const v = SANITIZERS[key](value) as Settings[K];
+  setStore(key, v as never);
+  savePersisted(key, v);
   if (key === "theme") applyTheme();
+  if (APPEARANCE_KEYS.includes(key)) applyAppearance();
+}
+
+/** Puts the given settings (all when omitted) back to their defaults and removes the stored values. */
+export function resetSettings(keys: readonly (keyof Settings)[] = KEYS): void {
+  for (const k of keys) {
+    setStore(k, SETTING_DEFAULTS[k] as never);
+    removePersisted(k);
+  }
+  if (keys.includes("theme")) applyTheme();
+  if (keys.some((k) => APPEARANCE_KEYS.includes(k))) applyAppearance();
 }
 
 /** "dark" or "light" after resolving "system". */
@@ -67,14 +118,49 @@ export function applyTheme(): void {
   document.documentElement.setAttribute("data-theme", resolvedTheme());
 }
 
+let lastZoom = 1;
+const inTauri = (): boolean => typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+
+/**
+ * Writes the size variables on <html> (`--dg-font-base`, `--dg-text-scale`, `--dg-editor-font-base`, `--dg-ui-scale`)
+ * and zooms the page. In the desktop app that is the webview zoom (true page zoom: CSS px, `window.innerWidth` and
+ * scroll maths stay consistent); in a browser it is the CSS `zoom` property of <html>.
+ */
+export function applyAppearance(): void {
+  const root = document.documentElement;
+  const vars = appearanceVars(settings);
+  for (const [name, value] of Object.entries(vars)) root.style.setProperty(name, value);
+  const zoom = settings.uiScale / 100;
+  if (inTauri()) {
+    root.style.removeProperty("zoom");
+    if (zoom !== lastZoom) {
+      lastZoom = zoom;
+      void import("@tauri-apps/api/webview").then((m) => m.getCurrentWebview().setZoom(zoom)).catch(() => undefined);
+    }
+  } else if (zoom === 1) {
+    root.style.removeProperty("zoom");
+  } else {
+    root.style.setProperty("zoom", String(zoom));
+  }
+  bumpAppearance();
+}
+
+/** Zooms the whole UI one step in or out; returns the new percent. */
+export function zoomUi(dir: 1 | -1): number {
+  const next = stepUiScale(settings.uiScale, dir);
+  setSetting("uiScale", next);
+  return next;
+}
+
 /** Flips between dark and light (the status bar switch). */
 export function toggleTheme(): void {
   setSetting("theme", resolvedTheme() === "dark" ? "light" : "dark");
 }
 
-/** Applies the theme and follows the OS when the preference is "system". Call once. */
+/** Applies the theme and the sizes and follows the OS when the preference is "system". Call once. */
 export function initSettings(): void {
   applyTheme();
+  applyAppearance();
   if (typeof matchMedia === "function") {
     matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
       if (settings.theme === "system") applyTheme();

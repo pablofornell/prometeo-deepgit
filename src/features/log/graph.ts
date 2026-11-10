@@ -5,6 +5,9 @@
  * `M x1 y1 C x1 ymid, x2 ymid, x2 y2` so it leaves and enters vertically.
  */
 import type { CommitRow, GraphRow } from "../../api/types";
+import { cssPx } from "../../state/metrics";
+
+export { cssPx };
 
 export interface GraphMetrics {
   /** Distance between two lane centres. */
@@ -22,11 +25,6 @@ export interface GraphMetrics {
 }
 
 export const DEFAULT_METRICS: GraphMetrics = { lane: 14, node: 4, head: 4.5, ring: 7, edge: 2, rowHeight: 24 };
-
-export function cssPx(name: string, fallback: number): number {
-  const v = parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name));
-  return Number.isFinite(v) ? v : fallback;
-}
 
 /** Reads the graph tokens (`--dg-log-lane-width`, ...) from the document. */
 export function readGraphMetrics(rowHeight: number): GraphMetrics {

@@ -1,5 +1,5 @@
 /** Title bar (DESIGN.md 5.1): logo, project switcher, branch widget, fetch / pull / push, Search Everywhere, tools, window controls. */
-import { type JSX, Show, createMemo, onCleanup } from "solid-js";
+import { type JSX, Show, createMemo } from "solid-js";
 import {
   Icon, Kbd, Spinner, WindowControls, dragRegion, markNotificationsRead, notifications, openMenu, plural, unreadCount, formatRelative,
   type IconName, type MenuItem,
@@ -8,7 +8,7 @@ import * as actions from "../../state/actions";
 import { activities } from "../../state/activity";
 import { fetchAge } from "../../state/fetchAge";
 import { bottomTool, toggleBottomTool } from "../../state/layout";
-import { register, runBinding, shortcutLabel } from "../../state/keymap";
+import { runBinding, shortcutLabel } from "../../state/keymap";
 import { settings, setSetting, type ThemePref } from "../../state/settings";
 import { focusedRepo, projectRepos, projectTotals, summary } from "../../state/workspace";
 import { BranchWidget } from "./BranchWidget";
@@ -61,9 +61,12 @@ export function TitleBar(): JSX.Element {
   };
 
   const themeItem = (label: string, value: ThemePref): MenuItem => ({ label, checked: settings.theme === value, onSelect: () => setSetting("theme", value) });
-  const openSettings = (anchor: HTMLElement | undefined) => {
+  /** Gear menu: the full Settings dialog (it owns Ctrl+, and Ctrl+Alt+S, see features/settings) and the quick toggles. */
+  const openSettingsMenu = (anchor: HTMLElement | undefined) => {
     if (!anchor) return;
     openMenu(anchor, () => [
+      { label: "Settings…", icon: "gear", shortcut: shortcutLabel("settings.open"), onSelect: () => runBinding("settings.open") },
+      { separator: true },
       { label: "Theme", heading: true },
       themeItem("Dark", "dark"),
       themeItem("Light", "light"),
@@ -89,9 +92,6 @@ export function TitleBar(): JSX.Element {
     markNotificationsRead();
     openMenu(bellBtn, items.length > 0 ? items : [{ label: "No notifications", disabled: true }]);
   };
-
-  const offs = [register("settings.open", ["Ctrl+Alt+S", "Ctrl+,"], () => openSettings(settingsBtn), { title: "Settings", group: "Global" })];
-  onCleanup(() => offs.forEach((off) => off()));
 
   return (
     <div class="dg-titlebar" {...dragRegion}>
@@ -164,7 +164,7 @@ export function TitleBar(): JSX.Element {
             <span class="dg-titlebar-dot" />
           </Show>
         </button>
-        <button type="button" ref={settingsBtn} class="dg-titlebar-btn" aria-label="Settings" data-tip="Settings" data-tip-shortcut={shortcutLabel("settings.open")} onClick={() => openSettings(settingsBtn)}>
+        <button type="button" ref={settingsBtn} class="dg-titlebar-btn" aria-label="Settings" data-tip="Settings" data-tip-shortcut={shortcutLabel("settings.open")} onClick={() => openSettingsMenu(settingsBtn)}>
           <Icon name="gear" />
         </button>
         <span class="dg-titlebar-sep" />

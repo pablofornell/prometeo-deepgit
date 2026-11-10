@@ -11,6 +11,7 @@ import type { DiffSpec, FileDiff, HunkRef } from "../../api/types";
 import { Button, EmptyState, Icon, IconButton, SegmentedControl, Spinner, StatusLetter, copyText, fileIconFor, openMenu, shortOid, splitPath, toast, type MenuItem } from "../../components/ui";
 import { confirmAction } from "../../state/dialogs";
 import { repoVersion } from "../../state/events";
+import { cssPx } from "../../state/metrics";
 import { setSetting, settings } from "../../state/settings";
 import { collapseOn, ignoreWs, lineNumbersOn, setCollapseOn, setIgnoreWs, setLineNumbersOn, setSyntaxOn, setWordDiffOn, syntaxOn, wordDiffOn } from "./diffPrefs";
 import { activateDiff, releaseDiff, type DiffController } from "./diffKeys";
@@ -37,7 +38,8 @@ export interface DiffViewerProps {
   toolbarExtra?: JSX.Element;
 }
 
-const ROW_H = 20;
+/** Diff line height in px (`--dg-line-height-code`, follows the editor font size). */
+const rowH = (): number => cssPx("--dg-line-height-code", 20);
 const OVERSCAN = 15;
 /** Syntax colours are off above this many characters (DESIGN.md 5.10: 1 MB). */
 const SYNTAX_MAX_CHARS = 1_000_000;
@@ -180,8 +182,8 @@ export function DiffViewer(props: DiffViewerProps): JSX.Element {
 
   const range = createMemo<readonly [number, number]>(
     () => {
-      const first = Math.floor(scrollTop() / ROW_H);
-      return [Math.max(0, first - OVERSCAN), Math.min(rowCount(), first + Math.ceil(viewH() / ROW_H) + 1 + OVERSCAN)] as const;
+      const first = Math.floor(scrollTop() / rowH());
+      return [Math.max(0, first - OVERSCAN), Math.min(rowCount(), first + Math.ceil(viewH() / rowH()) + 1 + OVERSCAN)] as const;
     },
     [0, 0] as const,
     { equals: (a, b) => a[0] === b[0] && a[1] === b[1] },
@@ -223,15 +225,15 @@ export function DiffViewer(props: DiffViewerProps): JSX.Element {
   };
   const onLeftWheel = (e: WheelEvent) => {
     if (!primary || e.shiftKey || Math.abs(e.deltaY) < Math.abs(e.deltaX)) return;
-    primary.scrollTop += e.deltaMode === 1 ? e.deltaY * ROW_H : e.deltaY;
+    primary.scrollTop += e.deltaMode === 1 ? e.deltaY * rowH() : e.deltaY;
     e.preventDefault();
   };
 
   const scrollToRow = (row: number) => {
     if (!primary) return;
-    const top = row * ROW_H;
+    const top = row * rowH();
     const vh = primary.clientHeight;
-    if (top < primary.scrollTop + ROW_H || top + ROW_H * 3 > primary.scrollTop + vh) primary.scrollTop = Math.max(0, top - Math.floor(vh / 3));
+    if (top < primary.scrollTop + rowH() || top + rowH() * 3 > primary.scrollTop + vh) primary.scrollTop = Math.max(0, top - Math.floor(vh / 3));
   };
 
   // ---------------------------------------------------------------- change navigation
@@ -365,12 +367,12 @@ export function DiffViewer(props: DiffViewerProps): JSX.Element {
   };
 
   const rowBox = (i: number, children: JSX.Element) => (
-    <div class="dg-diff-rowbox" style={{ top: i * ROW_H + "px" }}>
+    <div class="dg-diff-rowbox" style={{ top: i * rowH() + "px" }}>
       {children}
     </div>
   );
 
-  const spacerStyle = () => ({ height: rowCount() * ROW_H + "px", "--dgd-cols": String(maxCols() + 2) });
+  const spacerStyle = () => ({ height: rowCount() * rowH() + "px", "--dgd-cols": String(maxCols() + 2) });
 
   return (
     <div

@@ -14,9 +14,9 @@ import {
 import { nodeMenu } from "./menus";
 import { buildTree, expandableIds, filterTree, ids, repoDot, stateLabel, type SidebarNode } from "./nodes";
 import { SyncStrip } from "./SyncStrip";
+import { cssPx } from "../../state/metrics";
 import "./sidebar.css";
 
-const ROW_HEIGHT = 26;
 
 function Hl(props: { text: string; query: string }): JSX.Element {
   const parts = () => {
@@ -348,7 +348,7 @@ export function Sidebar(): JSX.Element {
         </Show>
         <Tree
           roots={roots()}
-          rowHeight={ROW_HEIGHT}
+          rowHeight={cssPx("--dg-sidebar-row-height", 26)}
           getId={(n) => n.id}
           getChildren={(n) => n.children}
           expanded={effectiveExpanded()}

@@ -1,0 +1,116 @@
+// @vitest-environment node
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+/** Minimal localStorage and document so the store can run under node. */
+let storage: Map<string, string>;
+let rootStyle: Map<string, string>;
+beforeEach(() => {
+  storage = new Map();
+  rootStyle = new Map();
+  vi.stubGlobal("localStorage", {
+    getItem: (k: string) => (storage.has(k) ? storage.get(k)! : null),
+    setItem: (k: string, v: string) => void storage.set(k, v),
+    removeItem: (k: string) => void storage.delete(k),
+  });
+  vi.stubGlobal("window", {});
+  vi.stubGlobal("document", {
+    documentElement: {
+      setAttribute: () => {},
+      style: { setProperty: (k: string, v: string) => void rootStyle.set(k, v), removeProperty: (k: string) => void rootStyle.delete(k) },
+    },
+  });
+});
+afterEach(() => vi.unstubAllGlobals());
+
+const load = async () => {
+  vi.resetModules();
+  return import("./settings");
+};
+
+describe("settings store", () => {
+  it("starts with the defaults", async () => {
+    const { settings, SETTING_DEFAULTS } = await load();
+    expect({ ...settings }).toEqual({ ...SETTING_DEFAULTS });
+    expect(settings.fontSize).toBe(13);
+    expect(settings.uiScale).toBe(100);
+    expect(settings.editorFontSize).toBeNull();
+  });
+
+  it("ignores garbage and clamps stored values", async () => {
+    storage.set("deepgit.ui.fontSize", "999");
+    storage.set("deepgit.ui.uiScale", '"wide"');
+    storage.set("deepgit.ui.editorFontSize", "3");
+    storage.set("deepgit.ui.theme", '"purple"');
+    storage.set("deepgit.ui.showGraph", "42");
+    storage.set("deepgit.ui.laneColors", "{not json");
+    const { settings } = await load();
+    expect(settings.fontSize).toBe(20);
+    expect(settings.uiScale).toBe(100);
+    expect(settings.editorFontSize).toBe(10);
+    expect(settings.theme).toBe("dark");
+    expect(settings.showGraph).toBe(true);
+    expect(settings.laneColors).toBe("repo");
+  });
+
+  it("loads valid stored values", async () => {
+    storage.set("deepgit.ui.fontSize", "16");
+    storage.set("deepgit.ui.uiScale", "130");
+    storage.set("deepgit.ui.theme", '"light"');
+    const { settings } = await load();
+    expect([settings.fontSize, settings.uiScale, settings.theme]).toEqual([16, 130, "light"]);
+  });
+
+  it("setSetting validates, persists and applies the sizes", async () => {
+    const { settings, setSetting } = await load();
+    setSetting("fontSize", 18);
+    expect(settings.fontSize).toBe(18);
+    expect(storage.get("deepgit.ui.fontSize")).toBe("18");
+    expect(rootStyle.get("--dg-font-base")).toBe("18px");
+    setSetting("fontSize", 400);
+    expect(settings.fontSize).toBe(20);
+    setSetting("uiScale", 150);
+    expect(rootStyle.get("--dg-ui-scale")).toBe("1.5");
+    expect(rootStyle.get("zoom")).toBe("1.5"); // browser fallback
+    setSetting("uiScale", 100);
+    expect(rootStyle.has("zoom")).toBe(false);
+    setSetting("theme", "nonsense" as never);
+    expect(settings.theme).toBe("dark");
+  });
+
+  it("uses the webview zoom instead of CSS zoom in the desktop app", async () => {
+    vi.stubGlobal("window", { __TAURI_INTERNALS__: {} });
+    const { setSetting } = await load();
+    setSetting("uiScale", 140);
+    expect(rootStyle.get("--dg-ui-scale")).toBe("1.4");
+    expect(rootStyle.has("zoom")).toBe(false);
+  });
+
+  it("zoomUi steps by 10 and stops at 80 and 200", async () => {
+    const { settings, zoomUi } = await load();
+    expect(zoomUi(1)).toBe(110);
+    expect(zoomUi(-1)).toBe(100);
+    for (let i = 0; i < 20; i++) zoomUi(1);
+    expect(settings.uiScale).toBe(200);
+    for (let i = 0; i < 20; i++) zoomUi(-1);
+    expect(settings.uiScale).toBe(80);
+  });
+
+  it("resetSettings puts values back and removes the stored ones", async () => {
+    const { settings, setSetting, resetSettings } = await load();
+    setSetting("fontSize", 17);
+    setSetting("uiScale", 160);
+    setSetting("showGraph", false);
+    setSetting("editorFontSize", 15);
+    resetSettings(["fontSize", "editorFontSize"]);
+    expect([settings.fontSize, settings.editorFontSize]).toEqual([13, null]);
+    expect(storage.has("deepgit.ui.fontSize")).toBe(false);
+    expect(storage.has("deepgit.ui.editorFontSize")).toBe(false);
+    expect(settings.uiScale).toBe(160); // not in the list
+    expect(settings.showGraph).toBe(false);
+    expect(rootStyle.get("--dg-font-base")).toBe("13px");
+    resetSettings();
+    expect([settings.uiScale, settings.showGraph]).toEqual([100, true]);
+    expect(storage.has("deepgit.ui.uiScale")).toBe(false);
+    expect(storage.has("deepgit.ui.showGraph")).toBe(false);
+  });
+});

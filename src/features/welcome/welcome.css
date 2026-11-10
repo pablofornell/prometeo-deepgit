@@ -12,7 +12,7 @@
 .dg-welcome-logo-main { color: var(--dg-accent); }
 .dg-welcome-logo-top { color: var(--dg-text-warning); }
 .dg-welcome-logo-bottom { color: var(--dg-text-success); }
-.dg-welcome-title { margin: var(--dg-space-4) 0 0; font-size: var(--dg-font-size-h1); line-height: 28px; font-weight: var(--dg-weight-semibold); }
+.dg-welcome-title { margin: var(--dg-space-4) 0 0; font-size: var(--dg-font-size-h1); line-height: calc(28 * var(--dg-u)); font-weight: var(--dg-weight-semibold); }
 .dg-welcome-tagline { margin: 0; color: var(--dg-text-muted); }
 
 .dg-welcome-action { display: flex; flex-direction: column; align-items: center; gap: var(--dg-space-4); }

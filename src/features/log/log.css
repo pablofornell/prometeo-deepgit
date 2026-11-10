@@ -136,7 +136,7 @@
 .dg-log-author .dg-avatar { flex: none; }
 .dg-log-aname { overflow: hidden; text-overflow: ellipsis; }
 .dg-log-date { font-size: var(--dg-font-size-medium); color: var(--dg-text-muted); font-variant-numeric: tabular-nums; }
-.dg-log-hash { font-family: var(--dg-font-mono); font-size: 11.5px; color: var(--dg-log-hash-fg); }
+.dg-log-hash { font-family: var(--dg-font-mono); font-size: var(--dg-font-size-mono-small); color: var(--dg-log-hash-fg); }
 
 /* date group row */
 .dg-log-datelabel {
