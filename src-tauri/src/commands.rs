@@ -9,7 +9,7 @@ use gitcore::{
     ApiError, CloneOpts, CloneProgress, CloneResult, CloneTarget, CommitDetails, CommitRow,
     ConflictEntry, ConflictSide, ConflictVersions, DiffSpec, FileDiff, Git, HunkRef, LogQuery,
     LogSessionInfo, MergeOpts, OpResult, Project, Refs, RepoChanged, RepoInfo, RepoSummary,
-    ResetMode, WorkingTree, Workspace,
+    ResetMode, StashUntracked, WorkingTree, Workspace,
 };
 use gitcore::{AuthMode, GitError};
 use tauri::{AppHandle, Emitter, State};
@@ -194,6 +194,18 @@ pub async fn refs(state: St<'_>, repo_id: String) -> Res<Refs> {
 pub async fn commit_details(state: St<'_>, repo_id: String, oid: String) -> Res<CommitDetails> {
     read(&state, &repo_id, move |g, r| {
         diff::commit_details(g, r, &oid)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn stash_untracked(
+    state: St<'_>,
+    repo_id: String,
+    oid: String,
+) -> Res<Option<StashUntracked>> {
+    read(&state, &repo_id, move |g, r| {
+        diff::stash_untracked(g, r, &oid)
     })
     .await
 }

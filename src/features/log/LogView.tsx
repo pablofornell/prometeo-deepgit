@@ -317,9 +317,10 @@ export function LogView(): JSX.Element {
 
   // A commit selected by another feature (palette, details, sidebar): find it in the log and scroll to it.
   let adoptToken = 0;
+  // A stash is not a log row: no row is selected for it.
   createEffect(() => {
     const sc = selectedCommit();
-    if (!sc) {
+    if (!sc || sc.stash) {
       if (untrack(multi).size > 0) setMulti(new Map());
       return;
     }
@@ -471,7 +472,9 @@ export function LogView(): JSX.Element {
   async function reload(q: LogQuery, reason: OpenReason): Promise<void> {
     const anchor = reason === "refresh" ? untrack(captureAnchor) : null;
     const sel = untrack(selectedCommit);
-    const res = await ctl.open(q, { reason, anchor: anchor ? { oid: anchor.oid, repoId: anchor.repoId } : null, selected: sel ? { oid: sel.oid, repoId: sel.repoId } : null });
+    // A stash is not a log row: the log does not look it up, and it does not select HEAD in its place.
+    const row = sel?.stash ? null : sel;
+    const res = await ctl.open(q, { reason, anchor: anchor ? { oid: anchor.oid, repoId: anchor.repoId } : null, selected: row ? { oid: row.oid, repoId: row.repoId } : null });
     if (!res) return;
     const m = untrack(map);
     const el = listEl();
@@ -482,6 +485,7 @@ export function LogView(): JSX.Element {
       setScrollTop(el.scrollTop);
     }
     mergeAuthors(ctl.scan().authors);
+    if (sel?.stash) return;
     if (sel) {
       if (res.selectedIndex !== null) {
         setMulti(new Map([[keyOf(sel.repoId, sel.oid), { repoId: sel.repoId, oid: sel.oid, ci: res.selectedIndex }]]));

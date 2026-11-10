@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 import { mockInvoke, mockListen } from "./mock";
-import type { CommitRow, ConsoleEntry, FileDiff, LogSessionInfo, OpResult, RepoSummary, Workspace, WorkingTree } from "./types";
+import type { CommitDetails, CommitRow, ConsoleEntry, FileDiff, LogSessionInfo, OpResult, RepoSummary, StashUntracked, Workspace, WorkingTree } from "./types";
 
 const call = <T>(cmd: string, args?: Record<string, unknown>) => mockInvoke(cmd, args) as Promise<T>;
 
@@ -167,5 +167,54 @@ describe("mock backend", () => {
   it("rejects a push to a remote that is not configured", async () => {
     const { ids } = await setup();
     await expect(call("push", { repoId: ids[2], branch: "main", remote: "team/fork" })).rejects.toMatchObject({ message: expect.stringContaining("does not appear to be a git repository") });
+  });
+
+  it("previews a stash: its tracked files, its untracked files and their diffs", async () => {
+    const { ids } = await setup();
+    const repoId = ids[0]; // api-gateway: one untracked file and two seeded stashes
+    const before = await call<WorkingTree>("working_tree", { repoId });
+    const untracked = before.unstaged.filter((f) => f.status === "untracked").map((f) => f.path);
+    expect(untracked.length).toBeGreaterThan(0);
+    const saved = await call<OpResult>("stash_save", { repoId, message: "preview me", includeUntracked: true, keepIndex: false });
+    expect(saved.ok).toBe(true);
+    const { stashes } = await call<{ stashes: { oid: string }[] }>("refs", { repoId });
+    const stash = stashes[0];
+
+    // the stash commit has base, index and untracked parents; its files are the tracked ones
+    const d = await call<CommitDetails>("commit_details", { repoId, oid: stash.oid });
+    expect(d.oid).toBe(stash.oid);
+    expect(d.parents).toHaveLength(3);
+    expect(d.files.length).toBeGreaterThan(0);
+    expect(d.files.some((f) => untracked.includes(f.path))).toBe(false);
+
+    // the untracked commit (third parent) holds the untracked files as added
+    const u = await call<StashUntracked | null>("stash_untracked", { repoId, oid: stash.oid });
+    expect(u).not.toBeNull();
+    expect(u?.oid).toBe(d.parents[2]);
+    expect(u?.files.map((f) => f.path)).toEqual(untracked);
+    expect(u?.files.every((f) => f.status === "added")).toBe(true);
+    const ud = await call<CommitDetails>("commit_details", { repoId, oid: u?.oid ?? "" });
+    expect(ud.parents).toEqual([]);
+
+    // diffs: an untracked file is all added lines; a tracked file diffs against the base
+    const ufile = await call<FileDiff>("file_diff", { repoId, spec: { kind: "commit", oid: u?.oid ?? "", parent: null }, path: untracked[0], oldPath: null, context: 3 });
+    expect(ufile.hunks.length).toBeGreaterThan(0);
+    expect(ufile.hunks.flatMap((h) => h.lines).every((l) => l.kind === "add")).toBe(true);
+    const tracked = d.files[0];
+    const tfile = await call<FileDiff>("file_diff", { repoId, spec: { kind: "commit", oid: stash.oid, parent: null }, path: tracked.path, oldPath: null, context: 3 });
+    expect(tfile.path).toBe(tracked.path);
+    expect(tfile.hunks.length).toBeGreaterThan(0);
+
+    // a stash made without -u has no untracked commit: null, and two parents
+    const seeded = stashes[1];
+    expect(await call<StashUntracked | null>("stash_untracked", { repoId, oid: seeded.oid })).toBeNull();
+    const sd = await call<CommitDetails>("commit_details", { repoId, oid: seeded.oid });
+    expect(sd.parents).toHaveLength(2);
+
+    // unknown oids still fail; a stash query for them finds nothing
+    const unknown = "f".repeat(40);
+    await expect(call("commit_details", { repoId, oid: unknown })).rejects.toMatchObject({ message: expect.stringContaining("Unknown commit") });
+    await expect(call("file_diff", { repoId, spec: { kind: "commit", oid: unknown, parent: null }, path: "x", oldPath: null, context: 3 })).rejects.toMatchObject({ message: expect.stringContaining("Unknown commit") });
+    expect(await call<StashUntracked | null>("stash_untracked", { repoId, oid: unknown })).toBeNull();
   });
 });

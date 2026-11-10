@@ -92,6 +92,30 @@ pub fn commit_details(git: &Git, repo: &RepoInfo, oid: &str) -> Result<CommitDet
     })
 }
 
+/// Untracked files of a stash, or `None` when the stash has no third parent.
+pub fn stash_untracked(
+    git: &Git,
+    repo: &RepoInfo,
+    oid: &str,
+) -> Result<Option<StashUntracked>, GitError> {
+    check_name("commit", oid)?;
+    let rev = format!("{oid}^3^{{commit}}");
+    let mut args = vec!["rev-parse", "-q", "--verify"];
+    args.extend(git.end_of_options());
+    args.push(&rev);
+    let out = git.run_unchecked(repo_path(repo), Some(&repo.id), &args, false, None)?;
+    let u = out.stdout.trim();
+    if out.code != 0 || u.is_empty() {
+        return Ok(None);
+    }
+    let u = u.to_string();
+    let d = commit_details(git, repo, &u)?;
+    Ok(Some(StashUntracked {
+        oid: u,
+        files: d.files,
+    }))
+}
+
 /// Parses `git diff-tree --name-status -z` output.
 pub fn parse_name_status(text: &str) -> Result<Vec<FileChange>, GitError> {
     let mut files = Vec::new();

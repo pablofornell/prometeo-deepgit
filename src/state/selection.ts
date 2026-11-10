@@ -14,6 +14,8 @@ import { onActiveProjectChanged, projectRepos, selectedRepoIds, selectedRepos, s
 export interface SelectedCommit {
   repoId: string;
   oid: string;
+  /** Set when a stash is selected: `oid` is then the stash commit. Not a log row. */
+  stash?: { index: number };
 }
 
 export interface SelectedFile {
@@ -59,7 +61,7 @@ export const changesScopeCount = (): number => changesCount(changesScopeRepos(),
  */
 export function setSelectedCommit(c: SelectedCommit | null): void {
   const prev = commit();
-  if (prev?.repoId === c?.repoId && prev?.oid === c?.oid) return;
+  if (prev?.repoId === c?.repoId && prev?.oid === c?.oid && prev?.stash?.index === c?.stash?.index) return;
   setCommit(c);
   if (!c && file()?.spec.kind === "commit") {
     setFile(null);

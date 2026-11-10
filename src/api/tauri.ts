@@ -15,7 +15,7 @@
 import type {
   ApiErrorShape, AuthNotice, AuthPrompt, CloneOpts, CloneProgress, CloneResult, CloneTarget, CommitDetails, ConflictEntry, ConflictSide, ConflictVersions,
   ConsoleEntry, DiffSpec, ExpectedOids, FileDiff, LogQuery, LogSessionInfo, MergeOpts, OpResult, Project, CommitRow, HunkOpts, RepoChanged, RepoSummary, Refs,
-  ResetMode, Workspace, WorkingTree,
+  ResetMode, StashUntracked, Workspace, WorkingTree,
 } from "./types";
 
 /** True when running inside the Tauri webview (false in a plain browser). */
@@ -88,6 +88,8 @@ export const logClose = (sessionId: number) => invoke<void>("log_close", { sessi
 
 export const refs = (repoId: string) => invoke<Refs>("refs", { repoId });
 export const commitDetails = (repoId: string, oid: string) => invoke<CommitDetails>("commit_details", { repoId, oid });
+/** Untracked files of a stash; null when the stash has none (made without `-u`). */
+export const stashUntracked = (repoId: string, oid: string) => invoke<StashUntracked | null>("stash_untracked", { repoId, oid });
 /** Local and remote branch names that contain the commit. */
 export const branchesContaining = (repoId: string, oid: string) => invoke<string[]>("branches_containing", { repoId, oid });
 export const workingTree = (repoId: string) => invoke<WorkingTree>("working_tree", { repoId });

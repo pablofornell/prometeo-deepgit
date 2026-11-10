@@ -97,6 +97,7 @@ pub fn run() {
             commands::log_close,
             commands::refs,
             commands::commit_details,
+            commands::stash_untracked,
             commands::branches_containing,
             commands::working_tree,
             commands::file_diff,
