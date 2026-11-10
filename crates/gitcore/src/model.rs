@@ -287,6 +287,14 @@ pub struct CommitDetails {
     pub files: Vec<FileChange>,
 }
 
+/// The untracked files of a stash (`git stash -u`). They sit in the stash's third parent.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct StashUntracked {
+    pub oid: String,
+    pub files: Vec<FileChange>,
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkingTree {

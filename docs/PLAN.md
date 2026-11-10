@@ -161,6 +161,8 @@ pub struct CommitDetails { pub repo_id: String, pub oid: String, pub parents: Ve
   pub author: Person, pub committer: Person, pub subject: String, pub body: String,
   pub refs: Vec<RefLabel>, pub files: Vec<FileChange> /* vs first parent; root commit vs empty tree */ }
 
+pub struct StashUntracked { pub oid: String, pub files: Vec<FileChange> /* the stash's third parent; root commit vs empty tree */ }
+
 pub struct WorkingTree { pub repo_id: String, pub staged: Vec<FileChange>, pub unstaged: Vec<FileChange>,
   pub conflicted: Vec<FileChange> /* untracked files are in unstaged with status Untracked */ }
 
@@ -233,6 +235,7 @@ with the same name in camelCase (e.g. `logOpen`).
 ### 5.3 Read
 | `refs` | `repoId` | `Refs` |
 | `commit_details` | `repoId, oid` | `CommitDetails` |
+| `stash_untracked` | `repoId, oid` | `Option<StashUntracked>` (`None` when the stash has no untracked files, e.g. made without `-u`) |
 | `branches_containing` | `repoId, oid` | `Vec<String>` (local + remote names) |
 | `working_tree` | `repoId` | `WorkingTree` |
 | `file_diff` | `repoId, spec: DiffSpec, path: String, oldPath: Option<String>, context: u32` | `FileDiff` |

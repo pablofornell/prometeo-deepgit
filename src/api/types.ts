@@ -225,6 +225,13 @@ export interface CommitDetails {
   files: FileChange[];
 }
 
+/** The untracked files of a stash (`git stash -u`). */
+export interface StashUntracked {
+  oid: string;
+  /** Status "added": the files are new in the untracked commit. */
+  files: FileChange[];
+}
+
 export interface WorkingTree {
   repoId: string;
   staged: FileChange[];

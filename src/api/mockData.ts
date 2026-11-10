@@ -70,7 +70,10 @@ export interface MockCommit {
 }
 
 export interface MockStash extends Stash {
+  /** The commit the stash was made on: its first parent. */
+  base: string;
   staged: FileChange[];
+  /** Untracked files (status "untracked") are here too when the stash was made with `-u`. */
   unstaged: FileChange[];
 }
 
@@ -453,6 +456,7 @@ export function generateRepo(info: RepoInfo, url: string, sc: Scenario, nowSec: 
       index: i,
       message: `WIP on ${headName}: ${(c?.oid ?? "").slice(0, 7)} ${c?.subject ?? ""}`,
       oid: hex40(info.name + ":stash:" + i),
+      base: c?.oid ?? repo.head.oid,
       time: nowSec - (i + 1) * 86400,
       staged: [],
       unstaged: [toFileChange(pick(i + 2), null, "modified", "stash-" + i)],

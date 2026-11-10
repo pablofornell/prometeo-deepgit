@@ -160,6 +160,42 @@ fn commit_details_lists_files_with_counts_and_handles_root_and_merge() {
 }
 
 #[test]
+fn stash_untracked_lists_the_untracked_files_of_a_stash() {
+    let r = TestRepo::new();
+    r.commit_file("a.txt", "1\n", "init");
+    let g = git();
+
+    // A stash made with -u keeps the untracked files in a third parent.
+    r.write("a.txt", "dirty\n");
+    r.write("u.txt", "untracked\n");
+    r.sh(&["stash", "push", "-u", "-q", "-m", "with untracked"]);
+    let with_u = r.sh(&["rev-parse", "stash@{0}"]);
+    let u = diff::stash_untracked(&g, &r.info, &with_u)
+        .unwrap()
+        .unwrap();
+    assert_eq!(u.oid, r.sh(&["rev-parse", "stash@{0}^3"]));
+    assert_eq!(u.files.len(), 1);
+    assert_eq!(u.files[0].path, "u.txt");
+    assert_eq!(u.files[0].status, FileStatus::Added);
+    // The tracked changes stay in the stash commit.
+    let tracked = diff::commit_details(&g, &r.info, &with_u).unwrap();
+    assert!(tracked.files.iter().any(|f| f.path == "a.txt"));
+    assert!(!tracked.files.iter().any(|f| f.path == "u.txt"));
+
+    // A plain stash has no third parent.
+    r.write("a.txt", "again\n");
+    r.sh(&["stash", "push", "-q", "-m", "plain"]);
+    let plain = r.sh(&["rev-parse", "stash@{0}"]);
+    assert!(diff::stash_untracked(&g, &r.info, &plain)
+        .unwrap()
+        .is_none());
+    // A commit that is not a stash has no third parent either.
+    assert!(diff::stash_untracked(&g, &r.info, &r.head())
+        .unwrap()
+        .is_none());
+}
+
+#[test]
 fn file_diff_for_commit_root_staged_unstaged_and_untracked() {
     let r = TestRepo::new();
     let root = r.commit_file("a.txt", "one\ntwo\nthree\n", "root");

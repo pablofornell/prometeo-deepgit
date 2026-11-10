@@ -5,9 +5,9 @@
  */
 import { type JSX, For, Match, Show, Switch, batch, createEffect, createMemo, createSignal, on, untrack } from "solid-js";
 import * as api from "../../api/tauri";
-import type { CommitDetails as CommitDetailsData, FileChange, RefLabel } from "../../api/types";
+import type { CommitDetails as CommitDetailsData, FileChange, RefLabel, StashUntracked } from "../../api/types";
 import {
-  Avatar, Button, EmptyState, HeaderSlot, Icon, IconButton, RefPill, RepoChip, SegmentedControl, StatusLetter, Tree, copyText, createExpanded, fileIconFor,
+  Avatar, Badge, Button, EmptyState, HeaderSlot, Icon, IconButton, RefPill, RepoChip, SegmentedControl, StatusLetter, Tree, copyText, createExpanded, fileIconFor,
   openContextMenu, openMenu, plural, shortOid, splitPath, statusColorVar, toast, type MenuItem, type TreeRowInfo,
 } from "../../components/ui";
 import * as actions from "../../state/actions";
@@ -16,7 +16,7 @@ import { repoVersion } from "../../state/events";
 import { loadPersisted, savePersisted } from "../../state/persist";
 import { refsVersion, repoRefs } from "../../state/refs";
 import { followFile } from "../../state/fileFollow";
-import { mainTab, selectFile, selectedCommit, selectedFile, setDetailsTab, setSelectedCommit } from "../../state/selection";
+import { mainTab, selectFile, selectedCommit, selectedFile, setDetailsTab, setSelectedCommit, type SelectedFile } from "../../state/selection";
 import { repoById, summary } from "../../state/workspace";
 import { committerDiffers, pushState, type PushState } from "./commitText";
 import { buildFileTree, dirIds, fileId, flatFiles, totals, type DirNode, type FileNode, type TreeNode } from "./fileTree";
@@ -39,6 +39,10 @@ const setFileView = (v: FileView) => {
 
 async function copy(text: string, what: string): Promise<void> {
   if (await copyText(text)) toast({ kind: "success", title: `Copied ${what}`, timeout: 2000 });
+}
+
+function messageOf(e: unknown): string {
+  return e instanceof Object && "message" in e ? String((e as { message: unknown }).message) : String(e);
 }
 
 /** Message text with `code`, URLs and issue keys styled. */
@@ -145,6 +149,7 @@ export function CommitDetails(): JSX.Element {
   const [retry, setRetry] = createSignal(0);
   const [expanded, ex] = createExpanded();
   const [dirSel, setDirSel] = createSignal<string | null>(null);
+  const [stashUntracked, setStashUntracked] = createSignal<StashUntracked | null>(null);
 
   let seq = 0;
   let branchSeq = 0;
@@ -157,6 +162,21 @@ export function CommitDetails(): JSX.Element {
     void api.branchesContaining(repoId, oid).then(
       (b) => mine === branchSeq && setBranches(b),
       () => mine === branchSeq && setBranches((old) => old ?? []),
+    );
+  };
+
+  /** Untracked files of a stash, read after its details. A stash has no branches to list. */
+  const loadStashUntracked = (repoId: string, oid: string, mine: number) => {
+    void api.stashUntracked(repoId, oid).then(
+      (u) => mine === seq && setStashUntracked(u),
+      (e: unknown) => {
+        if (mine !== seq) return;
+        batch(() => {
+          setDetails(null);
+          setError(messageOf(e));
+          setStatus("error");
+        });
+      },
     );
   };
 
@@ -187,6 +207,7 @@ export function CommitDetails(): JSX.Element {
       setParentIdx(0);
       setShowAllBranches(false);
       setDirSel(null);
+      setStashUntracked(null);
       setError("");
       setStatus("loading");
     });
@@ -197,7 +218,8 @@ export function CommitDetails(): JSX.Element {
           setDetails(d);
           setStatus("ready");
         });
-        loadBranches(sel.repoId, d.oid);
+        if (sel.stash) loadStashUntracked(sel.repoId, sel.oid, mine);
+        else loadBranches(sel.repoId, d.oid);
         for (const p of d.parents) {
           if (untrack(parentSubjects)[p] !== undefined) continue;
           void api.commitDetails(sel.repoId, p).then(
@@ -210,7 +232,7 @@ export function CommitDetails(): JSX.Element {
         if (mine !== seq) return;
         batch(() => {
           setDetails(null);
-          setError(e instanceof Object && "message" in e ? String((e as { message: unknown }).message) : String(e));
+          setError(messageOf(e));
           setStatus("error");
         });
       },
@@ -228,8 +250,9 @@ export function CommitDetails(): JSX.Element {
         const sel = untrack(selectedCommit);
         if (!sel) return;
         const d = untrack(details);
-        if (d) loadBranches(sel.repoId, d.oid);
-        else if (untrack(status) === "error") setRetry((n) => n + 1);
+        if (d) {
+          if (!sel.stash) loadBranches(sel.repoId, d.oid);
+        } else if (untrack(status) === "error") setRetry((n) => n + 1);
       },
       { defer: true },
     ),
@@ -242,7 +265,17 @@ export function CommitDetails(): JSX.Element {
 
   // ---------------------------------------------------------------- files
 
-  const files = () => details()?.files ?? [];
+  /** The changed files of the shown commit. A stash also lists its untracked files, with status "untracked". */
+  const files = (): FileChange[] => {
+    const d = details();
+    if (!d) return [];
+    const u = stashUntracked();
+    return u ? [...d.files, ...u.files.map((f): FileChange => ({ ...f, status: "untracked" }))] : d.files;
+  };
+  const isStash = () => !!selectedCommit()?.stash;
+  /** The open file belongs to the shown commit: to the commit itself, or to the untracked commit of a stash. */
+  const ownsFile = (f: SelectedFile, d: CommitDetailsData): boolean =>
+    f.repoId === d.repoId && f.spec.kind === "commit" && (f.spec.oid === d.oid || f.spec.oid === stashUntracked()?.oid);
   const tree = createMemo(() => buildFileTree(files()));
   const list = createMemo(() => flatFiles(files()));
   const sums = createMemo(() => totals(files()));
@@ -250,7 +283,7 @@ export function CommitDetails(): JSX.Element {
   // Expand folders when a new commit arrives.
   createEffect(
     on(
-      () => details()?.oid,
+      [() => details()?.oid, stashUntracked],
       () => {
         const t = tree();
         ex.set(new Set(files().length <= EXPAND_ALL_LIMIT ? dirIds(t) : t.filter((n) => n.kind === "dir").map((n) => n.id)));
@@ -264,7 +297,12 @@ export function CommitDetails(): JSX.Element {
   const openFile = (f: FileChange, reveal = true) => {
     const d = details();
     if (!d) return;
-    selectFile({ repoId: d.repoId, spec: specFor(d), path: f.path, oldPath: f.oldPath ?? undefined }, { reveal });
+    // A stash has no parent picker: an untracked file is read from the untracked commit, the others from the stash.
+    const u = stashUntracked();
+    const spec = isStash()
+      ? { kind: "commit" as const, oid: f.status === "untracked" && u ? u.oid : d.oid, parent: null }
+      : specFor(d);
+    selectFile({ repoId: d.repoId, spec, path: f.path, oldPath: f.oldPath ?? undefined }, { reveal });
   };
 
   // The commit changed while a file was open: keep it (pointed at the new commit) when the new commit changes the same
@@ -303,7 +341,7 @@ export function CommitDetails(): JSX.Element {
     if (dir) return dir;
     const f = selectedFile();
     const d = details();
-    return f && d && f.repoId === d.repoId && f.spec.kind === "commit" && f.spec.oid === d.oid ? fileId(f.path) : null;
+    return f && d && ownsFile(f, d) ? fileId(f.path) : null;
   });
   createEffect(on(selectedFile, () => setDirSel(null), { defer: true }));
 
@@ -312,8 +350,8 @@ export function CommitDetails(): JSX.Element {
     on(parentIdx, () => {
       const d = details();
       const f = selectedFile();
-      if (d && f && f.repoId === d.repoId && f.spec.kind === "commit" && f.spec.oid === d.oid) {
-        const change = d.files.find((x) => x.path === f.path);
+      if (d && f && ownsFile(f, d)) {
+        const change = files().find((x) => x.path === f.path);
         if (change) openFile(change, false);
       }
     }, { defer: true }),
@@ -506,6 +544,7 @@ export function CommitDetails(): JSX.Element {
                   <div class="dg-details-pad">
                     <div class="dg-details-id">
                       <Show when={repo()}>{(r) => <RepoChip name={r().name} />}</Show>
+                      <Show when={selectedCommit()?.stash}>{(s) => <Badge title="Stash">{`stash@{${s().index}}`}</Badge>}</Show>
                       <button type="button" class="dg-details-hash" title="Copy hash" onClick={() => void copy(shortOid(d().oid), shortOid(d().oid))}>
                         {d().oid}
                       </button>
@@ -548,21 +587,23 @@ export function CommitDetails(): JSX.Element {
                           </For>
                         </Show>
                       </dd>
-                      <dt>Branches</dt>
-                      <dd>
-                        <Show when={branches()} fallback={<span class="dg-details-muted">Loading…</span>}>
-                          <Show when={refLabels().length > 0} fallback={<span class="dg-details-muted">none</span>}>
-                            <span class="dg-details-pills">
-                              <For each={refLabels().slice(0, showAllBranches() ? refLabels().length : MAX_BRANCH_PILLS)}>{(l) => <RefPill label={l} />}</For>
-                              <Show when={!showAllBranches() && refLabels().length > MAX_BRANCH_PILLS}>
-                                <button type="button" class="dg-details-more" title={refLabels().slice(MAX_BRANCH_PILLS).map((l) => l.name).join("\n")} onClick={() => setShowAllBranches(true)}>
-                                  +{refLabels().length - MAX_BRANCH_PILLS}
-                                </button>
-                              </Show>
-                            </span>
+                      <Show when={!isStash()}>
+                        <dt>Branches</dt>
+                        <dd>
+                          <Show when={branches()} fallback={<span class="dg-details-muted">Loading…</span>}>
+                            <Show when={refLabels().length > 0} fallback={<span class="dg-details-muted">none</span>}>
+                              <span class="dg-details-pills">
+                                <For each={refLabels().slice(0, showAllBranches() ? refLabels().length : MAX_BRANCH_PILLS)}>{(l) => <RefPill label={l} />}</For>
+                                <Show when={!showAllBranches() && refLabels().length > MAX_BRANCH_PILLS}>
+                                  <button type="button" class="dg-details-more" title={refLabels().slice(MAX_BRANCH_PILLS).map((l) => l.name).join("\n")} onClick={() => setShowAllBranches(true)}>
+                                    +{refLabels().length - MAX_BRANCH_PILLS}
+                                  </button>
+                                </Show>
+                              </span>
+                            </Show>
                           </Show>
-                        </Show>
-                      </dd>
+                        </dd>
+                      </Show>
                       <Show when={tags().length > 0}>
                         <dt>Tags</dt>
                         <dd><span class="dg-details-pills"><For each={tags()}>{(l) => <RefPill label={l} />}</For></span></dd>
@@ -592,7 +633,7 @@ export function CommitDetails(): JSX.Element {
                   />
                 </div>
 
-                <Show when={d().parents.length > 1}>
+                <Show when={d().parents.length > 1 && !isStash()}>
                   <div class="dg-details-against">
                     <span class="dg-details-muted">Changes against</span>
                     <button type="button" class="dg-details-against-btn" onClick={parentMenu}>

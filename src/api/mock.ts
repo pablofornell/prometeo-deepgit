@@ -10,7 +10,7 @@ import { checkMergeOpts, defaultMergeMessage, effectiveMessage, mergeArgs } from
 import { authReply, beginAuth, credentialsClear, setAuthPrefs, type AuthSession } from "./mockAuth";
 import {
   DEEPGIT_ROOT, PAYMENTS_ROOT, PEOPLE, SCENARIOS, genericScenario, generateRepo, hashStr, hex40, repoId,
-  type MockCommit, type MockRepo, type Scenario,
+  type MockCommit, type MockRepo, type MockStash, type Scenario,
 } from "./mockData";
 import { buildFileDiff, fileText, toFileChange } from "./mockDiff";
 import { uniqueProjectName, validateProjectName } from "./projectName";
@@ -417,10 +417,57 @@ function sessionRows(a: Args): CommitRow[] {
 
 // ---------------------------------------------------------------- diffs and details
 
+// ---------------------------------------------------------------- stash commits
+
+/** Index commit (second parent) of a stash. Like the other mock oids, it is derived from the stash oid. */
+const stashIndexOid = (s: MockStash) => hex40(s.oid + ":index");
+/** Untracked commit (third parent, a root commit) of a stash. */
+const stashUntrackedOid = (s: MockStash) => hex40(s.oid + ":untracked");
+const untrackedOf = (s: MockStash) => s.unstaged.filter((f) => f.status === "untracked");
+const stashUntrackedFiles = (s: MockStash): FileChange[] => untrackedOf(s).map((f) => toFileChange(f.path, null, "added", stashUntrackedOid(s)));
+
+/** Tracked changes of a stash, versus its base. Untracked files are not here. */
+function stashFiles(s: MockStash): FileChange[] {
+  const staged = new Set(s.staged.map((f) => f.path));
+  const rest = s.unstaged.filter((f) => f.status !== "untracked" && !staged.has(f.path));
+  return [...s.staged, ...rest].map((f) => toFileChange(f.path, f.oldPath, f.status, s.oid));
+}
+
+/** The stash commit or the untracked commit of a stash, by full oid. */
+function stashByOid(repo: MockRepo, oid: string): { stash: MockStash; untracked: boolean } | undefined {
+  for (const stash of repo.stashes) {
+    if (stash.oid === oid) return { stash, untracked: false };
+    if (untrackedOf(stash).length > 0 && stashUntrackedOid(stash) === oid) return { stash, untracked: true };
+  }
+  return undefined;
+}
+
+/** Details of a stash commit (parents: base, index and, when there are untracked files, untracked) or of its untracked commit. */
+function stashDetails(repo: MockRepo, oid: string): CommitDetails {
+  const { stash: s, untracked } = stashByOid(repo, oid) ?? fail(`Unknown commit ${oid}`, `fatal: bad object ${oid}`);
+  const person = hashStr(s.oid) % PEOPLE.length;
+  const base = { repoId: repo.info.id, author: personOf(person, s.time), committer: personOf(person, s.time), body: "", refs: [] };
+  if (untracked) return { ...base, oid: stashUntrackedOid(s), parents: [], subject: "untracked files", files: stashUntrackedFiles(s) };
+  const parents = [s.base, stashIndexOid(s), ...(untrackedOf(s).length > 0 ? [stashUntrackedOid(s)] : [])];
+  return { ...base, oid: s.oid, parents, subject: s.message, files: stashFiles(s) };
+}
+
+/** Oid and changed files of a commit, a stash commit or an untracked commit; undefined when unknown. */
+function revisionFiles(repo: MockRepo, oid: string): { oid: string; files: FileChange[] } | undefined {
+  const full = resolve(repo, oid);
+  const c = full ? repo.byOid.get(full) : undefined;
+  if (c) return { oid: c.oid, files: commitFiles(repo, c) };
+  const hit = stashByOid(repo, oid);
+  if (!hit) return undefined;
+  return hit.untracked
+    ? { oid: stashUntrackedOid(hit.stash), files: stashUntrackedFiles(hit.stash) }
+    : { oid: hit.stash.oid, files: stashFiles(hit.stash) };
+}
+
 function commitDetails(repo: MockRepo, oid: string): CommitDetails {
   const full = resolve(repo, oid);
   const c = full ? repo.byOid.get(full) : undefined;
-  if (!c) fail(`Unknown commit ${oid}`, `fatal: bad object ${oid}`);
+  if (!c) return stashDetails(repo, oid);
   const committerIdx = hashStr(c.oid) % 11 === 0 ? (c.person + 1) % PEOPLE.length : c.person;
   return {
     repoId: repo.info.id, oid: c.oid, parents: c.parents,
@@ -436,11 +483,10 @@ function fileDiff(repo: MockRepo, spec: DiffSpec, path: string, oldPath: string 
   let status: "added" | "modified" | "deleted" = "modified";
   let seed = path;
   if (spec.kind === "commit") {
-    const full = resolve(repo, spec.oid);
-    const c = full ? repo.byOid.get(full) : undefined;
-    const f = c ? commitFiles(repo, c).find((x) => x.path === path) : undefined;
+    const rev = revisionFiles(repo, spec.oid) ?? fail(`Unknown commit ${spec.oid}`, `fatal: bad object ${spec.oid}`);
+    const f = rev.files.find((x) => x.path === path);
     if (f) status = f.status === "added" ? "added" : f.status === "deleted" ? "deleted" : "modified";
-    seed = (full ?? spec.oid) + (spec.parent ?? "");
+    seed = rev.oid + (spec.parent ?? "");
   } else {
     const list = spec.kind === "staged" ? repo.wt.staged : repo.wt.unstaged;
     const f = list.find((x) => x.path === path);
@@ -656,6 +702,14 @@ const handlers: Record<string, Handler> = {
     c.git(repo, ["show", "--no-patch", "--format=%H%n%P%n%an%n%ae%n%at%n%s%n%b", d.oid]);
     c.git(repo, ["diff-tree", "--no-commit-id", "--numstat", "-r", "-M", "--root", d.oid]);
     return d;
+  },
+  stash_untracked: (a, c) => {
+    const repo = repoOf(a.repoId);
+    const oid = str(a.oid);
+    c.git(repo, ["rev-parse", "-q", "--verify", `${oid}^3^{commit}`]);
+    const s = repo.stashes.find((x) => x.oid === oid);
+    if (!s || untrackedOf(s).length === 0) return null;
+    return { oid: stashUntrackedOid(s), files: stashUntrackedFiles(s) };
   },
   branches_containing: (a, c) => {
     const repo = repoOf(a.repoId);
@@ -1139,7 +1193,7 @@ const handlers: Record<string, Handler> = {
     const head = repo.byOid.get(repo.head.oid);
     const message = optStr(a.message) || `WIP on ${repo.head.branch ?? "(no branch)"}: ${short(repo.head.oid)} ${head?.subject ?? ""}`;
     repo.stashes.forEach((s) => s.index++);
-    repo.stashes.unshift({ index: 0, message, oid: hex40("stash" + Date.now() + Math.random()), time: Math.floor(Date.now() / 1000), staged, unstaged });
+    repo.stashes.unshift({ index: 0, message, oid: hex40("stash" + Date.now() + Math.random()), base: repo.head.oid, time: Math.floor(Date.now() / 1000), staged, unstaged });
     if (!bool(a.keepIndex)) repo.wt.staged = [];
     repo.wt.unstaged = repo.wt.unstaged.filter((f) => !unstaged.includes(f));
     c.git(repo, ["stash", "push", ...(includeUntracked ? ["--include-untracked"] : []), ...(bool(a.keepIndex) ? ["--keep-index"] : []), ...(optStr(a.message) ? ["-m", optStr(a.message) as string] : [])], { stdout: `Saved working directory and index state ${message}\n` });
