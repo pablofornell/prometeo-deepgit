@@ -13,6 +13,7 @@ import {
   type MockCommit, type MockRepo, type MockStash, type Scenario,
 } from "./mockData";
 import { buildFileDiff, fileText, toFileChange } from "./mockDiff";
+import { CHANGED_ON_DISK, fileKey, filePathError, isFolder, listFiles, readText, searchFiles, versionOf } from "./mockFiles";
 import { uniqueProjectName, validateProjectName } from "./projectName";
 import { entryOf, genericConflicts, currentOids, hasStage, isTextConflict, sideStages, versionsOf, type MockConflict } from "./mockConflicts";
 import type {
@@ -747,6 +748,26 @@ const handlers: Record<string, Handler> = {
     c.git(repo, rev ? ["show", `${rev}:${str(a.path)}`] : ["cat-file", "--filters", str(a.path)]);
     return fileText(str(a.path), rev ?? "worktree");
   },
+  list_files: (a, c) => {
+    const repo = repoOf(a.repoId);
+    c.git(repo, ["ls-files", "-z", "--cached", "--others", "--exclude-standard"]);
+    return listFiles(repo.worktree, repo.ignored);
+  },
+  read_text_file: (a) => {
+    const repo = repoOf(a.repoId);
+    const key = readableFile(repo, stringArg(a, "path", "read_text_file"));
+    return readText(repo.worktree.get(key) ?? "");
+  },
+  search_files: (a, c) => {
+    const repo = repoOf(a.repoId);
+    const query = stringArg(a, "query", "search_files");
+    const caseSensitive = bool(a.caseSensitive);
+    const regex = bool(a.regex);
+    // Run git only for a usable, non-empty query. A bad regex fails in searchFiles, before the console entry.
+    const result = searchFiles(repo.worktree, repo.ignored, query, caseSensitive, regex);
+    if (query !== "") c.git(repo, ["grep", "-n", "--column", "-I", "--no-color", "-z", "--untracked", "--exclude-standard", ...(caseSensitive ? [] : ["-i"]), regex ? "-E" : "-F", "-e", query, "--"]);
+    return result;
+  },
   last_commit_message: (a, c) => {
     const repo = repoOf(a.repoId);
     c.git(repo, ["log", "-1", "--format=%B"]);
@@ -794,6 +815,21 @@ const handlers: Record<string, Handler> = {
     for (const p of paths) repo.conflicts.delete(p);
     c.git(repo, ["restore", "--worktree", "--", ...paths]);
     emitChanged(repo);
+  },
+  write_text_file: (a) => {
+    const repo = repoOf(a.repoId);
+    const path = stringArg(a, "path", "write_text_file");
+    const content = stringArg(a, "content", "write_text_file");
+    const expected = optStr(a.expectedVersion);
+    const refused = filePathError(path);
+    if (refused !== null) fail(refused);
+    const key = fileKey(path);
+    const current = repo.worktree.get(key);
+    if (current === undefined && isFolder(repo.worktree, key)) fail(`not a regular file: ${path}`);
+    if (expected !== null && (current === undefined || versionOf(current) !== expected)) fail(CHANGED_ON_DISK);
+    repo.worktree.set(key, content);
+    emitChanged(repo);
+    return versionOf(content);
   },
   stage_hunk: (a, c) => {
     const repo = repoOf(a.repoId);
@@ -1437,6 +1473,16 @@ function stashRestore(a: Args, c: Ctx, drop: boolean): OpResult {
   }
   emitChanged(repo);
   return ok(drop ? `Dropped stash@{${idx}}` : "Applied");
+}
+
+/** The map key of a worktree file that can be read; the refusal of `read_text_file` otherwise. */
+function readableFile(repo: MockRepo, path: string): string {
+  const refused = filePathError(path);
+  if (refused !== null) fail(refused);
+  const key = fileKey(path);
+  if (repo.worktree.has(key)) return key;
+  if (isFolder(repo.worktree, key)) fail(`not a regular file: ${path}`);
+  fail(`file not found: ${path}`);
 }
 
 /** A required `String` argument, refused like serde does when it is missing or not a string. */

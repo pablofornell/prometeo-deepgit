@@ -7,6 +7,7 @@ pub mod conflicts;
 pub mod diff;
 pub mod discover;
 pub mod error;
+pub mod files;
 pub mod graph;
 pub mod log;
 pub mod model;

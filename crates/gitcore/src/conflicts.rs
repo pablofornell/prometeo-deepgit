@@ -969,7 +969,7 @@ fn keep_line_endings(content: &str, versions: &[&[u8]]) -> Vec<u8> {
 /// Writes a regular file inside the repo. An existing file keeps its mode (it is rewritten in
 /// place); a new one gets the exec bit when the index entry had it. Never writes through a
 /// symlink, and never outside the repo.
-fn write_worktree_file(
+pub(crate) fn write_worktree_file(
     root: &Path,
     rel: &str,
     bytes: &[u8],

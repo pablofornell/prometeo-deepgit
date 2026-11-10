@@ -294,6 +294,45 @@ export interface FileDiff {
   tooLarge: boolean;
 }
 
+// ---------------------------------------------------------------- project files
+
+/** Tracked and untracked files of the worktree, without the ignored ones. */
+export interface FileList {
+  /** Relative paths, sorted by bytes. */
+  files: string[];
+  /** More than 100 000 files: the list stops there. */
+  truncated: boolean;
+}
+
+/** A worktree file read as text. */
+export interface TextFile {
+  /** Empty when `binary` or `tooLarge`. */
+  content: string;
+  /** A hash of the bytes and their length. Send it back when saving. Empty when `tooLarge`. */
+  version: string;
+  /** A NUL byte in the first 8 000 bytes, or not UTF-8. */
+  binary: boolean;
+  /** Over 2 MiB. Not loaded. */
+  tooLarge: boolean;
+}
+
+/** One matching line of a search. */
+export interface SearchHit {
+  path: string;
+  /** 1-based. */
+  line: number;
+  /** 1-based, in characters. */
+  column: number;
+  /** The line, cut to 400 characters. */
+  text: string;
+}
+
+export interface SearchResult {
+  /** At most 2 000 hits, sorted by path and line. */
+  hits: SearchHit[];
+  truncated: boolean;
+}
+
 // ---------------------------------------------------------------- console, events, results
 
 export interface ConsoleEntry {

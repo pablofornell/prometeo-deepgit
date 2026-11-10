@@ -4,6 +4,7 @@
  */
 import type { FileChange, RepoInfo, RepoStateKind, Stash } from "./types";
 import { toFileChange } from "./mockDiff";
+import { initialWorktree } from "./mockFiles";
 import { DOCS_SITE_CONFLICTS, DOCS_SITE_CONTEXT, LEDGER_CONFLICTS, LEDGER_CONTEXT, type MockConflict, type MockConflictContext } from "./mockConflicts";
 
 // ---------------------------------------------------------------- random helpers
@@ -105,6 +106,10 @@ export interface MockRepo {
   state: RepoStateKind;
   fetches: number;
   filePool: string[];
+  /** The fake disk: path -> content of every worktree file (tracked, untracked or conflicted). Deleted files are absent. */
+  worktree: Map<string, string>;
+  /** Paths of `worktree` that `.gitignore` hides: `list_files` and `search_files` leave them out. */
+  ignored: Set<string>;
   /** Bumped on every mutation of the commit graph / refs; invalidates ancestor caches. */
   version: number;
 }
@@ -261,6 +266,8 @@ export function generateRepo(info: RepoInfo, url: string, sc: Scenario, nowSec: 
     state: sc.state ?? "clean",
     fetches: 0,
     filePool: dom.files,
+    worktree: new Map(),
+    ignored: new Set(),
     version: 0,
   };
   const g: Gen = { repo, r: rng(hashStr("repo:" + info.name)), nouns: dom.nouns };
@@ -462,6 +469,15 @@ export function generateRepo(info: RepoInfo, url: string, sc: Scenario, nowSec: 
       unstaged: [toFileChange(pick(i + 2), null, "modified", "stash-" + i)],
     });
   }
+  // --- worktree files: every path the mock shows as tracked, untracked or conflicted (deleted ones are gone)
+  const shown = [
+    ...dom.files,
+    ...[...repo.wt.staged, ...repo.wt.unstaged, ...repo.wt.conflicted].filter((f) => f.status !== "deleted").map((f) => f.path),
+    ...repo.commits.flatMap((c) => (c.files ?? []).filter((f) => f.status !== "deleted").map((f) => f.path)),
+  ];
+  const disk = initialWorktree(shown);
+  repo.worktree = disk.files;
+  repo.ignored = disk.ignored;
   return repo;
 }
 
