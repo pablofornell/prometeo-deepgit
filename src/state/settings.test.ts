@@ -55,6 +55,26 @@ describe("settings store", () => {
     expect(settings.dateFormat).toBe("iso");
   });
 
+  it("diff pointer scrolling is on by default, and a stored garbage value falls back to on", async () => {
+    storage.set("deepgit.ui.diffPointerScroll", "42");
+    const { settings } = await load();
+    expect(settings.diffPointerScroll).toBe(true);
+  });
+
+  it("diff pointer scrolling can be turned off, and garbage set at runtime falls back to on", async () => {
+    const { settings, setSetting, resetSettings } = await load();
+    expect(settings.diffPointerScroll).toBe(true);
+    setSetting("diffPointerScroll", false);
+    expect(settings.diffPointerScroll).toBe(false);
+    expect(storage.get("deepgit.ui.diffPointerScroll")).toBe("false");
+    setSetting("diffPointerScroll", "no" as never);
+    expect(settings.diffPointerScroll).toBe(true);
+    setSetting("diffPointerScroll", false);
+    resetSettings(["diffPointerScroll"]);
+    expect(settings.diffPointerScroll).toBe(true);
+    expect(storage.has("deepgit.ui.diffPointerScroll")).toBe(false);
+  });
+
   it("loads valid stored values", async () => {
     storage.set("deepgit.ui.fontSize", "16");
     storage.set("deepgit.ui.uiScale", "130");

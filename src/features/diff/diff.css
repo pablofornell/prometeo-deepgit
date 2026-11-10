@@ -1,5 +1,6 @@
 /* Diff viewer (DESIGN.md 5.10). Prefix dg-diff-. Colours and sizes come from tokens only. */
-.dg-diff { display: flex; flex-direction: column; height: 100%; min-height: 0; min-width: 0; --dgd-gutter: var(--dg-diff-gutter-width); }
+/* The gutter fits the digits of the largest line number (set on the viewer root) and 12 px of padding. `ch` resolves on the row, in the mono font. */
+.dg-diff { display: flex; flex-direction: column; height: 100%; min-height: 0; min-width: 0; --dgd-gutter: calc(var(--dgd-ln-digits, 3) * 1ch + 12px); }
 .dg-diff:focus { outline: 0; }
 .dg-diff.has-no-ln { --dgd-gutter: calc(var(--dg-diff-gutter-width) / 6); }
 
@@ -61,11 +62,11 @@
 }
 .dg-diff-row-uni { grid-template-columns: var(--dgd-gutter) var(--dgd-gutter) var(--dg-diff-marker-width) 1fr; }
 .dg-diff-ln {
-  position: sticky; left: 0; z-index: 1; text-align: right; padding-right: 12px; background: var(--dg-island-bg);
+  position: sticky; left: 0; z-index: 1; text-align: right; padding-left: 4px; padding-right: 8px; background: var(--dg-island-bg);
   color: var(--dg-editor-line-number); font-size: calc(var(--dg-font-size-mono) - 0.5px); overflow: hidden; user-select: none;
 }
 .dg-diff-ln-new { left: var(--dgd-gutter); }
-.has-no-ln .dg-diff-ln { padding-right: 0; font-size: 0; }
+.has-no-ln .dg-diff-ln { padding-left: 0; padding-right: 0; font-size: 0; }
 .dg-diff-mark { text-align: center; user-select: none; }
 .dg-diff-code { color: var(--dg-editor-fg); padding-left: 4px; min-width: 0; }
 

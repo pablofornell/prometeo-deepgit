@@ -35,6 +35,8 @@ export interface Settings {
   /** How every date of the UI is written (`state/dates.ts`): "3 h ago", "10 Nov 2026, 14:32" (the user's locale) or "2026-11-10 14:32". */
   dateFormat: DateFormat;
   diffMode: DiffMode;
+  /** Scroll long diff lines by the pointer position near the pane edges (`features/diff/pointerScroll.ts`). */
+  diffPointerScroll: boolean;
   // ---- auto-fetch and commit sign-off (wave 1: git features) -----------------------------------------------------
   /** Fetch every repo of the project in the background every N minutes; 0 = off (`state/autoFetch.ts`). */
   autoFetchMinutes: number;
@@ -68,6 +70,7 @@ export const SETTING_DEFAULTS: Readonly<Settings> = {
   theme: "dark",
   dateFormat: "iso",
   diffMode: "sideBySide",
+  diffPointerScroll: true,
   // ---- auto-fetch and commit sign-off
   autoFetchMinutes: 15,
   autoFetchPrune: true,
@@ -93,6 +96,7 @@ export const SANITIZERS: { [K in keyof Settings]: (v: unknown) => Settings[K] } 
   theme: oneOf<ThemePref>("dark", "light", "system")(SETTING_DEFAULTS.theme),
   dateFormat: oneOf<DateFormat>("relative", "absolute", "iso")(SETTING_DEFAULTS.dateFormat),
   diffMode: oneOf<DiffMode>("sideBySide", "unified")(SETTING_DEFAULTS.diffMode),
+  diffPointerScroll: (v) => (typeof v === "boolean" ? v : SETTING_DEFAULTS.diffPointerScroll),
   autoFetchMinutes: (v) => ((AUTO_FETCH_CHOICES as readonly number[]).includes(v as number) ? (v as number) : SETTING_DEFAULTS.autoFetchMinutes),
   autoFetchPrune: (v) => (typeof v === "boolean" ? v : SETTING_DEFAULTS.autoFetchPrune),
   commitSignOff: (v) => (typeof v === "boolean" ? v : SETTING_DEFAULTS.commitSignOff),

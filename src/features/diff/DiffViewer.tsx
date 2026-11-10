@@ -22,6 +22,7 @@ import {
 } from "./diffModel";
 import { SbsHalf, UnifiedRow, type RowCtx } from "./DiffRows";
 import { hunkHash } from "./hunkHash";
+import { stepToward, targetScrollLeft } from "./pointerScroll";
 import { languageFor } from "./syntax";
 import "./diff.css";
 
@@ -196,6 +197,14 @@ export function DiffViewer(props: DiffViewerProps): JSX.Element {
   const rowCount = () => view().m.rows.length;
   const changes = (): ChangeMark[] => view().m.changes;
   const maxCols = () => view().m.maxCols;
+  // Digits of the largest line number in the loaded diff (the whole file included), at least 3. Sizes the line number gutter.
+  const lnDigits = createMemo(() => {
+    let max = 0;
+    for (const d of [diff(), full()]) {
+      for (const h of d?.hunks ?? []) max = Math.max(max, h.oldStart + h.oldLines - 1, h.newStart + h.newLines - 1);
+    }
+    return Math.max(3, String(max).length);
+  });
 
   // ---------------------------------------------------------------- window
 
@@ -278,6 +287,57 @@ export function DiffViewer(props: DiffViewerProps): JSX.Element {
     primary.scrollTop += e.deltaMode === 1 ? e.deltaY * rowH() : e.deltaY;
     e.preventDefault();
   };
+
+  // ---------------------------------------------------------------- pointer scroll (long lines)
+
+  // The pointer position sets a target per pane. One animation loop eases each pane toward its target.
+  const panTargets = new Map<HTMLDivElement, number>();
+  let panFrame = 0;
+  const stopPointerScroll = () => {
+    panTargets.clear();
+    if (panFrame) cancelAnimationFrame(panFrame);
+    panFrame = 0;
+  };
+  const panTick = () => {
+    panFrame = 0;
+    for (const [pane, target] of panTargets) {
+      const next = stepToward(pane.scrollLeft, target);
+      pane.scrollLeft = next;
+      // Stop at the target. Also stop when the browser rounds the position to within a pixel of it.
+      if (next === target || Math.abs(target - pane.scrollLeft) < 1) panTargets.delete(pane);
+    }
+    if (panTargets.size > 0) panFrame = requestAnimationFrame(panTick);
+  };
+  // `pane` is the pane under the pointer. Both panes get the same ratio, each with its own overflow.
+  const onPanePointerMove = (e: PointerEvent, pane: HTMLDivElement | undefined) => {
+    if (!settings.diffPointerScroll || e.pointerType !== "mouse" || !pane) return;
+    // A button is down (a text selection drag): leave the scroll position alone.
+    if (e.buttons !== 0) {
+      stopPointerScroll();
+      return;
+    }
+    const rect = pane.getBoundingClientRect();
+    for (const p of [primary, left]) {
+      if (!p) continue;
+      const max = p.scrollWidth - p.clientWidth;
+      if (max <= 0) {
+        panTargets.delete(p);
+        continue;
+      }
+      panTargets.set(p, targetScrollLeft(e.clientX, rect.left, rect.width, max));
+    }
+    if (panTargets.size > 0 && !panFrame) panFrame = requestAnimationFrame(panTick);
+  };
+  createEffect(
+    on(
+      () => settings.diffPointerScroll,
+      (enabled) => {
+        if (!enabled) stopPointerScroll();
+      },
+      { defer: true },
+    ),
+  );
+  onCleanup(stopPointerScroll);
 
   const scrollToRow = (row: number) => {
     if (!primary) return;
@@ -431,6 +491,7 @@ export function DiffViewer(props: DiffViewerProps): JSX.Element {
       class="dg-diff"
       tabindex={-1}
       classList={{ "has-no-ln": !lineNumbersOn(), "is-narrow": narrow() }}
+      style={{ "--dgd-ln-digits": String(lnDigits()) }}
       onPointerDown={() => activateDiff(controller)}
       onFocusIn={() => activateDiff(controller)}
     >
@@ -547,7 +608,14 @@ export function DiffViewer(props: DiffViewerProps): JSX.Element {
                   <span class="dg-diff-cap-hash">{captions().r[0]}</span>
                   <span class="dg-diff-cap-label">{captions().r[1]}</span>
                 </div>
-                <div class="dg-diff-pane" tabindex={0} ref={(el) => attachPrimary(el, false)} onScroll={onPrimaryScroll}>
+                <div
+                  class="dg-diff-pane"
+                  tabindex={0}
+                  ref={(el) => attachPrimary(el, false)}
+                  onScroll={onPrimaryScroll}
+                  onPointerMove={(e) => onPanePointerMove(e, primary)}
+                  onPointerLeave={stopPointerScroll}
+                >
                   <div class="dg-diff-spacer" style={spacerStyle()}>
                     <For each={indexes()}>
                       {(i) => rowBox(i, <Show when={uniRows()[i]} keyed>{(r) => <UnifiedRow row={r} ctx={ctx} />}</Show>)}
@@ -567,7 +635,15 @@ export function DiffViewer(props: DiffViewerProps): JSX.Element {
                 <span class="dg-diff-cap-hash">{captions().r[0]}</span>
                 <span class="dg-diff-cap-label">{captions().r[1]}</span>
               </div>
-              <div class="dg-diff-pane dg-diff-pane-l" tabindex={-1} ref={(el) => (left = el)} onScroll={onLeftScroll} onWheel={onLeftWheel}>
+              <div
+                class="dg-diff-pane dg-diff-pane-l"
+                tabindex={-1}
+                ref={(el) => (left = el)}
+                onScroll={onLeftScroll}
+                onWheel={onLeftWheel}
+                onPointerMove={(e) => onPanePointerMove(e, left)}
+                onPointerLeave={stopPointerScroll}
+              >
                 <div class="dg-diff-spacer" style={spacerStyle()}>
                   <For each={indexes()}>
                     {(i) => rowBox(i, <Show when={sbsRows()[i]} keyed>{(r) => <SbsHalf row={r} side="l" ctx={ctx} />}</Show>)}
@@ -575,7 +651,14 @@ export function DiffViewer(props: DiffViewerProps): JSX.Element {
                 </div>
               </div>
               <div class="dg-diff-gap" aria-hidden="true" />
-              <div class="dg-diff-pane dg-diff-pane-r" tabindex={0} ref={(el) => attachPrimary(el, true)} onScroll={onPrimaryScroll}>
+              <div
+                class="dg-diff-pane dg-diff-pane-r"
+                tabindex={0}
+                ref={(el) => attachPrimary(el, true)}
+                onScroll={onPrimaryScroll}
+                onPointerMove={(e) => onPanePointerMove(e, primary)}
+                onPointerLeave={stopPointerScroll}
+              >
                 <div class="dg-diff-spacer" style={spacerStyle()}>
                   <For each={indexes()}>
                     {(i) => rowBox(i, <Show when={sbsRows()[i]} keyed>{(r) => <SbsHalf row={r} side="r" ctx={ctx} />}</Show>)}
