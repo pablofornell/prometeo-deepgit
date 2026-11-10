@@ -258,6 +258,17 @@ export function CommitDetails(): JSX.Element {
     ),
   );
 
+  // The selected stash was popped or dropped: clear the selection. Another index for the same stash updates the label.
+  createEffect(() => {
+    const sel = selectedCommit();
+    if (!sel?.stash) return;
+    const list = repoRefs(sel.repoId)()?.stashes;
+    if (!list) return;
+    const now = list.find((x) => x.oid === sel.oid);
+    if (!now) setSelectedCommit(null);
+    else if (now.index !== sel.stash.index) setSelectedCommit({ ...sel, stash: { index: now.index } });
+  });
+
   const repo = () => {
     const s = selectedCommit();
     return s ? repoById(s.repoId) : undefined;
@@ -506,8 +517,24 @@ export function CommitDetails(): JSX.Element {
           {(d) => (
             <>
               <IconButton icon="copy" label="Copy hash" shortcut="Ctrl+Shift+C" onClick={() => void copy(shortOid(d().oid), shortOid(d().oid))} />
-              <IconButton icon="cherryPick" label={`Cherry-pick onto ${summary(d().repoId)?.branch ?? "HEAD"}`} onClick={() => void actions.cherryPick(d().repoId, [d().oid])} />
-              <IconButton icon="more" label="More" onClick={commitMenu} />
+              <Show
+                when={selectedCommit()?.stash}
+                fallback={
+                  <>
+                    <IconButton icon="cherryPick" label={`Cherry-pick onto ${summary(d().repoId)?.branch ?? "HEAD"}`} onClick={() => void actions.cherryPick(d().repoId, [d().oid])} />
+                    <IconButton icon="more" label="More" onClick={commitMenu} />
+                  </>
+                }
+              >
+                {(s) => (
+                  // A stash is not a commit of a branch: show the stash actions, not cherry-pick, revert or reset.
+                  <>
+                    <IconButton icon="stash" label={`Apply stash@{${s().index}}`} onClick={() => void actions.stashApply(d().repoId, s().index, d().oid)} />
+                    <IconButton icon="stashPop" label={`Pop stash@{${s().index}}`} onClick={() => void actions.stashPop(d().repoId, s().index, d().oid)} />
+                    <IconButton icon="delete" label={`Drop stash@{${s().index}}`} onClick={() => void actions.stashDrop(d().repoId, s().index, d().oid)} />
+                  </>
+                )}
+              </Show>
             </>
           )}
         </Show>
