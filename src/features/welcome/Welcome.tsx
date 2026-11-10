@@ -33,17 +33,17 @@ function Logo(): JSX.Element {
   return (
     <svg class="dg-welcome-logo" width="48" height="48" viewBox="0 0 1024 1024" aria-hidden="true">
       <rect class="dg-welcome-logo-tile" width="1024" height="1024" rx="224" ry="224" />
-      <g fill="none" stroke-width="52" stroke-linecap="round" stroke-linejoin="round">
-        <path class="dg-welcome-logo-main" d="M352 232 V792" stroke="currentColor" />
-        <path class="dg-welcome-logo-top" d="M352 232 H540 Q672 232 672 364" stroke="currentColor" />
-        <path class="dg-welcome-logo-bottom" d="M352 792 H540 Q672 792 672 660" stroke="currentColor" />
+      <g fill="none" stroke-width="96" stroke-linecap="round" stroke-linejoin="round">
+        <path class="dg-welcome-logo-main" d="M512 820 V204" stroke="currentColor" />
+        <path class="dg-welcome-logo-left" d="M512 512 C430 512 232 460 232 340" stroke="currentColor" />
+        <path class="dg-welcome-logo-right" d="M512 512 C594 512 792 460 792 340" stroke="currentColor" />
       </g>
       <g class="dg-welcome-logo-ring" stroke-width="24">
-        <circle class="dg-welcome-logo-main" cx="352" cy="232" r="68" fill="currentColor" />
-        <circle class="dg-welcome-logo-main" cx="352" cy="512" r="68" fill="currentColor" />
-        <circle class="dg-welcome-logo-main" cx="352" cy="792" r="68" fill="currentColor" />
-        <circle class="dg-welcome-logo-top" cx="672" cy="364" r="68" fill="currentColor" />
-        <circle class="dg-welcome-logo-bottom" cx="672" cy="660" r="68" fill="currentColor" />
+        <circle class="dg-welcome-logo-main" cx="512" cy="820" r="96" fill="currentColor" />
+        <circle class="dg-welcome-logo-main" cx="512" cy="512" r="96" fill="currentColor" />
+        <circle class="dg-welcome-logo-main" cx="512" cy="204" r="96" fill="currentColor" />
+        <circle class="dg-welcome-logo-left" cx="232" cy="340" r="96" fill="currentColor" />
+        <circle class="dg-welcome-logo-right" cx="792" cy="340" r="96" fill="currentColor" />
       </g>
     </svg>
   );
