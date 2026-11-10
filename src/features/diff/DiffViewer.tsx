@@ -308,7 +308,7 @@ export function DiffViewer(props: DiffViewerProps): JSX.Element {
     }
     if (panTargets.size > 0) panFrame = requestAnimationFrame(panTick);
   };
-  // `pane` is the pane under the pointer. Both panes get the same ratio, each with its own overflow.
+  // `pane` is the pane under the pointer. Only the primary pane moves: the scroll sync above moves the left pane.
   const onPanePointerMove = (e: PointerEvent, pane: HTMLDivElement | undefined) => {
     if (!settings.diffPointerScroll || e.pointerType !== "mouse" || !pane) return;
     // A button is down (a text selection drag): leave the scroll position alone.
@@ -317,7 +317,7 @@ export function DiffViewer(props: DiffViewerProps): JSX.Element {
       return;
     }
     const rect = pane.getBoundingClientRect();
-    for (const p of [primary, left]) {
+    for (const p of [primary]) {
       if (!p) continue;
       const max = p.scrollWidth - p.clientWidth;
       if (max <= 0) {

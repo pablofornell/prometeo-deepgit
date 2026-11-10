@@ -19,6 +19,7 @@ registerSettingsSection({
   id: "diff",
   title: "Diff viewer",
   order: 25,
+  icon: "sideBySide",
   keywords: ["diff", "scroll", "horizontal", "mouse", "pointer", "long", "lines"],
   component: DiffSection,
   reset: () => resetSettings(["diffPointerScroll"]),
