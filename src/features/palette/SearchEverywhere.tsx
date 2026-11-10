@@ -14,7 +14,7 @@ import { TABS, type Scope, cycleTab, parseQuery, placeholderFor } from "./query"
 import { loadRecent, saveRecent, withRecent } from "./recent";
 import { type Hit, type Row, buildRows } from "./results";
 import {
-  type BranchItem, type CommitItem, type FileItem, type PaletteItem, type RepoItem, actionItems, activate, branchItems, loadFiles,
+  type BranchItem, type CommitItem, type FileItem, type PaletteItem, type RepoItem, actionExists, actionItems, activate, branchItems, loadFiles,
   repoItems, searchCommits,
 } from "./sources";
 import "./palette.css";
@@ -93,7 +93,7 @@ function Palette(): JSX.Element {
   let input!: HTMLInputElement;
   let list: HTMLDivElement | undefined;
   const parsed = createMemo(() => parseQuery(raw(), tab()));
-  const [recent, setRecent] = createSignal<PaletteItem[]>(loadRecent());
+  const [recent, setRecent] = createSignal<PaletteItem[]>(loadRecent(actionExists));
   const [selKey, setSelKey] = createSignal<string | null>(null);
 
   // sources that are cheap and synchronous

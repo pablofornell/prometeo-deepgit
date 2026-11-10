@@ -373,6 +373,10 @@ pub fn conflict_versions(
 /// would check the first version that has lines out with (yours, theirs, base). That is not
 /// always the ending of the blob: with `core.autocrlf=true` (the default of Git for Windows) or an
 /// `eol=crlf` attribute the repository holds LF and the worktree CRLF.
+///
+/// The checkout conversion is worked out from the attributes and the config (`checkout_eol`),
+/// never by asking git to check the blob out: that runs the smudge filters (Git LFS downloads,
+/// any command in the config) only to learn a line ending.
 fn detect_eol(
     git: &Git,
     repo: &RepoInfo,
@@ -384,32 +388,201 @@ fn detect_eol(
     if let Some(e) = worktree_bytes(repo, path).and_then(|b| eol_of(&b)) {
         return e;
     }
+    let mut action = None;
     [st.yours, st.theirs, 1]
         .into_iter()
         .filter_map(|n| u.stage(n))
         .find_map(|e| {
             let stored = blobs.get(&e.oid)?.bytes.as_deref()?;
             let stored_eol = eol_of(stored)?;
-            let checked_out = checked_out_bytes(git, repo, path, &e.oid);
-            Some(checked_out.and_then(|b| eol_of(&b)).unwrap_or(stored_eol))
+            let action = *action.get_or_insert_with(|| crlf_action(git, repo, path));
+            Some(if converts_to_crlf(stored, action) {
+                Eol::Crlf
+            } else {
+                stored_eol
+            })
         })
         .unwrap_or(Eol::Lf)
 }
 
-/// The blob `oid` as git would write it to the worktree at `path` (line-ending conversion and
-/// filters applied): `git cat-file --filters`. `None` when git cannot say.
-fn checked_out_bytes(git: &Git, repo: &RepoInfo, path: &str, oid: &str) -> Option<Vec<u8>> {
-    let at = format!("--path={path}");
-    git.run_unchecked_raw(
-        repo_path(repo),
-        Some(&repo.id),
-        &["cat-file", "--filters", &at, oid],
-        false,
-        None,
+/// How git converts line endings when it checks a file out (git's `convert.c`, the part that
+/// writes the worktree).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum CrlfAction {
+    /// No conversion (`-text`, `binary`, or no attribute and `core.autocrlf=false`).
+    Binary,
+    /// Text: every bare LF becomes CRLF.
+    TextCrlf,
+    /// Text checked out with LF: nothing changes.
+    TextLf,
+    /// `text=auto` / `core.autocrlf=true`: bare LFs become CRLF unless the blob already has a CR
+    /// or looks binary.
+    AutoCrlf,
+    /// `text=auto` checked out with LF.
+    AutoLf,
+}
+
+/// The value of one attribute from `git check-attr`: "set", "unset", "unspecified" or a value.
+fn attr_value<'a>(attrs: &'a [(String, String)], name: &str) -> &'a str {
+    attrs
+        .iter()
+        .find(|(n, _)| n == name)
+        .map_or("unspecified", |(_, v)| v.as_str())
+}
+
+/// The checkout conversion of `path`, from its `text`, `crlf` (the old name) and `eol`
+/// attributes, then `core.autocrlf` and `core.eol`. Reads attributes and config only.
+fn crlf_action(git: &Git, repo: &RepoInfo, path: &str) -> CrlfAction {
+    let attrs = git
+        .run_unchecked_raw(
+            repo_path(repo),
+            Some(&repo.id),
+            &["check-attr", "-z", "text", "crlf", "eol", "--", path],
+            false,
+            None,
+        )
+        .ok()
+        .filter(|o| o.code == 0)
+        .map(|o| parse_check_attr(&o.stdout))
+        .unwrap_or_default();
+    let config = |key: &str| {
+        git.run_unchecked(
+            repo_path(repo),
+            Some(&repo.id),
+            &["config", "--get", key],
+            false,
+            None,
+        )
+        .ok()
+        .filter(|o| o.code == 0)
+        .map(|o| o.stdout.trim().to_ascii_lowercase())
+    };
+    checkout_action(
+        attr_value(&attrs, "text"),
+        attr_value(&attrs, "crlf"),
+        attr_value(&attrs, "eol"),
+        config("core.autocrlf").as_deref(),
+        config("core.eol").as_deref(),
+        cfg!(windows),
     )
-    .ok()
-    .filter(|o| o.code == 0)
-    .map(|o| o.stdout)
+}
+
+/// `git check-attr -z` output: `<path> NUL <attribute> NUL <value> NUL`, repeated.
+fn parse_check_attr(out: &[u8]) -> Vec<(String, String)> {
+    let fields: Vec<String> = out
+        .split(|b| *b == 0)
+        .map(|f| String::from_utf8_lossy(f).into_owned())
+        .collect();
+    fields
+        .as_chunks::<3>()
+        .0
+        .iter()
+        .map(|[_, name, value]| (name.clone(), value.clone()))
+        .collect()
+}
+
+/// The rule of git's `convert_attrs` and `output_eol`. `text` / `crlf` / `eol` are attribute
+/// values as `check-attr` prints them, `autocrlf` / `core_eol` the config values (None: not set),
+/// `native_crlf` whether this git's native line ending is CRLF (Git for Windows).
+fn checkout_action(
+    text: &str,
+    crlf: &str,
+    eol: &str,
+    autocrlf: Option<&str>,
+    core_eol: Option<&str>,
+    native_crlf: bool,
+) -> CrlfAction {
+    #[derive(PartialEq)]
+    enum Attr {
+        Undefined,
+        Binary,
+        Text,
+        Input,
+        Auto,
+    }
+    let text_attr = |v: &str| match v {
+        "set" => Attr::Text,
+        "unset" => Attr::Binary,
+        "input" => Attr::Input,
+        "auto" => Attr::Auto,
+        _ => Attr::Undefined,
+    };
+    let mut t = text_attr(text);
+    if t == Attr::Undefined {
+        t = text_attr(crlf);
+    }
+    let autocrlf = match autocrlf {
+        Some("input") => Some(false),
+        Some("true" | "yes" | "on" | "1") => Some(true),
+        _ => None,
+    };
+    // `core.autocrlf` wins over `core.eol`; then `core.eol`; then the native ending
+    let text_eol_crlf = match autocrlf {
+        Some(crlf) => crlf,
+        None => match core_eol {
+            Some("crlf") => true,
+            Some("lf") => false,
+            _ => native_crlf,
+        },
+    };
+    let by_eol = |auto: bool| match (eol, auto) {
+        ("crlf", true) => Some(CrlfAction::AutoCrlf),
+        ("lf", true) => Some(CrlfAction::AutoLf),
+        ("crlf", false) => Some(CrlfAction::TextCrlf),
+        ("lf", false) => Some(CrlfAction::TextLf),
+        _ => None,
+    };
+    match t {
+        Attr::Binary => CrlfAction::Binary,
+        Attr::Input => by_eol(false).unwrap_or(CrlfAction::TextLf),
+        Attr::Auto => by_eol(true).unwrap_or(if text_eol_crlf {
+            CrlfAction::AutoCrlf
+        } else {
+            CrlfAction::AutoLf
+        }),
+        Attr::Text => by_eol(false).unwrap_or(if text_eol_crlf {
+            CrlfAction::TextCrlf
+        } else {
+            CrlfAction::TextLf
+        }),
+        Attr::Undefined => by_eol(false).unwrap_or(match autocrlf {
+            Some(true) => CrlfAction::AutoCrlf,
+            Some(false) => CrlfAction::AutoLf,
+            None => CrlfAction::Binary,
+        }),
+    }
+}
+
+/// Whether checking `stored` out with `action` turns its bare LFs into CRLF (git's
+/// `will_convert_lf_to_crlf`).
+fn converts_to_crlf(stored: &[u8], action: CrlfAction) -> bool {
+    let (mut lone_lf, mut lone_cr, mut crlf, mut nul) = (0usize, 0usize, 0usize, 0usize);
+    let (mut printable, mut nonprintable) = (0usize, 0usize);
+    for (i, b) in stored.iter().enumerate() {
+        match *b {
+            b'\r' if stored.get(i + 1) == Some(&b'\n') => crlf += 1,
+            b'\r' => lone_cr += 1,
+            b'\n' if i > 0 && stored[i - 1] == b'\r' => {}
+            b'\n' => lone_lf += 1,
+            0 => nul += 1,
+            127 => nonprintable += 1,
+            // BS, HT, ESC and FF count as printable, like in git
+            8 | 9 | 27 | 12 => printable += 1,
+            b if b < 32 => nonprintable += 1,
+            _ => printable += 1,
+        }
+    }
+    if lone_lf == 0 {
+        return false;
+    }
+    match action {
+        CrlfAction::TextCrlf => true,
+        CrlfAction::AutoCrlf => {
+            let binary = lone_cr > 0 || nul > 0 || (printable >> 7) < nonprintable;
+            crlf == 0 && lone_cr == 0 && !binary
+        }
+        CrlfAction::Binary | CrlfAction::TextLf | CrlfAction::AutoLf => false,
+    }
 }
 
 /// The bytes of the regular worktree file (not a symlink, at most the cap), if there is one.
@@ -857,6 +1030,81 @@ mod tests {
         assert_eq!(eol_of(b"a\nb\n"), Some(Eol::Lf));
         assert_eq!(eol_of(b"a\r\nb\nc\n"), Some(Eol::Lf));
         assert_eq!(eol_of(b"no newline"), None);
+    }
+
+    #[test]
+    fn checkout_conversion_follows_attributes_then_config() {
+        use CrlfAction::*;
+        let u = "unspecified";
+        // nothing set: no conversion; `core.autocrlf` decides
+        assert_eq!(checkout_action(u, u, u, None, None, false), Binary);
+        assert_eq!(checkout_action(u, u, u, None, Some("crlf"), true), Binary);
+        assert_eq!(
+            checkout_action(u, u, u, Some("true"), None, false),
+            AutoCrlf
+        );
+        assert_eq!(checkout_action(u, u, u, Some("input"), None, false), AutoLf);
+        assert_eq!(checkout_action(u, u, u, Some("false"), None, false), Binary);
+        // `text`: `core.autocrlf`, then `core.eol`, then the native ending
+        assert_eq!(checkout_action("set", u, u, None, None, false), TextLf);
+        assert_eq!(checkout_action("set", u, u, None, None, true), TextCrlf);
+        assert_eq!(
+            checkout_action("set", u, u, None, Some("crlf"), false),
+            TextCrlf
+        );
+        assert_eq!(checkout_action("set", u, u, None, Some("lf"), true), TextLf);
+        assert_eq!(
+            checkout_action("set", u, u, Some("true"), Some("lf"), false),
+            TextCrlf
+        );
+        assert_eq!(
+            checkout_action("auto", u, u, None, Some("crlf"), false),
+            AutoCrlf
+        );
+        // `eol` makes a file text and wins over the config; `-text` / `binary` wins over `eol`
+        assert_eq!(checkout_action(u, u, "crlf", None, None, false), TextCrlf);
+        assert_eq!(
+            checkout_action("auto", u, "crlf", Some("input"), None, false),
+            AutoCrlf
+        );
+        assert_eq!(
+            checkout_action("set", u, "lf", Some("true"), None, false),
+            TextLf
+        );
+        assert_eq!(
+            checkout_action("unset", u, "crlf", Some("true"), None, false),
+            Binary
+        );
+        // the old `crlf` attribute when `text` is not set
+        assert_eq!(
+            checkout_action(u, "unset", u, Some("true"), None, false),
+            Binary
+        );
+        assert_eq!(
+            checkout_action(u, "input", u, Some("true"), None, false),
+            TextLf
+        );
+    }
+
+    #[test]
+    fn auto_conversion_leaves_cr_and_binary_alone() {
+        assert!(converts_to_crlf(b"a\nb\n", CrlfAction::AutoCrlf));
+        assert!(!converts_to_crlf(b"a\r\nb\n", CrlfAction::AutoCrlf));
+        assert!(!converts_to_crlf(b"a\0\nb\n", CrlfAction::AutoCrlf));
+        assert!(converts_to_crlf(b"a\r\nb\n", CrlfAction::TextCrlf));
+        assert!(!converts_to_crlf(b"a\r\nb\r\n", CrlfAction::TextCrlf));
+        assert!(!converts_to_crlf(b"a\nb\n", CrlfAction::AutoLf));
+        assert!(!converts_to_crlf(b"a\nb\n", CrlfAction::Binary));
+    }
+
+    #[test]
+    fn check_attr_output_is_read() {
+        let out = b"f\0text\0auto\0f\0crlf\0unspecified\0f\0eol\0crlf\0";
+        let attrs = parse_check_attr(out);
+        assert_eq!(attr_value(&attrs, "text"), "auto");
+        assert_eq!(attr_value(&attrs, "eol"), "crlf");
+        assert_eq!(attr_value(&attrs, "crlf"), "unspecified");
+        assert_eq!(attr_value(&attrs, "other"), "unspecified");
     }
 
     #[test]

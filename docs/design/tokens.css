@@ -1,4 +1,9 @@
 /*
+ * V1 HISTORY. This is the token set of the v1 design hand-off and of `mockup.html` (`src/gen.js` reads it). The app does
+ * not use it, and it is not kept up to date: it still holds the retired repo palette (`--dg-repo-*`, the repo spine),
+ * which DESIGN.md 4.1 removed. The tokens in use are `src/theme/tokens.css` (neutral base, metrics) and
+ * `src/theme/colors.css` (every colour that carries meaning).
+ *
  * DeepGit design tokens.
  * Base: JetBrains New UI "Islands" Dark / Light, shared with Prometeo DataGrip
  * (prometeo-datagrip/src/theme/dark.css, light.css, metrics.css). Shared names and values are kept identical.

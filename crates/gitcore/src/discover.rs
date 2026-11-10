@@ -51,8 +51,14 @@ pub fn is_repo(dir: &Path) -> bool {
 /// First 12 hex chars of sha1(canonical path).
 pub fn repo_id(path: &Path) -> String {
     let canon = canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    path_id(&canon.to_string_lossy())
+}
+
+/// The id of a repo or project whose canonical path is `canonical`: the first 12 hex chars of its
+/// sha1 (no file system access; `repo_id` canonicalizes first).
+pub fn path_id(canonical: &str) -> String {
     let mut h = sha1_smol::Sha1::new();
-    h.update(canon.to_string_lossy().as_bytes());
+    h.update(canonical.as_bytes());
     h.digest().to_string()[..12].to_string()
 }
 

@@ -11,15 +11,15 @@ Companion files in this folder:
 
 | File | Content |
 |---|---|
-| `tokens.css` | All CSS custom properties. Dark and light values. Metrics. Motion. |
+| `tokens.css` | V1 history: the token set of the v1 hand-off and of `mockup.html`. It is not kept up to date (it still has the retired repo palette). The tokens in use are `src/theme/tokens.css` and `src/theme/colors.css`. |
 | `mockup.html` | Static high-fidelity mockup of the main window, dark theme, 1600 × 1000 px. Open it in a browser. |
 | `mockup.png` | Screenshot of `mockup.html` at 1600 × 1000, scale 1. |
 
 Rules for implementers:
 
-1. Use only tokens from `tokens.css` for colours, sizes and durations.
+1. Use only tokens from `src/theme/tokens.css` and `src/theme/colors.css` for colours, sizes and durations. In this document, `tokens.css` and `colors.css` mean those two files.
 2. Do not write a hex value in component CSS.
-3. If you need a value that is not in `tokens.css`, add a token. Do not hard-code it.
+3. If you need a value that is not in those files, add a token. Do not hard-code it.
 4. Copy the HTML structure and class logic of `mockup.html` when a component looks the same.
 5. When this document and the mockup do not agree, this document is correct.
 
@@ -252,7 +252,7 @@ Values are `#RRGGBB` or `#RRGGBBAA`. Metrics, motion and font tokens are in the 
 | `--dg-notification-fg` | `#D1D3D9` | `#000000` |  |
 | `--dg-progress-track` | `#40434A` | `#D1D3D9` |  |
 | `--dg-icon` | `#C3C5CB` | `#6C707E` |  |
-| `--dg-icon-secondary` | `#868A91` | `#818594` |  |
+| `--dg-icon-secondary` | `#868A91` | `#787C8B` | 3:1 or more on a selected row (`colors.test.ts`). |
 | `--dg-icon-disabled` | `#5F6269` | `#A8ADBD` |  |
 
 #### Editor / code (Islands Dark scheme)
@@ -425,7 +425,7 @@ The washes are transparent, so they work on every surface. Where an opaque colou
 13. **Text on a wash.** Muted and secondary text is too weak on a coloured wash. Inside a selected row, a banner, a toast, the command preview and an active tab, `colors.css` section 4 sets them to `--dg-text-muted-on-wash`.
 14. **Motion.** The colour system adds no transition of its own. Existing transitions keep their `prefers-reduced-motion` rules.
 
-**Contrast guarantee** (`src/theme/colors.test.ts`). The test reads the real `tokens.css`, `extra.css` and `colors.css`, resolves `var()` and `color-mix` like the browser, and checks both themes: every `*-fg` on every surface (window, island, panel, raised, popup, dialog, console, editor), plain and under each wash of its family, on a hovered row and on both selected-row backgrounds, and as a pill on a selected row (4.5:1); body and on-wash text on every wash (4.5:1); family solids, lanes, the focus ring and the selection edge (3:1); white on every fill, the primary and danger buttons, Push, HEAD and the project badge (4.5:1); ref pills, ahead/behind, file status, diff and merge lines and words, toasts, banners, console lines, the title bar and status bar glow. It also fails when a stylesheet or a component uses a token that is not defined, and when feature CSS has a hex colour.
+**Contrast guarantee** (`src/theme/colors.test.ts`). The test reads the real `tokens.css`, `extra.css` and `colors.css`, resolves `var()` and `color-mix` like the browser, and checks both themes: every `*-fg` on every surface (window, island, panel, raised, popup, dialog, console, editor), plain and under each wash of its family, on a hovered row and on both selected-row backgrounds, and as a pill on a selected row (4.5:1); body and on-wash text on every wash (4.5:1); family solids, lanes, `--dg-icon` and `--dg-icon-secondary` (also on hovered and selected rows), the focus ring and the selection edge (3:1); white on every fill, the primary and danger buttons, Push, HEAD and the project badge (4.5:1); ref pills, ahead/behind, file status, diff and merge lines and words, toasts, banners, console lines, the title bar and status bar glow. It also fails when a stylesheet or a component uses a token that is not defined, and when feature CSS has a hex colour.
 
 ---
 
@@ -1180,7 +1180,7 @@ Lanes are coloured by lane (4.1 rule 2) in the combined log too. There is no "by
 
 ## 13. Implementation checklist
 
-1. Copy `tokens.css` into `src/theme/tokens.css`. Import it before any component CSS.
+1. Copy `tokens.css` into `src/theme/tokens.css`. Import it before any component CSS. (Done in v1; since then `src/theme/tokens.css` is the source, and `docs/design/tokens.css` is v1 history.)
 2. Copy the fonts from Prometeo DataGrip. Add the `@font-face` block from `prometeo-datagrip/src/theme/fonts.css`.
 3. Build the window shell (2.1–2.4) with empty islands. Check it against `mockup.png` at 1600 × 1000.
 4. Build the log with fake data and virtualization (5.5–5.7). Test with 100 000 rows.

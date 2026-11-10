@@ -57,7 +57,10 @@ export type SliderEvent =
   | { type: "input"; value: number }
   /** Pointer released (`change`, `pointerup`). `value` is the slider value at that moment, when known. */
   | { type: "release"; value?: number }
-  /** The drag ended without a release on the slider (`pointercancel`): nothing is applied. */
+  /**
+   * The drag was lost: it ended without a release on the slider (`pointercancel`, the pointer capture ended with the
+   * button up, the window lost the focus, the page was hidden). Nothing is applied; the slider shows the stored value.
+   */
   | { type: "cancel" };
 
 export interface SliderStepResult {
@@ -87,6 +90,30 @@ export function sliderStep(state: SliderState, event: SliderEvent, committed: nu
     }
     case "cancel":
       return { state: SLIDER_IDLE, apply: null };
+  }
+}
+
+/** A DOM event that can end a pointer drag of the slider. `hidden`: `visibilitychange` to a hidden page. */
+export type DragSignal = "pointerup" | "pointercancel" | "lostpointercapture" | "blur" | "hidden";
+
+/**
+ * What `signal` means for a drag in progress: `pointerup` is the release (with the slider value at that moment); every
+ * other one means the drag is lost (`cancel`), so a later pointerup cannot apply a stale preview. A capture that ends
+ * while the button is still `pressed` is not the end of the drag (the slider still gets the pointer): null.
+ *
+ *   dragEnd("blur")                         { type: "cancel" }   (alt-tab during a drag)
+ *   dragEnd("lostpointercapture", true)     null
+ */
+export function dragEnd(signal: DragSignal, pressed = false, value?: number): SliderEvent | null {
+  switch (signal) {
+    case "pointerup":
+      return { type: "release", value };
+    case "lostpointercapture":
+      return pressed ? null : { type: "cancel" };
+    case "pointercancel":
+    case "blur":
+    case "hidden":
+      return { type: "cancel" };
   }
 }
 

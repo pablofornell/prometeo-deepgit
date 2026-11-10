@@ -168,6 +168,51 @@ fn a_resolution_is_crlf_also_when_the_worktree_file_is_gone() {
 }
 
 #[test]
+fn the_line_ending_is_found_without_running_filters() {
+    // A smudge filter (Git LFS is one) may download, run anything, or fail. Finding the line
+    // ending of a gone worktree file must read attributes and config only.
+    let r = crlf_repo();
+    let g = git();
+    merge_conflict(&r);
+    let marks = tempfile::tempdir().unwrap();
+    let marker = marks.path().join("smudge-ran");
+    let cmd = format!(
+        "touch '{}'; exit 1",
+        marker.to_string_lossy().replace('\\', "/")
+    );
+    r.sh(&["config", "filter.boom.smudge", &cmd]);
+    r.sh(&["config", "filter.boom.required", "true"]);
+    std::fs::remove_file(r.path().join("f")).unwrap();
+    let eol_with = |attrs: &str| {
+        r.write(".gitattributes", attrs);
+        conflict_versions(&g, &r.info, "f").unwrap().eol
+    };
+
+    assert_eq!(eol_with("f filter=boom\n"), Eol::Crlf, "core.autocrlf=true");
+    assert_eq!(
+        eol_with("f filter=boom -text\n"),
+        Eol::Lf,
+        "-text: no conversion"
+    );
+    r.sh(&["config", "core.autocrlf", "false"]);
+    assert_eq!(eol_with("f filter=boom\n"), Eol::Lf, "no conversion at all");
+    assert_eq!(eol_with("f filter=boom eol=crlf\n"), Eol::Crlf, "eol=crlf");
+    r.sh(&["config", "core.eol", "lf"]);
+    assert_eq!(
+        eol_with("f filter=boom text\n"),
+        Eol::Lf,
+        "text, core.eol=lf"
+    );
+    r.sh(&["config", "core.eol", "crlf"]);
+    assert_eq!(
+        eol_with("f filter=boom text\n"),
+        Eol::Crlf,
+        "text, core.eol=crlf"
+    );
+    assert!(!marker.exists(), "the smudge filter ran");
+}
+
+#[test]
 fn a_file_committed_with_crlf_keeps_crlf_in_the_repository() {
     // The file went in before autocrlf was on: its blobs hold CRLF and git leaves such a file
     // alone. A resolution must not turn the blob into LF (the whole file would show as changed).

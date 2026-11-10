@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { SLIDER_IDLE, type SliderEvent, type SliderState, parseNumberText, pinShift, sliderStep, snapToRange, stepBy } from "./sizeControl";
+import { type DragSignal, SLIDER_IDLE, type SliderEvent, type SliderState, dragEnd, parseNumberText, pinShift, sliderStep, snapToRange, stepBy } from "./sizeControl";
 
 const FONT = { min: 10, max: 20, step: 1 };
 const SCALE = { min: 80, max: 200, step: 10 };
@@ -106,6 +106,37 @@ describe("slider gesture", () => {
 
   it("an input that repeats the current value is not a change", () => {
     expect(run([{ type: "input", value: 13 }], 13).applied).toEqual([]);
+  });
+});
+
+describe("drag end signals", () => {
+  const lost: DragSignal[] = ["pointercancel", "lostpointercapture", "blur", "hidden"];
+
+  it("a pointerup on the slider is the release, with the slider value", () => {
+    expect(dragEnd("pointerup", false, 16)).toEqual({ type: "release", value: 16 });
+    const { applied, state } = run([{ type: "down" }, { type: "input", value: 16 }, dragEnd("pointerup", false, 16)!], 13);
+    expect(applied).toEqual([16]);
+    expect(state).toEqual(SLIDER_IDLE);
+  });
+
+  it.each(lost)("%s ends the drag, applies nothing and shows the stored value again", (signal) => {
+    let state = SLIDER_IDLE;
+    for (const e of [{ type: "down" }, { type: "input", value: 19 }] as SliderEvent[]) state = sliderStep(state, e, 13).state;
+    expect(state).toEqual({ dragging: true, preview: 19 });
+    const r = sliderStep(state, dragEnd(signal)!, 13);
+    expect(r.apply).toBeNull();
+    expect(r.state).toEqual(SLIDER_IDLE);
+  });
+
+  it.each(lost)("after %s a later pointerup or change does not apply the stale preview", (signal) => {
+    const { applied, state } = run([{ type: "down" }, { type: "input", value: 19 }, dragEnd(signal)!, dragEnd("pointerup")!, { type: "release", value: 19 }], 13);
+    expect(applied).toEqual([]);
+    expect(state).toEqual(SLIDER_IDLE);
+  });
+
+  it("a capture that ends while the button is still down does not end the drag", () => {
+    expect(dragEnd("lostpointercapture", true)).toBeNull();
+    expect(dragEnd("blur", true)).toEqual({ type: "cancel" });
   });
 });
 

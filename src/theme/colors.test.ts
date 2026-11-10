@@ -5,7 +5,7 @@
  * tokens the way the browser does (`var()`, `color-mix`) and checks, for the dark and the light theme:
  *   - every `--dg-<family>-fg` on every surface it is used on, plain and under each wash (>= 4.5:1),
  *   - body text and muted text on every wash and on the selected-row backgrounds (>= 4.5:1),
- *   - non-text indicators: family solids, graph lanes, diff markers (>= 3:1),
+ *   - non-text indicators: family solids, graph lanes, diff markers, icons also on a selected row (>= 3:1),
  *   - text on filled controls: primary button, danger button, HEAD pill (>= 4.5:1),
  *   - diff, merge, toasts, the title bar and status bar glow.
  * It also checks that every token a stylesheet uses is defined in both themes, and that feature CSS has no hex colour.
@@ -172,6 +172,22 @@ describe.each(["dark", "light"] as Theme[])("%s theme", (theme) => {
     }
     for (const s of SURFACES) check(`--dg-focus-ring on ${s}`, solid("--dg-focus-ring"), solid(s), GRAPHIC);
     for (const s of ["--dg-island-bg", "--dg-panel-bg", "--dg-popup-bg"]) check(`--dg-selection-edge on a selected row over ${s}`, solid("--dg-selection-edge"), on(s, "--dg-selection-bg"), GRAPHIC);
+    done();
+  });
+
+  it("icons are visible on the surfaces, on a hovered row and on a selected row (3:1)", () => {
+    for (const t of ["--dg-icon", "--dg-icon-secondary"]) {
+      for (const s of SURFACES) {
+        check(`${t} on ${s}`, solid(t), solid(s), GRAPHIC);
+        check(`${t} on --dg-row-hover-bg over ${s}`, solid(t), on(s, "--dg-row-hover-bg"), GRAPHIC);
+      }
+      // file, branch and folder icons stay in their colour on a selected row
+      for (const s of ROW_SURFACES) {
+        for (const sel of ["--dg-selection-inactive-bg", "--dg-selection-bg", "--dg-matrix-column-selected-bg"]) {
+          check(`${t} on ${sel} over ${s}`, solid(t), on(s, sel), GRAPHIC);
+        }
+      }
+    }
     done();
   });
 

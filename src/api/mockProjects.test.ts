@@ -34,3 +34,19 @@ describe("mock command project_rename", () => {
     expect((await call<Workspace>("workspace_load")).projects.map((p) => p.name)).toEqual(ws.projects.map((p) => p.name));
   });
 });
+
+describe("mock command project_add", () => {
+  it("gives a folder whose name a project has already a numbered name, like add_project in Rust", async () => {
+    const ws = await call<Workspace>("workspace_load");
+    const taken = ws.projects[0].name;
+    const second = await call<Project>("project_add", { path: `/elsewhere/one/${taken}` });
+    expect(second.name).toBe(`${taken} (2)`);
+    const third = await call<Project>("project_add", { path: `/elsewhere/two/${taken.toUpperCase()}` });
+    expect(third.name).toBe(`${taken.toUpperCase()} (3)`);
+    // the same folder again is the project it already is
+    expect((await call<Project>("project_add", { path: `/elsewhere/one/${taken}` })).id).toBe(second.id);
+    for (const p of [second, third]) await call("project_remove", { projectId: p.id });
+    await call("project_set_active", { projectId: ws.activeProjectId });
+    expect((await call<Workspace>("workspace_load")).projects.map((p) => p.name)).toEqual(ws.projects.map((p) => p.name));
+  });
+});

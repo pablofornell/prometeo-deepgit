@@ -85,7 +85,7 @@
 .dg-changes-actions { display: none; align-items: center; gap: var(--dg-space-1); position: absolute; right: var(--dg-space-2); top: 1px; bottom: 1px; padding-left: var(--dg-space-3); background-color: transparent; border-radius: var(--dg-action-button-radius); }
 .dg-changes-actions.is-header { display: inline-flex; position: static; padding: 0; background: none; }
 .dg-changes-row:hover .dg-changes-actions { display: inline-flex; }
-/* The box has no fill of its own (an opaque one would hide the repo tint of the row); the counts it covers are hidden instead. */
+/* The box has no fill of its own (an opaque one would hide the hover and selection background of the row); the counts it covers are hidden instead. */
 .dg-changes-row:hover .dg-changes-counts { visibility: hidden; }
 .dg-changes-action-danger:hover:not(:disabled) .dg-icon { color: var(--dg-text-error); }
 /* conflicted rows: "Yours", "Theirs", "Merge…" */

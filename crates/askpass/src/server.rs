@@ -165,6 +165,10 @@ const DIR_PREFIX: &str = "deepgit-askpass-";
 /// bytes of it.
 #[cfg(unix)]
 const SOCKET_NAME: &str = "sock";
+/// Every name the socket had: older versions called it `askpass.sock`. The stale sweep removes
+/// these, and nothing else, from a dead process's directory.
+#[cfg(unix)]
+const SOCKET_NAMES: [&str; 2] = [SOCKET_NAME, "askpass.sock"];
 /// `sun_path` holds 104 bytes on macOS and 108 on Linux, with the final NUL.
 #[cfg(unix)]
 const MAX_SOCKET_PATH: usize = 103;
@@ -222,7 +226,7 @@ fn private_dir(base: Option<&std::path::Path>) -> io::Result<std::path::PathBuf>
 
 /// Removes `deepgit-askpass-<pid>-*` directories of dead processes (a crash leaves them). Only a
 /// real directory of this user (not a link, not someone else's in a shared `/tmp`) is touched, and
-/// only when it is empty or holds just the socket.
+/// only when it is empty or holds just the socket (under its name of this or an older version).
 #[cfg(unix)]
 fn sweep_stale(base: &std::path::Path) {
     use std::os::unix::fs::MetadataExt;
@@ -252,7 +256,9 @@ fn sweep_stale(base: &std::path::Path) {
         if !mine {
             continue;
         }
-        let _ = std::fs::remove_file(dir.join(SOCKET_NAME));
+        for socket in SOCKET_NAMES {
+            let _ = std::fs::remove_file(dir.join(socket));
+        }
         let _ = std::fs::remove_dir(&dir);
     }
 }
@@ -336,6 +342,11 @@ mod tests {
         // pid 2^31-2 does not exist on Linux or macOS.
         let stale = base.path().join(format!("{DIR_PREFIX}2147483646-abcdef"));
         std::fs::create_dir(&stale).unwrap();
+        // One left by an older version, whose socket was `askpass.sock`.
+        let old = base.path().join(format!("{DIR_PREFIX}2147483646-0a0b0c"));
+        std::fs::create_dir(&old).unwrap();
+        std::fs::write(old.join("askpass.sock"), "").unwrap();
+        std::fs::write(old.join(SOCKET_NAME), "").unwrap();
         let alive = base
             .path()
             .join(format!("{DIR_PREFIX}{}-abcdef", std::process::id()));
@@ -352,10 +363,12 @@ mod tests {
         let full = base.path().join(format!("{DIR_PREFIX}2147483646-full"));
         std::fs::create_dir(&full).unwrap();
         std::fs::write(full.join("other-file"), "x").unwrap();
+        std::fs::write(full.join("askpass.sock"), "").unwrap();
         let _server = Server::start_unix(echo_handler(), Some(base.path()))
             .await
             .unwrap();
         assert!(!stale.exists());
+        assert!(!old.exists(), "the old socket name is swept too");
         assert!(alive.exists());
         assert!(other.exists());
         assert!(link.symlink_metadata().is_ok());

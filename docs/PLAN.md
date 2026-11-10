@@ -10,7 +10,8 @@ All JSON is **camelCase** (`#[serde(rename_all = "camelCase")]`). Enums with dat
 - Tauri 2, Rust edition 2021, toolchain 1.99.
 - Frontend: SolidJS 1, TypeScript 5 (strict), Vite 6. No UI framework. No CSS framework.
 - Git access: the `git` CLI (as IntelliJ does). No libgit2.
-- Theme: `docs/design/tokens.css` + `docs/design/DESIGN.md` (the designer owns them).
+- Theme: `src/theme/tokens.css` + `src/theme/colors.css`, spec in `docs/design/DESIGN.md` (the designer owns it).
+  `docs/design/tokens.css` is v1 history (the token set of the v1 mockup), not kept up to date.
 
 ## 2. Repository layout
 
@@ -51,7 +52,7 @@ src/                       SolidJS UI
   api/types.ts             TS mirror of section 4
   api/tauri.ts             typed invoke wrappers + browser mock fallback
   api/mock.ts              fake multi-repo backend for `npm run dev` in a browser
-  theme/                   tokens.css (copy of docs/design/tokens.css), fonts
+  theme/                   tokens.css, colors.css (the tokens in use; started as a copy of docs/design/tokens.css), fonts
   styles/                  global CSS
   state/                   stores (workspace, selection, log, status, settings)
   components/ui/           primitives: Icon, Button, Menu, Popup, Dialog, Toast,
@@ -214,11 +215,11 @@ with the same name in camelCase (e.g. `logOpen`).
 |---|---|---|
 | `workspace_load` | – | `Workspace` |
 | `workspace_save_ui` | `ui: Value` | `()` |
-| `project_add` | `path: String` | `Project` (repos discovered, depth ≤ 4, skip `node_modules`, `target`, `.git` internals, hidden dirs except the root; a folder that is a repo is still scanned for nested repos) |
+| `project_add` | `path: String` | `Project` (repos discovered, depth ≤ 4, skip `node_modules`, `target`, `.git` internals, hidden dirs except the root; a folder that is a repo is still scanned for nested repos). The name is the folder name; when another project has that name already (compared as in `project_rename`), it gets a number: `api (2)`, `api (3)`. The same folder again returns the project it already is |
 | `project_remove` | `projectId` | `()` |
 | `project_rescan` | `projectId` | `Project` |
 | `project_set_active` | `projectId` | `()` |
-| `project_rename` | `projectId`, `name: String` | `Project` (updated; saves the workspace atomically). The name is trimmed. Errors: `The project name cannot be empty.`, `The project name is too long: 80 characters at most.` (characters, not bytes), `The project name cannot contain control characters (tab, new line).`, `Another project is already called "<name>".` (other projects, case-insensitive, trimmed), `unknown project`. The id never changes (it comes from the path), and `project_rescan` keeps the name. The mock and the UI use the same rules (`src/api/projectName.ts`). |
+| `project_rename` | `projectId`, `name: String` | `Project` (updated; saves the workspace atomically). The name is trimmed. Errors: `The project name cannot be empty.`, `The project name is too long: 80 characters at most.` (characters, not bytes), `The project name cannot contain control characters (tab, new line).`, `Another project is already called "<name>".` (other projects, trimmed, Unicode NFC and a simple case fold: `name_key` / `nameKey`), `unknown project`. The id never changes (it comes from the path), and `project_rescan` keeps the name. The mock and the UI use the same rules (`src/api/projectName.ts`). |
 | `repo_summaries` | `repoIds: Vec<String>` | `Vec<RepoSummary>` (parallel) |
 
 ### 5.2 Log (server-side sessions; the UI only fetches visible rows)

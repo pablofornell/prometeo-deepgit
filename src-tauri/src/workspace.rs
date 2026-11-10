@@ -5,7 +5,10 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use gitcore::discover::path_id;
+use gitcore::paths::strip_verbatim;
 use gitcore::{Project, RepoInfo, Workspace};
+use unicode_normalization::UnicodeNormalization;
 
 fn unix_secs() -> u64 {
     SystemTime::now()
@@ -27,6 +30,7 @@ pub fn load(path: &Path) -> Workspace {
     };
     match serde_json::from_str::<Workspace>(&text) {
         Ok(mut ws) => {
+            normalize_paths(&mut ws);
             normalize_active(&mut ws);
             ws
         }
@@ -69,6 +73,60 @@ pub fn save(path: &Path, ws: &Workspace) -> std::io::Result<()> {
     result
 }
 
+/// Files written before `gitcore::paths::canonicalize` dropped the verbatim prefix on Windows
+/// hold paths such as `\\?\C:\work`; the same folder added now is `C:\work`, so it would not
+/// match. Such paths get the plain form (`strip_verbatim`, the rule `canonicalize` uses).
+///
+/// Ids are `path_id` of the canonical path. An entry whose path changes here and whose id is the
+/// hash of its old path gets the id of the new path: the id a fresh add, a rescan and a clone
+/// compute for that folder. Entries with a plain path keep their ids. The active project follows
+/// its new id; a project or repo that is now the same as an earlier one is dropped.
+fn normalize_paths(ws: &mut Workspace) {
+    let mut moved: Vec<(String, String)> = Vec::new();
+    let mut plain = |id: &mut String, path: &mut String| {
+        let Some(p) = strip_verbatim(path) else {
+            return;
+        };
+        if *id == path_id(path) {
+            let new = path_id(&p);
+            moved.push((std::mem::replace(id, new.clone()), new));
+        }
+        *path = p;
+    };
+    for project in &mut ws.projects {
+        plain(&mut project.id, &mut project.path);
+        for repo in &mut project.repos {
+            plain(&mut repo.id, &mut repo.path);
+        }
+        let mut seen = std::collections::HashSet::new();
+        project.repos.retain(|r| seen.insert(r.path.clone()));
+    }
+    if moved.is_empty() {
+        return;
+    }
+    if let Some(active) = ws.active_project_id.as_mut() {
+        if let Some((_, new)) = moved.iter().find(|(old, _)| old == active) {
+            *active = new.clone();
+        }
+    }
+    // the same folder twice (added again after the upgrade): the first entry stays
+    let mut kept: Vec<Project> = Vec::new();
+    for project in std::mem::take(&mut ws.projects) {
+        match kept
+            .iter()
+            .find(|k| k.path == project.path || k.id == project.id)
+        {
+            Some(k) => {
+                if ws.active_project_id.as_deref() == Some(project.id.as_str()) {
+                    ws.active_project_id = Some(k.id.clone());
+                }
+            }
+            None => kept.push(project),
+        }
+    }
+    ws.projects = kept;
+}
+
 /// The active project must exist; otherwise fall back to the first one (or none).
 fn normalize_active(ws: &mut Workspace) {
     let valid = ws
@@ -81,10 +139,12 @@ fn normalize_active(ws: &mut Workspace) {
 }
 
 /// Adds `project`, or returns the existing one with the same path. The first project becomes active.
-pub fn add_project(ws: &mut Workspace, project: Project) -> Project {
+/// A name that another project has already (`name_key`) gets a number: "api (2)", "api (3)"...
+pub fn add_project(ws: &mut Workspace, mut project: Project) -> Project {
     if let Some(existing) = ws.projects.iter().find(|p| p.path == project.path) {
         return existing.clone();
     }
+    project.name = unique_name(ws, &project.name);
     ws.projects.push(project.clone());
     if ws.active_project_id.is_none() {
         ws.active_project_id = Some(project.id.clone());
@@ -137,9 +197,52 @@ pub fn all_repos(ws: &Workspace) -> Vec<RepoInfo> {
 /// Longest project name, in characters.
 pub const PROJECT_NAME_MAX: usize = 80;
 
+/// What two project names are compared by: trimmed, NFC, then a simple case fold (each character
+/// lowercased, and the few letters whose fold is not their lowercase, such as final sigma and
+/// long s), then NFC again. "Café" (precomposed), "CAFE\u{301}" (combining accent) and " café "
+/// are the same name. `src/api/projectName.ts` has the same rule.
+pub fn name_key(name: &str) -> String {
+    let folded: String = name
+        .trim()
+        .nfc()
+        .flat_map(char::to_lowercase)
+        .map(|c| match c {
+            '\u{3c2}' => '\u{3c3}',   // final sigma
+            '\u{17f}' => 's',         // long s
+            '\u{3d0}' => '\u{3b2}',   // beta symbol
+            '\u{3d1}' => '\u{3b8}',   // theta symbol
+            '\u{3d5}' => '\u{3c6}',   // phi symbol
+            '\u{3d6}' => '\u{3c0}',   // pi symbol
+            '\u{3f0}' => '\u{3ba}',   // kappa symbol
+            '\u{3f1}' => '\u{3c1}',   // rho symbol
+            '\u{3f5}' => '\u{3b5}',   // lunate epsilon
+            '\u{1e9b}' => '\u{1e61}', // long s with dot above
+            '\u{1fbe}' => '\u{3b9}',  // prosgegrammeni
+            c => c,
+        })
+        .collect();
+    folded.nfc().collect()
+}
+
+/// `name`, or the first of "name (2)", "name (3)"... that no project has (`name_key`).
+fn unique_name(ws: &Workspace, name: &str) -> String {
+    let taken = |n: &str| {
+        let key = name_key(n);
+        ws.projects.iter().any(|p| name_key(&p.name) == key)
+    };
+    let base = name.trim();
+    if !taken(base) {
+        return base.to_string();
+    }
+    (2..)
+        .map(|i| format!("{base} ({i})"))
+        .find(|n| !taken(n))
+        .expect("a free number")
+}
+
 /// Checks a new name for project `id` and returns it trimmed. Refused: empty, longer than
-/// `PROJECT_NAME_MAX` characters, control characters, or the name of another project (ignoring
-/// case and surrounding spaces). The browser mock (`src/api/projectName.ts`) has the same rules
+/// `PROJECT_NAME_MAX` characters, control characters, or the name of another project (the same
+/// `name_key`: ignoring case, Unicode normal form and surrounding spaces). The browser mock (`src/api/projectName.ts`) has the same rules
 /// and messages.
 pub fn validate_project_name(ws: &Workspace, id: &str, name: &str) -> Result<String, String> {
     let name = name.trim();
@@ -154,11 +257,11 @@ pub fn validate_project_name(ws: &Workspace, id: &str, name: &str) -> Result<Str
     if name.chars().any(char::is_control) {
         return Err("The project name cannot contain control characters (tab, new line).".into());
     }
-    let lower = name.to_lowercase();
+    let key = name_key(name);
     if let Some(other) = ws
         .projects
         .iter()
-        .find(|p| p.id != id && p.name.trim().to_lowercase() == lower)
+        .find(|p| p.id != id && name_key(&p.name) == key)
     {
         return Err(format!(
             "Another project is already called \"{}\".",
@@ -419,6 +522,115 @@ mod tests {
         );
         // its own name, in another case, is fine
         assert_eq!(check("A").unwrap(), "A");
+    }
+
+    #[test]
+    fn names_are_compared_in_one_unicode_form_and_case() {
+        // "é" precomposed (U+00E9) and as "e" + combining acute (U+0301)
+        assert_eq!(name_key(" Caf\u{e9} "), name_key("CAFE\u{301}"));
+        assert_eq!(name_key("\u{3a3}\u{3c3}\u{3c2}"), "\u{3c3}\u{3c3}\u{3c3}");
+        assert_eq!(name_key("Stra\u{17f}e"), name_key("STRASE"));
+        assert_ne!(name_key("api"), name_key("apl"));
+        let mut ws = sample();
+        ws.projects[1].name = "Caf\u{e9}".into();
+        assert_eq!(
+            validate_project_name(&ws, "a", "cafe\u{301}").unwrap_err(),
+            "Another project is already called \"Caf\u{e9}\"."
+        );
+    }
+
+    #[test]
+    fn a_folder_with_a_taken_name_gets_a_number() {
+        let mut ws = Workspace::default();
+        let at = |path: &str, name: &str| Project {
+            id: path_id(path),
+            name: name.into(),
+            path: path.into(),
+            repos: vec![],
+        };
+        assert_eq!(add_project(&mut ws, at("/w/api", "api")).name, "api");
+        assert_eq!(add_project(&mut ws, at("/x/api", "api")).name, "api (2)");
+        assert_eq!(add_project(&mut ws, at("/y/API", "API")).name, "API (3)");
+        // the folder that is there already comes back as it is
+        assert_eq!(add_project(&mut ws, at("/x/api", "api")).name, "api (2)");
+        assert_eq!(
+            add_project(&mut ws, at("/z/caf\u{e9}", "caf\u{e9}")).name,
+            "caf\u{e9}"
+        );
+        assert_eq!(
+            add_project(&mut ws, at("/q/cafe\u{301}", "Cafe\u{301}")).name,
+            "Cafe\u{301} (2)"
+        );
+        let names: Vec<_> = ws.projects.iter().map(|p| p.name.as_str()).collect();
+        assert_eq!(
+            names,
+            vec!["api", "api (2)", "API (3)", "caf\u{e9}", "Cafe\u{301} (2)"]
+        );
+    }
+
+    /// A file written on Windows before the verbatim prefix was dropped. Ids are hashes of the
+    /// stored path, as the app made them then.
+    #[test]
+    fn old_verbatim_windows_paths_load_in_the_plain_form() {
+        let (old_root, old_repo) = (r"\\?\C:\work", r"\\?\C:\work\api");
+        let (root, repo) = (r"C:\work", r"C:\work\api");
+        let plain = r"/w/plain";
+        let custom = r"\\?\D:\custom";
+        let device = r"\\?\C:\work\nul";
+        let entry = |id: String, path: &str, repos: Vec<RepoInfo>| serde_json::json!({"id": id, "name": "n", "path": path, "repos": repos});
+        let ri = |path: &str| RepoInfo {
+            id: path_id(path),
+            name: "r".into(),
+            path: path.into(),
+        };
+        let file = serde_json::json!({
+            "projects": [
+                entry(path_id(old_root), old_root, vec![ri(old_root), ri(old_repo)]),
+                entry(path_id(plain), plain, vec![ri(plain)]),
+                // an id that is not the hash of the path stays
+                entry("kept-id".into(), custom, vec![]),
+                // a name that needs the prefix stays verbatim
+                entry(path_id(device), device, vec![]),
+                // the same folder added again after the upgrade
+                entry(path_id(root), root, vec![ri(root)]),
+            ],
+            "activeProjectId": path_id(old_root),
+            "ui": {}
+        });
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("workspace.json");
+        std::fs::write(&path, file.to_string()).unwrap();
+        let ws = load(&path);
+
+        let got: Vec<(&str, &str)> = ws
+            .projects
+            .iter()
+            .map(|p| (p.id.as_str(), p.path.as_str()))
+            .collect();
+        let (root_id, plain_id, device_id) = (path_id(root), path_id(plain), path_id(device));
+        assert_eq!(
+            got,
+            vec![
+                (root_id.as_str(), root),
+                (plain_id.as_str(), plain),
+                ("kept-id", r"D:\custom"),
+                (device_id.as_str(), device),
+            ]
+        );
+        let repos: Vec<(String, &str)> = ws.projects[0]
+            .repos
+            .iter()
+            .map(|r| (r.id.clone(), r.path.as_str()))
+            .collect();
+        assert_eq!(
+            repos,
+            vec![(path_id(root), root), (path_id(repo), repo)],
+            "the ids a rescan gives"
+        );
+        assert_eq!(ws.active_project_id, Some(path_id(root)));
+        // a plain file is left exactly as it is
+        save(&path, &sample()).unwrap();
+        assert_eq!(load(&path).projects, sample().projects);
     }
 
     #[test]

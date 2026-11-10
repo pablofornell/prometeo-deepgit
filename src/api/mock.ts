@@ -13,7 +13,7 @@ import {
   type MockCommit, type MockRepo, type Scenario,
 } from "./mockData";
 import { buildFileDiff, fileText, toFileChange } from "./mockDiff";
-import { validateProjectName } from "./projectName";
+import { uniqueProjectName, validateProjectName } from "./projectName";
 import { entryOf, genericConflicts, currentOids, hasStage, isTextConflict, sideStages, versionsOf, type MockConflict } from "./mockConflicts";
 import type {
   CloneOpts, CloneProgress, CloneResult, CloneTarget, CommitDetails, CommitRow, ConflictEntry, ConflictLabels, ConflictVersions, ConsoleEntry, DiffSpec,
@@ -579,7 +579,7 @@ const handlers: Record<string, Handler> = {
     const existing = workspace.projects.find((p) => p.path === path);
     if (existing) return structuredClone(existing);
     const defs: [string, string][] = [[path, name], [`${path}/api`, "api"], [`${path}/web`, "web"]];
-    const project: Project = { id: "p-" + hex40(path).slice(0, 8), name, path, repos: [] };
+    const project: Project = { id: "p-" + hex40(path).slice(0, 8), name: uniqueProjectName(name, workspace.projects), path, repos: [] };
     for (const [p, n] of defs) project.repos.push({ id: repoId(p), name: n, path: p });
     workspace.projects.push(project);
     for (const info of project.repos) registerRepo(info, genericScenario(info.name));
@@ -1358,7 +1358,7 @@ async function cloneRepo(a: Args, c: Ctx): Promise<CloneResult> {
       project.repos.push(info);
     } else {
       created = true;
-      project = { id: "p-" + hex40(path).slice(0, 8), name: dirName, path, repos: [info] };
+      project = { id: "p-" + hex40(path).slice(0, 8), name: uniqueProjectName(dirName, workspace.projects), path, repos: [info] };
       workspace.projects.push(project);
     }
     c.git(null, gitArgs, { stderr: `Cloning into '${path}'...\nReceiving objects: 100% (350/350), done.\n` });

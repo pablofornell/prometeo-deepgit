@@ -7,8 +7,10 @@
  *   </Section>
  */
 import { type JSX, For, Show, createEffect, createSignal, createUniqueId, onCleanup } from "solid-js";
-import { IconButton, moveDialogBy } from "../../components/ui";
-import { type NumberRange, type Point, SLIDER_IDLE, type SliderEvent, parseNumberText, pinShift, sliderStep, snapToRange, stepBy } from "./sizeControl";
+import { IconButton, type PendingReanchor, moveDialogBy, reanchorClick, reanchorResized, reanchorScale } from "../../components/ui";
+import {
+  type DragSignal, type NumberRange, type Point, SLIDER_IDLE, type SliderEvent, dragEnd, parseNumberText, pinShift, sliderStep, snapToRange, stepBy,
+} from "./sizeControl";
 
 /** A titled group of rows inside a page. */
 export function Section(props: { title?: string; children: JSX.Element }): JSX.Element {
@@ -89,34 +91,56 @@ const inTauri = (): boolean => typeof window !== "undefined" && "__TAURI_INTERNA
 /** The keys that change a number: holding one down gives one step, not a run of them (each step resizes the page). */
 const STEP_KEYS = new Set(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "PageUp", "PageDown", "Home", "End"]);
 
+/** The one dialog move that waits for a page zoom (`reanchorClick`), and what ends it. */
+let pending: PendingReanchor<HTMLElement> | null = null;
+let pendingTimer = 0;
+let pendingFrame = 0;
+
+const endPending = () => {
+  window.clearTimeout(pendingTimer);
+  cancelAnimationFrame(pendingFrame);
+  window.removeEventListener("resize", onZoomResize);
+  pending = null;
+};
+
+/**
+ * The zoom applied. The dialog moves in the next frame, from the geometry it has then. Each `resize` puts the dialog
+ * back in its place (`Dialog`), so a second `resize` (one per zoom step) moves it again from scratch, not twice.
+ */
+function onZoomResize(): void {
+  if (!pending) return;
+  pending = reanchorResized(pending);
+  cancelAnimationFrame(pendingFrame);
+  pendingFrame = requestAnimationFrame(() => {
+    const p = pending;
+    if (p?.anchor.isConnected) moveDialogBy(p.anchor, pinShift(p.before, p.anchor.getBoundingClientRect(), p.pointer, reanchorScale(p)));
+  });
+  window.clearTimeout(pendingTimer);
+  pendingTimer = window.setTimeout(endPending, 400);
+}
+
 /**
  * Runs `change` (it resizes the page) and then moves the dialog so that `anchor` is under the pointer again
  * (`pinShift`). `zoom` is `[old percent, new percent]` when the change is a page zoom: the webview applies it a moment
- * later and client coordinates change with it, so the move waits for the `resize` that the zoom causes.
+ * later and client coordinates change with it, so the move waits for the `resize` that the zoom causes. Quick clicks
+ * share one pending move, so the dialog moves once (`reanchorClick`).
  */
 function changeInPlace(anchor: HTMLElement, pointer: Point | null, change: () => void, zoom?: [number, number]): void {
   const before = anchor.getBoundingClientRect();
-  const settle = (scale: number) => {
-    if (anchor.isConnected) moveDialogBy(anchor, pinShift(before, anchor.getBoundingClientRect(), pointer, scale));
-  };
   if (!zoom) {
     change();
-    settle(1);
+    if (anchor.isConnected) moveDialogBy(anchor, pinShift(before, anchor.getBoundingClientRect(), pointer, 1));
     return;
   }
   // In a browser the zoom is the CSS `zoom` of <html>: nothing to wait for, and the dialog is not moved.
   if (!inTauri()) return change();
-  let timer = 0;
-  const done = () => {
-    window.clearTimeout(timer);
-    window.removeEventListener("resize", onResize);
-  };
-  const onResize = () => {
-    done();
-    requestAnimationFrame(() => settle(zoom[0] / zoom[1]));
-  };
-  window.addEventListener("resize", onResize);
-  timer = window.setTimeout(done, 1500);
+  const fresh = pending === null;
+  pending = reanchorClick(pending, { anchor, before, pointer, from: zoom[0], to: zoom[1] });
+  if (fresh) window.addEventListener("resize", onZoomResize);
+  // a move computed for the earlier click must not run with this click's geometry
+  cancelAnimationFrame(pendingFrame);
+  window.clearTimeout(pendingTimer);
+  pendingTimer = window.setTimeout(endPending, 1500);
   change();
 }
 
@@ -214,36 +238,59 @@ export function SizeControl(props: SizeControlProps): JSX.Element {
     }
   };
 
-  /** A pointer went down on the slider: follow it on the window until it is released (also outside the slider). */
-  const begin = (e: MouseEvent) => {
-    if (e.button !== 0 || props.disabled || state.dragging) return;
+  /**
+   * A pointer went down on the slider. The slider captures it (`setPointerCapture`), so it gets the moves and the
+   * release also outside its box; nothing listens on the window for the pointer. The drag ends on the release, or is
+   * lost (`dragEnd`: the stored value comes back) when the capture ends without one, the window loses the focus
+   * (alt-tab) or the page is hidden.
+   */
+  const begin = (e: PointerEvent) => {
+    const slider = input;
+    if (e.button !== 0 || props.disabled || state.dragging || !slider) return;
     pointer = { x: e.clientX, y: e.clientY };
     dispatch({ type: "down" });
-    const move = (ev: MouseEvent) => {
+    try {
+      slider.setPointerCapture(e.pointerId);
+    } catch {
+      // not an active pointer any more: the release and the window events still end the drag
+    }
+    const move = (ev: PointerEvent) => {
       pointer = { x: ev.clientX, y: ev.clientY };
     };
-    // `change` is the normal end of a drag and comes with the release; this is the net for an engine that does not send it
-    const up = () => {
+    const end = (signal: DragSignal, pressed = false) => {
+      if (signal === "pointerup") {
+        stop();
+        // `change` is the normal end of a drag and comes with the release; this is the net for an engine that does not send it
+        window.setTimeout(() => dispatch(dragEnd("pointerup", false, Number(slider.value))!), 0);
+        return;
+      }
+      const event = dragEnd(signal, pressed);
+      if (!event) return;
       stop();
-      window.setTimeout(() => dispatch({ type: "release", value: input ? Number(input.value) : undefined }), 0);
+      dispatch(event);
     };
-    const cancel = () => {
-      stop();
-      dispatch({ type: "cancel" });
+    const up = () => end("pointerup");
+    const cancel = () => end("pointercancel");
+    const lost = (ev: PointerEvent) => end("lostpointercapture", (ev.buttons & 1) === 1);
+    const blur = () => end("blur");
+    const hidden = () => {
+      if (document.visibilityState === "hidden") end("hidden");
     };
     const stop = () => {
-      window.removeEventListener("pointermove", move, true);
-      window.removeEventListener("mousemove", move, true);
-      window.removeEventListener("pointerup", up, true);
-      window.removeEventListener("mouseup", up, true);
-      window.removeEventListener("pointercancel", cancel, true);
+      slider.removeEventListener("pointermove", move);
+      slider.removeEventListener("pointerup", up);
+      slider.removeEventListener("pointercancel", cancel);
+      slider.removeEventListener("lostpointercapture", lost);
+      window.removeEventListener("blur", blur);
+      document.removeEventListener("visibilitychange", hidden);
       stopTracking = undefined;
     };
-    window.addEventListener("pointermove", move, true);
-    window.addEventListener("mousemove", move, true);
-    window.addEventListener("pointerup", up, true);
-    window.addEventListener("mouseup", up, true);
-    window.addEventListener("pointercancel", cancel, true);
+    slider.addEventListener("pointermove", move);
+    slider.addEventListener("pointerup", up);
+    slider.addEventListener("pointercancel", cancel);
+    slider.addEventListener("lostpointercapture", lost);
+    window.addEventListener("blur", blur);
+    document.addEventListener("visibilitychange", hidden);
     stopTracking = stop;
   };
   onCleanup(() => stopTracking?.());
@@ -263,7 +310,6 @@ export function SizeControl(props: SizeControlProps): JSX.Element {
         aria-valuetext={shown() === 0 && props.zeroLabel ? props.zeroLabel : `${shown()}${props.unit ?? ""}`}
         style={{ "--dg-fill": `${fill()}%` }}
         onPointerDown={begin}
-        onMouseDown={begin}
         onKeyDown={(e) => {
           if (e.repeat && STEP_KEYS.has(e.key)) e.preventDefault();
         }}

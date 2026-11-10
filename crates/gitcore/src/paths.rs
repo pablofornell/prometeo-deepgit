@@ -26,8 +26,10 @@ pub fn canonicalize(path: &Path) -> io::Result<PathBuf> {
 /// path is not verbatim, or when it would mean something else without the prefix: Windows only
 /// reads a name that ends in a dot or a space, or a device name such as `NUL` or `COM1`, as a
 /// file when the path is verbatim.
-#[cfg(any(windows, test))]
-fn strip_verbatim(path: &str) -> Option<String> {
+///
+/// Pure string work, so it runs on every system: `workspace.json` files written before this rule
+/// still hold verbatim paths and are cleaned with it when they load.
+pub fn strip_verbatim(path: &str) -> Option<String> {
     let rest = path.strip_prefix(r"\\?\")?;
     let (plain, names) = if let Some(unc) = rest.strip_prefix(r"UNC\") {
         // server\share\names...
@@ -56,7 +58,6 @@ fn strip_verbatim(path: &str) -> Option<String> {
 }
 
 /// A file name that Windows reads the same way with and without the verbatim prefix.
-#[cfg(any(windows, test))]
 fn is_plain_name(name: &str) -> bool {
     if name == "." || name == ".." || name.ends_with('.') || name.ends_with(' ') {
         return false;

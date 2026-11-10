@@ -1,7 +1,7 @@
 // @vitest-environment node
 // The same cases as `project_names_are_validated` in src-tauri/src/workspace.rs.
 import { describe, expect, it } from "vitest";
-import { PROJECT_NAME_MAX, validateProjectName } from "./projectName";
+import { PROJECT_NAME_MAX, nameKey, uniqueProjectName, validateProjectName } from "./projectName";
 
 const projects = [{ id: "a", name: "a" }, { id: "b", name: "  Payments " }];
 const check = (name: string) => validateProjectName(name, projects, "a");
@@ -32,5 +32,34 @@ describe("validateProjectName", () => {
   });
   it("accepts the project's own name in another case", () => {
     expect(check("A")).toEqual({ name: "A" });
+  });
+});
+
+// The same cases as `names_are_compared_in_one_unicode_form_and_case` and `a_folder_with_a_taken_name_gets_a_number`.
+describe("nameKey", () => {
+  it("compares names in one Unicode form and case", () => {
+    // "\u00e9" precomposed (U+00E9) and as "e" + combining acute (U+0301)
+    expect(nameKey(" Caf\u00e9 ")).toBe(nameKey("CAFE\u0301"));
+    expect(nameKey("\u03a3\u03c3\u03c2")).toBe("\u03c3\u03c3\u03c3");
+    expect(nameKey("Stra\u017fe")).toBe(nameKey("STRASE"));
+    expect(nameKey("api")).not.toBe(nameKey("apl"));
+    const ps = [{ id: "a", name: "a" }, { id: "b", name: "Caf\u00e9" }];
+    expect(validateProjectName("cafe\u0301", ps, "a")).toEqual({ error: 'Another project is already called "Caf\u00e9".' });
+  });
+});
+
+describe("uniqueProjectName", () => {
+  it("numbers a name that another project has", () => {
+    const ps: { name: string }[] = [];
+    const add = (name: string) => {
+      const n = uniqueProjectName(name, ps);
+      ps.push({ name: n });
+      return n;
+    };
+    expect(add("api")).toBe("api");
+    expect(add("api")).toBe("api (2)");
+    expect(add("API")).toBe("API (3)");
+    expect(add("caf\u00e9")).toBe("caf\u00e9");
+    expect(add("Cafe\u0301")).toBe("Cafe\u0301 (2)");
   });
 });

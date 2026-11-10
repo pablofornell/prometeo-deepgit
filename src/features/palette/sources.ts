@@ -52,6 +52,14 @@ const EXTRAS: ExtraAction[] = [
   },
 ];
 
+/**
+ * Whether a stored action `key` can still run. A palette-only action ("x.") must be in `EXTRAS`; a keyboard binding
+ * counts as there (some are registered only while their view is open, and say so when picked).
+ */
+export function actionExists(key: string): boolean {
+  return !key.startsWith("x.") || EXTRAS.some((x) => x.key === key);
+}
+
 const ICON_BY_BINDING: Record<string, IconName> = {
   "git.fetchAll": "fetch", "git.pull": "pull", "git.pullAll": "pull", "git.push": "push", "git.newBranch": "newBranch",
   "git.stash": "stashPush", "view.refresh": "refresh", "settings.open": "gear", "tool.sidebar": "project",

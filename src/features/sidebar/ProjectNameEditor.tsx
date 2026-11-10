@@ -1,23 +1,37 @@
 /**
  * In-place rename of the project in the sidebar card: Enter saves, Esc cancels, leaving the field saves when the name
  * is valid (else cancels). The error under the field uses the backend's rules (`projectNameError`).
+ *
+ * The editor belongs to the project it was opened for (`rename.ts`): it reads the id and the name once, and when the
+ * card shows another project it saves nothing.
  */
-import { type JSX, Show, createSignal, onMount } from "solid-js";
+import { type JSX, Show, createSignal, onCleanup, onMount } from "solid-js";
 import { toApiError } from "../../api/tauri";
 import { TextField, toast } from "../../components/ui";
-import { projectNameError, renameProject } from "../../state/workspace";
+import { activeProject, projectNameError, renameProject } from "../../state/workspace";
+import { renameStep } from "./rename";
 
 export function ProjectNameEditor(props: { projectId: string; name: string; onDone: (renamed: boolean) => void }): JSX.Element {
-  const [value, setValue] = createSignal(props.name);
+  // read once: a later project switch must not turn this rename into one of another project
+  const projectId = props.projectId;
+  const original = props.name;
+  const [value, setValue] = createSignal(original);
   const [saveError, setSaveError] = createSignal<string | null>(null);
   const [busy, setBusy] = createSignal(false);
-  const error = () => saveError() ?? projectNameError(props.projectId, value());
+  const error = () => saveError() ?? projectNameError(projectId, value());
   let input: HTMLInputElement | undefined;
   let finished = false;
+  /** The field lost the focus while a save was running: an error then closes the editor (with a toast). */
+  let leftWhileBusy = false;
 
-  onMount(() => {
+  const focusAll = () => {
     input?.focus();
     input?.select();
+  };
+  onMount(focusAll);
+  // gone (the card shows another project): a blur or a save that ends later does nothing
+  onCleanup(() => {
+    finished = true;
   });
 
   const finish = (renamed: boolean) => {
@@ -27,25 +41,29 @@ export function ProjectNameEditor(props: { projectId: string; name: string; onDo
   };
 
   const save = async (leaving: boolean) => {
-    if (busy() || finished) return;
-    if (value().trim() === props.name) return finish(false);
-    if (projectNameError(props.projectId, value()) !== null) {
-      // Enter keeps the field open with the error; leaving it drops the invalid name
-      if (leaving) finish(false);
+    if (finished) return;
+    if (busy()) {
+      if (leaving) leftWhileBusy = true;
       return;
     }
+    const step = renameStep({ projectId, original, shownId: activeProject()?.id, value: value(), error: projectNameError(projectId, value()), leaving });
+    if (step.kind === "close") return finish(false);
+    if (step.kind === "keep") return;
     setBusy(true);
     try {
-      await renameProject(props.projectId, value());
+      await renameProject(step.projectId, step.name);
       finish(true);
     } catch (e) {
       setBusy(false);
+      if (finished) return;
       const message = toApiError(e).message;
-      if (leaving) {
+      if (leaving || leftWhileBusy) {
         toast({ kind: "error", title: "Could not rename the project", body: message });
         finish(false);
       } else {
         setSaveError(message);
+        // the field kept the focus (read-only, not disabled, while busy); take it back anyway so Esc and leaving work
+        focusAll();
       }
     }
   };
@@ -61,8 +79,10 @@ export function ProjectNameEditor(props: { projectId: string; name: string; onDo
         inputRef={(el) => (input = el)}
         error={error() !== null}
         aria-label="Project name"
-        aria-describedby={error() ? `${props.projectId}-rename-error` : undefined}
-        disabled={busy()}
+        aria-describedby={error() ? `${projectId}-rename-error` : undefined}
+        // read-only, not disabled: a disabled field loses the focus (WebKit blurs it), and then Esc and blur do nothing
+        readOnly={busy()}
+        aria-busy={busy() ? true : undefined}
         onKeyDown={(e) => {
           if (e.key === "Enter") {
             e.preventDefault();
@@ -81,7 +101,7 @@ export function ProjectNameEditor(props: { projectId: string; name: string; onDo
       />
       <Show when={error()}>
         {(m) => (
-          <span class="dg-sidebar-rename-error" id={`${props.projectId}-rename-error`} role="alert">
+          <span class="dg-sidebar-rename-error" id={`${projectId}-rename-error`} role="alert">
             {m()}
           </span>
         )}
