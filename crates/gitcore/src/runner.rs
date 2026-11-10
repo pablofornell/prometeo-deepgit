@@ -134,7 +134,7 @@ impl Git {
     /// the installed git supports.
     pub fn new(git_bin: Option<PathBuf>) -> Self {
         let bin = git_bin.unwrap_or_else(|| PathBuf::from("git"));
-        let end_of_options = Command::new(&bin)
+        let end_of_options = no_window(&mut Command::new(&bin))
             .arg("--version")
             .stdin(Stdio::null())
             .output()
@@ -408,7 +408,7 @@ impl Git {
     /// True when the repo's `index.lock` exists (a killed `git pull` can leave it behind). The
     /// file is never removed: another git process of the user may own it.
     fn index_lock_exists(&self, repo: &Path) -> bool {
-        Command::new(&self.bin)
+        no_window(&mut Command::new(&self.bin))
             .arg("-C")
             .arg(repo)
             .args(["rev-parse", "--git-path", "index.lock"])
@@ -424,6 +424,7 @@ impl Git {
     /// True when `core.sshCommand` is configured for the repo (it would lose against the env var).
     fn ssh_command_configured(&self, repo: Option<&Path>) -> bool {
         let mut cmd = Command::new(&self.bin);
+        no_window(&mut cmd);
         if let Some(repo) = repo {
             cmd.arg("-C").arg(repo);
         }
@@ -492,11 +493,7 @@ impl Git {
             // Who may ask for a password, and how ssh behaves (see `apply_auth_env`).
             self.apply_auth(&mut cmd, Some(repo), ticket);
         }
-        #[cfg(windows)]
-        {
-            use std::os::windows::process::CommandExt;
-            cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
-        }
+        no_window(&mut cmd);
         #[cfg(unix)]
         if limits.is_some() {
             // A new session: its own process group, so a timeout can kill git together with ssh and
@@ -716,13 +713,27 @@ fn kill_tree(child: &mut std::process::Child) {
 /// `taskkill /T` takes the children (ssh, credential helpers) down with git. Untested on Windows.
 #[cfg(not(unix))]
 fn kill_tree(child: &mut std::process::Child) {
-    let _ = Command::new("taskkill")
+    let _ = no_window(&mut Command::new("taskkill"))
         .args(["/PID", &child.id().to_string(), "/T", "/F"])
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .status();
     let _ = child.kill();
+}
+
+/// Every spawn goes through this. The release app is a GUI-subsystem binary, and on Windows a GUI
+/// app that starts a console program (git, taskkill) opens a console window for it: a flash.
+/// CREATE_NO_WINDOW gives the child a hidden console that its own children (ssh, credential
+/// helpers) share. Not DETACHED_PROCESS: with no console at all, each of those children would
+/// open a new one and flash.
+fn no_window(cmd: &mut Command) -> &mut Command {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+    }
+    cmd
 }
 
 /// First argument that is not an option (the git subcommand).
