@@ -89,7 +89,7 @@ The window has these parts:
 | Part | Where | What it does |
 |---|---|---|
 | Title bar | Top | Project switcher, branch widget, Fetch, Pull and Push buttons, Search Everywhere field, Git console button, notifications, settings, window buttons. |
-| Tool stripe | Left edge | Buttons for the Project sidebar (`Alt+1`), Local changes (`Alt+0`), Branch matrix (`Alt+2`), Stashes (`Alt+3`, shows the sidebar) and Git console (`Alt+9`). Also the notifications button. |
+| Tool stripe | Left edge | Buttons for the Project sidebar (`Alt+1`), Local changes (`Alt+0`), Branch matrix (`Alt+2`) and Git console (`Alt+9`). Also the notifications button. |
 | Sidebar | Left | The project card and the tree of repositories, branches, tags and stashes. |
 | Main island | Centre | Two tabs: **Log** and **Local changes**. |
 | Right column | Right of the main island | Two tabs. **Changed files** shows the selected commit and its changed files. **File changes** shows the diff of the selected file. |
@@ -877,7 +877,6 @@ While a menu, popup or dialog is open, most shortcuts do not work.
 | `Alt+1` | Show or hide the sidebar |
 | `Alt+0` | Switch between **Local changes** and **Log** |
 | `Alt+2` | Show or hide the branch matrix |
-| `Alt+3` | Show the sidebar (stashes) |
 | `Alt+9` | Show or hide the Git console |
 | `Ctrl+D` | Show the **File changes** tab (the diff) |
 | `Shift+Esc` | Hide the bottom tool window |

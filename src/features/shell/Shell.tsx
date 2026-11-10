@@ -16,7 +16,7 @@ import { LogView } from "../log/LogView";
 import { Sidebar } from "../sidebar/Sidebar";
 import { StatusBar } from "../statusbar/StatusBar";
 import { TitleBar } from "../titlebar/TitleBar";
-import { bottomTool, openBottomTool, setSidebarVisible, sidebarVisible, toggleBottomTool, toggleSidebar, type BottomTool } from "../../state/layout";
+import { bottomTool, openBottomTool, sidebarVisible, toggleBottomTool, toggleSidebar, type BottomTool } from "../../state/layout";
 import { changesScopeCount, detailsTab, mainTab, setDetailsTab, setMainTab } from "../../state/selection";
 import { activeProject, selectedRepos } from "../../state/workspace";
 import { keysFor, formatKeys, register } from "../../state/keymap";
@@ -152,7 +152,6 @@ export function Shell(): JSX.Element {
           <StripeButton icon="project" label="Project" keys={keyOf("tool.sidebar")} active={sidebarVisible()} onClick={toggleSidebar} />
           <StripeButton icon="changes" label="Local changes" keys={keyOf("tool.changes")} active={mainTab() === "changes"} count={changesScopeCount()} onClick={() => setMainTab(mainTab() === "changes" ? "log" : "changes")} />
           <StripeButton icon="matrix" label="Branch matrix" keys={keyOf("tool.matrix")} active={bottomTool() === "matrix"} onClick={() => toggleBottomTool("matrix")} />
-          <StripeButton icon="stash" label="Stashes" keys={keyOf("tool.stashes")} onClick={() => setSidebarVisible(true)} />
           <span class="dg-grow" />
           <StripeButton icon="console" label="Git console" keys={keyOf("tool.console")} active={bottomTool() === "console"} onClick={() => toggleBottomTool("console")} />
           <button type="button" class="dg-shell-stripe-btn" aria-label="Notifications" {...tip("Notifications")} onClick={notificationsMenu}>

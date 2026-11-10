@@ -470,7 +470,7 @@ The tooltip on Pull and Push lists each repo with its count.
 ### 5.2 Tool stripe (40 px)
 
 1. Buttons are 30 × 30, radius 6, icon 18 px, gap 4, centred in the 40 px column.
-2. Top group: Project (`Alt+1`), Local changes (`Alt+0`), Branch matrix (`Alt+2`), Stashes (`Alt+3`).
+2. Top group: Project (`Alt+1`), Local changes (`Alt+0`), Branch matrix (`Alt+2`).
 3. Bottom group: Git console (`Alt+9`), Notifications.
 4. The selected button has `--dg-stripe-button-selected-bg` and a white icon.
 5. A counter badge sits at the bottom right of the button: height 14, min width 14, radius 7, 9/600 text, 2 px ring of `--dg-window-bg`. Local changes shows the number of changed files.
@@ -973,7 +973,6 @@ Windows/Linux keys. On macOS, `Ctrl` becomes `Cmd` and `Alt` becomes `Option`.
 | Tool windows | `Alt+1` | Project sidebar |
 | Tool windows | `Alt+0` | Local changes |
 | Tool windows | `Alt+2` | Branch matrix |
-| Tool windows | `Alt+3` | Stashes |
 | Tool windows | `Alt+9` | Git console |
 | Tool windows | `Esc` | Return focus to the log |
 | Tool windows | `Ctrl+D` | Show the **File changes** tab (the diff) |

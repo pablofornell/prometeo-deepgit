@@ -5,7 +5,7 @@
  */
 import * as actions from "./actions";
 import { notifyRepoChanged } from "./events";
-import { openBottomTool, setSidebarVisible, toggleBottomTool, toggleSidebar } from "./layout";
+import { openBottomTool, toggleBottomTool, toggleSidebar } from "./layout";
 import { register } from "./keymap";
 import { detailsTab, mainTab, setDetailsTab, setMainTab } from "./selection";
 import { toggleTheme } from "./settings";
@@ -20,7 +20,6 @@ export function registerGlobalShortcuts(): void {
   const g = (title: string) => ({ title, group: "Global", when: hasProject, allowInInput: true });
   register("tool.sidebar", "Alt+1", toggleSidebar, { title: "Toggle project sidebar", group: "Tool windows" });
   register("tool.changes", "Alt+0", () => setMainTab(mainTab() === "changes" ? "log" : "changes"), { title: "Show local changes", group: "Tool windows", when: hasProject });
-  register("tool.stashes", "Alt+3", () => setSidebarVisible(true), { title: "Show the sidebar (stashes)", group: "Tool windows", when: hasProject });
   register("tool.matrix", "Alt+2", () => toggleBottomTool("matrix"), { title: "Toggle branch matrix", group: "Tool windows", when: hasProject });
   register("tool.console", "Alt+9", () => toggleBottomTool("console"), { title: "Toggle git console", group: "Tool windows" });
   register("tool.diff", "Ctrl+D", () => setDetailsTab("diff"), { title: "Show file changes (the diff)", group: "Tool windows", allowInInput: true });
