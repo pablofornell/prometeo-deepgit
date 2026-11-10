@@ -14,7 +14,7 @@ import { selectFile, selectedCommit, setChangesRepoId, setMainTab, setSelectedCo
 import { settings, setSetting } from "../../state/settings";
 import {
   activeProject, addProject, focusedRepo, projectRepos, rescanProject, selectAllRepos, selectOnlyRepo,
-  selectedRepoIds, setFocusedRepoId, toggleRepo,
+  selectedRepoIds, setFocusedRepoId, summary, toggleRepo,
 } from "../../state/workspace";
 
 export type ItemKind = "action" | "branch" | "commit" | "file" | "repo";
@@ -50,6 +50,14 @@ const EXTRAS: ExtraAction[] = [
   { key: "x.pushAll", title: "Push all repositories…", icon: "push", group: "Git", run: () => void actions.push(projectRepos().map((r) => r.id)) },
   { key: "x.stashAll", title: "Stash changes in all repositories…", icon: "stashPush", group: "Git", run: () => void actions.stashSave(projectRepos().map((r) => r.id)) },
   { key: "x.tagHead", title: "New tag on HEAD…", icon: "tag", group: "Git", run: () => { const r = focusedRepo(); if (r) void actions.tagCreate([r.id], "HEAD", "HEAD"); } },
+  {
+    key: "x.resolveConflicts", title: "Resolve conflicts…", icon: "conflict", group: "Git",
+    run: () => {
+      const ids = projectRepos().filter((r) => (summary(r.id)?.conflicted ?? 0) > 0).map((r) => r.id);
+      if (ids.length > 0) void actions.openConflicts(ids);
+      else toast({ kind: "info", title: "No conflicts", body: "No repository of this project has conflicted files." });
+    },
+  },
 ];
 
 const ICON_BY_BINDING: Record<string, IconName> = {

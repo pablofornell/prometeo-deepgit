@@ -17,6 +17,7 @@ Each folder in `src/features/` is one feature with **one root component** (names
 | `welcome/` | `Welcome()` | Shown when the workspace has no project. Keep the drag bar + `WindowControls`. |
 | `settings/` | `SettingsDialog`, `registerSettings()`, `SettingsHost` | Settings window and zoom keys. Sections are plain files, see "Settings sections" below. |
 | `dialogs/` | `registerAllDialogs()` | Add `registerDialog(name, Component)` lines. |
+| `merge/` | `registerMergeDialogs()` | No tab of its own: dialogs `conflicts` (`ConflictsDialog`) and `mergeFile` (`MergeFileDialog`), registered from `App`, opened with `actions.openConflicts` / `actions.openMerge`. It also reads `features/diff/syntax.ts` and `wordDiff.ts` (allowed here: they are pure helpers). See "Merge conflicts" below. |
 | `shell/` | `Shell()` | Window layout (the right column tabs live here). Owned by the foundation, not by feature agents. |
 
 Files in `titlebar/ ... welcome/` currently hold **stubs**. Replace the stub, keep the export name and props.
@@ -96,6 +97,8 @@ actions.deleteBranch(ids, name); actions.renameBranch(repoId, name); actions.che
 actions.opContinue(ids); actions.opAbort(ids); actions.opSkip(ids);
 actions.stage(repoId, paths); actions.unstage(repoId, paths); actions.discard(repoId, paths); actions.commit(ids, message, { amend, signOff });
 actions.stageHunk(repoId, path, index, reverse); actions.discardHunk(repoId, path, index);
+actions.openConflicts(ids); actions.openMerge(repoId, path);                // conflicts dialog / merge window
+actions.acceptSide(repoId, paths, "ours" | "theirs"); actions.saveResolution(repoId, path, content, expectedOursOid, resolved);
 ```
 
 Every action resolves to a `BatchResult { ok, skipped, failed, conflicts, cancelled, results }` and never rejects. Toasts, the
@@ -106,7 +109,7 @@ summary refresh are done for you. To add a new action, add it to `actions.ts` wi
 
 `registerDialog(name, Component)` and `showDialog(name, props) -> Promise<result | undefined>` (undefined = cancelled).
 Names and their `props` / `result` types are in `DialogRegistry`: `newBranch`, `renameBranch`, `merge`, `rebase`, `reset`,
-`confirm` (done), `push`, `stash`, `tag`, `checkoutRemote`, `settings` (`features/settings`, props `{ section? }`), `clone`, `auth` (opened by `state/auth.ts`, not by features). Until a name is registered `showDialog` falls back to
+`confirm` (done), `push`, `stash`, `tag`, `checkoutRemote`, `settings` (`features/settings`, props `{ section? }`), `clone`, `auth` (opened by `state/auth.ts`, not by features), `conflicts`, `mergeFile`. Until a name is registered `showDialog` falls back to
 `window.prompt` / `confirm`. A dialog component receives its props plus `close(result?)`:
 
 ```tsx
@@ -154,6 +157,32 @@ Rules (keep them simple; change them here and in `DESIGN.md` 2.3 together):
 5. Width: persisted `deepgit.ui.split.details` (px, set by dragging the splitter). Without a value the column takes 42 % of the row. It is clamped on every use (min 320 px, the log keeps 480 px). **Maximize** (button next to the tabs, double-click on the File changes tab) shows the column at row width minus a strip of at least 200 px for the log; it is not persisted and ends when the user leaves File changes or drags the splitter. See `shell/widths.ts`.
 6. Diff layout: the user's choice of this session (`explicitDiffMode` in `diff/diffPrefs.ts`, set by the header switch and `Ctrl+Alt+D`) wins; otherwise a diff pane narrower than 720 px (`NARROW_DIFF_PX`) uses unified; otherwise the saved `diffMode` setting. Hunk buttons and `F7` work in both layouts.
 7. Old localStorage values are ignored: `diffVisible` is never read, `shell.ratios` keeps only `bottom` (`sanitizeRatios`).
+
+## Merge conflicts (`features/merge/`)
+
+Behaviour is ported from IntelliJ (`MergeConflictModel`, `MergeModelBase`, `MergeRangeUtil`, `MergeResolveUtil`); the UI is the view.
+
+| File | What |
+|---|---|
+| `seqDiff.ts` | Myers diff (`diffSeq`) and the three-way merge ranges (`mergeRanges`, a port of `ComparisonMergeUtil.buildSimple`). |
+| `resolve.ts` | `tryResolveText(left, base, right)`: "magic resolve" at word level (tries exact, then ignoring whitespace). Returns `null` when the sides changed the same words differently. |
+| `model.ts` | `MergeModel(base, left, right)` (left = Yours, right = Theirs): `chunks` with `type` (`inserted` / `deleted` / `modified` / `conflict`), `leftChange` / `rightChange`, `resolvable`, per-side resolved flags and the range in the Result; `applyChange`, `ignoreChange`, `applyNonConflicting("left" \| "right" \| "all")`, `magicResolve`, `magicResolveAll`, `resolveAutomatically`, `acceptAll`, `reset`, `counts()`, `nextUnresolved`, `documentEdits` (the Result was edited by hand), `snapshot` / `restore` (undo), `resultText()`, `resultWithMarkers(labels)`. `classify` is the classification table. Pure: tests are `*.test.ts` next to it. |
+| `scrollSync.ts` | Anchors of the three panes and `mapLine` (scroll sync). |
+| `editor.ts` | The CodeMirror 6 glue (no Solid): `createPane`, line marks for the chunks, syntax colours from `features/diff/syntax.ts`, the undo link (`modelState` effect + `invertedEffects`). |
+| `ThreeWay.tsx` | The three panes, the bands and buttons in the gutters, toolbar, keys, save. |
+| `SideChoice.tsx` | Delete/modify and binary files: keep one whole side. |
+| `MergeFileDialog.tsx`, `ConflictsDialog.tsx` | The dialogs `mergeFile` and `conflicts`. |
+
+Rules to keep:
+
+- **Yours / Theirs** are the user's view. The backend already swaps the git stages during a rebase (`ConflictVersions.swapped`);
+  the UI never maps stages. Left pane = `versions.ours`, right pane = `versions.theirs`.
+- Text is edited with LF. `normalizeText(text, versions.eol)` turns CRLF into LF for CRLF files; `saveResolution` converts back.
+- Only UTF-8 text without NUL bytes reaches the editor (`ConflictBlob.text` is `null` otherwise); such files only get Accept Yours / Theirs.
+- Save: all conflicts resolved = `saveResolution(..., resolved = true)` (written and staged); conflicts left = the model's
+  `resultWithMarkers` with `resolved = false` (written with `<<<<<<<` blocks, not staged). Pass the `oid` of the Yours blob as `expectedOursOid`.
+- A hand edit inside a change resolves it (`byHand`); undoing the edit opens it again. Model actions are one undo step each.
+- The mock backend mirrors the Rust rules (path checks, "no longer in conflict", stale blob, binary). Extend `mockConflicts.ts` for new demos.
 
 ## UI components (`src/components/ui`, `import { ... } from "../../components/ui"`)
 
@@ -223,5 +252,7 @@ Zoom keys (`Ctrl+=`, `Ctrl++`, `Ctrl+-`, `Ctrl+0`) are registered in `features/s
 - `npm run dev` runs the whole UI in a browser on the mock backend (`src/api/mock.ts`: project "payments-platform" with 6 repos of
   ~1000-2500 commits, project "deepgit"). In dev, `window.__deepgit` exposes `{ actions, workspace, selection, settings, layout, api }`
   for Playwright scripts and the console. If you need data the mock does not have, extend the mock (`src/api/mock*.ts`) and say so.
-- Conflict demos in the mock: merge or rebase a branch whose name contains `spike` or `conflict`.
+- Conflict demos in the mock: `docs-site` is merging with 4 conflicted files (a real conflict, a file that merges automatically,
+  delete/modify, a binary file) and `ledger-service` is rebasing with 2 (Yours and Theirs swapped); merging or rebasing a branch whose
+  name contains `spike` or `conflict` makes new ones (`mockConflicts.ts`).
 - Login demos in the mock: fetch, pull or push of `docs-site`, or a clone of an https URL with "private" in it, opens the login dialog (`api/mockAuth.ts`). The auto-fetch never does (it runs with `background`).

@@ -1,4 +1,4 @@
-//! Merge conflicts (PLAN.md section 5.6): the list of unmerged files, the three versions of one
+//! Merge conflicts (PLAN.md section 5.8): the list of unmerged files, the three versions of one
 //! file, accepting one side, and saving a resolution made by hand.
 //!
 //! A file is unmerged when the index holds stages 1 (base), 2 and 3 for it

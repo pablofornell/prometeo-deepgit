@@ -4,6 +4,7 @@
  */
 import type { FileChange, RepoInfo, RepoStateKind, Stash } from "./types";
 import { toFileChange } from "./mockDiff";
+import { DOCS_SITE_CONFLICTS, DOCS_SITE_CONTEXT, LEDGER_CONFLICTS, LEDGER_CONTEXT, type MockConflict, type MockConflictContext } from "./mockConflicts";
 
 // ---------------------------------------------------------------- random helpers
 
@@ -94,6 +95,10 @@ export interface MockRepo {
   head: { branch: string | null; oid: string };
   stashes: MockStash[];
   wt: { staged: FileChange[]; unstaged: FileChange[]; conflicted: FileChange[] };
+  /** The unmerged files by path, with their index stages (see `mockConflicts.ts`); `wt.conflicted` lists the same paths. */
+  conflicts: Map<string, MockConflict>;
+  /** What the labels of the merge window say about the operation in progress. */
+  conflictCtx: MockConflictContext | null;
   state: RepoStateKind;
   fetches: number;
   filePool: string[];
@@ -249,6 +254,8 @@ export function generateRepo(info: RepoInfo, url: string, sc: Scenario, nowSec: 
     head: { branch: "main", oid: "" },
     stashes: [],
     wt: { staged: [], unstaged: [], conflicted: [] },
+    conflicts: new Map(),
+    conflictCtx: null,
     state: sc.state ?? "clean",
     fetches: 0,
     filePool: dom.files,
@@ -427,9 +434,19 @@ export function generateRepo(info: RepoInfo, url: string, sc: Scenario, nowSec: 
       repo.wt.unstaged.push(toFileChange(p, null, "untracked", "wt-untracked-" + p));
     }
   }
-  for (let i = 0; i < (sc.conflicts ?? 0); i++) {
-    const p = pick(n++ + 3);
-    repo.wt.conflicted.push({ path: p, oldPath: null, status: "conflicted", additions: null, deletions: null, binary: false });
+  // Demo conflicts with real file versions (merge window): docs-site is merging, ledger-service is rebasing.
+  const demo = info.name === "docs-site" ? { list: DOCS_SITE_CONFLICTS, ctx: DOCS_SITE_CONTEXT } : info.name === "ledger-service" ? { list: LEDGER_CONFLICTS, ctx: LEDGER_CONTEXT } : null;
+  if (demo) {
+    for (const c of demo.list) {
+      repo.conflicts.set(c.path, c);
+      repo.wt.conflicted.push({ path: c.path, oldPath: null, status: "conflicted", additions: null, deletions: null, binary: false });
+    }
+    repo.conflictCtx = demo.ctx;
+  } else {
+    for (let i = 0; i < (sc.conflicts ?? 0); i++) {
+      const p = pick(n++ + 3);
+      repo.wt.conflicted.push({ path: p, oldPath: null, status: "conflicted", additions: null, deletions: null, binary: false });
+    }
   }
   for (let i = 0; i < (sc.stashes ?? 0); i++) {
     const c = repo.byOid.get(mainTip);
@@ -456,7 +473,7 @@ export const SCENARIOS: Scenario[] = [
   { name: "refunds-worker", color: 2, commits: 2100, head: "main", behind: 2, remoteOnly: ["feature/PAY-2318-refunds"] },
   { name: "web-checkout", color: 3, commits: 2400, head: "main", dirty: { staged: 0, unstaged: 3, untracked: 0 }, remoteOnly: ["feature/PAY-2318-refunds"] },
   { name: "shared-proto", color: 4, commits: 900, head: "main" },
-  { name: "docs-site", color: 5, commits: 1200, head: "main", ahead: 1, stashes: 1 },
+  { name: "docs-site", color: 5, commits: 1200, head: "main", ahead: 1, stashes: 1, state: "merging", conflicts: 4 },
   { name: "deepgit", color: 6, commits: 700, head: "main", dirty: { staged: 1, unstaged: 2, untracked: 1 } },
 ];
 

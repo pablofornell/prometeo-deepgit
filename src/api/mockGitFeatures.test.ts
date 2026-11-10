@@ -22,8 +22,8 @@ async function topCommit(repoId: string): Promise<CommitRow> {
 }
 
 /** A branch `side` that is one commit ahead of main; the repo is back on main. With `diverge`, main has a commit of its own too. */
-async function sideBranch(repoId: string, diverge: boolean): Promise<void> {
-  await call("branch_create", { repoId, name: "side", startPoint: "main", checkout: true });
+async function sideBranch(repoId: string, diverge: boolean, name = "side"): Promise<void> {
+  await call("branch_create", { repoId, name, startPoint: "main", checkout: true });
   await call("revert", { repoId, oid: "HEAD" });
   await call("checkout", { repoId, target: "main" });
   if (diverge) await call("revert", { repoId, oid: "HEAD" });
@@ -31,12 +31,12 @@ async function sideBranch(repoId: string, diverge: boolean): Promise<void> {
 
 describe("mock merge", () => {
   it("fast-forwards by default and with ffOnly when it can", async () => {
-    const [, , , , , docs] = await repoIds();
-    await sideBranch(docs, false);
-    const side = (await call<{ local: { name: string; oid: string }[] }>("refs", { repoId: docs })).local.find((b) => b.name === "side")?.oid;
-    const r = await merge(docs, "side", { mode: "ffOnly" });
+    const [, , refunds] = await repoIds();
+    await sideBranch(refunds, false, "ff-side");
+    const side = (await call<{ local: { name: string; oid: string }[] }>("refs", { repoId: refunds })).local.find((b) => b.name === "ff-side")?.oid;
+    const r = await merge(refunds, "ff-side", { mode: "ffOnly" });
     expect(r).toMatchObject({ ok: true, message: "Fast-forward" });
-    expect((await call<{ local: { name: string; oid: string }[] }>("refs", { repoId: docs })).local.find((b) => b.name === "main")?.oid).toBe(side);
+    expect((await call<{ local: { name: string; oid: string }[] }>("refs", { repoId: refunds })).local.find((b) => b.name === "main")?.oid).toBe(side);
   });
 
   it("noFf makes a merge commit even when it could fast-forward, with the message", async () => {
@@ -115,13 +115,14 @@ describe("mock merge", () => {
   });
 
   it("puts the options in the console entry like the backend arguments", async () => {
-    const [, , , , , docs] = await repoIds();
+    const [, , , web] = await repoIds();
+    await sideBranch(web, true, "console-side");
     const seen: ConsoleEntry[] = [];
     const off = mockListen("git-console", (p) => seen.push(p as ConsoleEntry));
-    await merge(docs, "side", { mode: "noFf", message: "x y", allowUnrelatedHistories: true });
+    await merge(web, "console-side", { mode: "noFf", message: "x y", allowUnrelatedHistories: true });
     off();
     const entry = seen.find((e) => e.args[0] === "merge");
-    expect(entry?.args).toEqual(["merge", "--no-edit", "--no-ff", "--allow-unrelated-histories", "-m", "x y", "--end-of-options", "side"]);
+    expect(entry?.args).toEqual(["merge", "--no-edit", "--no-ff", "--allow-unrelated-histories", "-m", "x y", "--end-of-options", "console-side"]);
   });
 });
 

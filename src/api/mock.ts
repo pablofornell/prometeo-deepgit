@@ -14,10 +14,11 @@ import {
 } from "./mockData";
 import { addColoredProject, colorizeRepos, parseColorChoice, setProjectColor, setRepoColor } from "./mockColors";
 import { buildFileDiff, fileText, toFileChange } from "./mockDiff";
+import { entryOf, genericConflicts, hasStage, isTextConflict, sideStages, versionsOf, yoursOid, type MockConflict } from "./mockConflicts";
 import type {
-  CloneOpts, CloneProgress, CloneResult, CloneTarget, CommitDetails, CommitRow, ConsoleEntry, DiffSpec, FileChange, FileDiff, GraphRow,
-  LocalBranch, LogQuery, LogSessionInfo, MergeMode, MergeOpts, OpResult, Project, RefLabel, Refs, RepoChanged, RepoInfo, RepoSummary,
-  ResetMode, Workspace, WorkingTree,
+  CloneOpts, CloneProgress, CloneResult, CloneTarget, CommitDetails, CommitRow, ConflictEntry, ConflictLabels, ConflictVersions, ConsoleEntry, DiffSpec,
+  FileChange, FileDiff, GraphRow, LocalBranch, LogQuery, LogSessionInfo, MergeMode, MergeOpts, OpResult, Project, RefLabel, Refs, RepoChanged, RepoInfo,
+  RepoSummary, ResetMode, Workspace, WorkingTree,
 } from "./types";
 
 type Args = Record<string, unknown>;
@@ -452,10 +453,47 @@ const conflict = (message: string): OpResult => ({ ok: false, message, conflicts
 const wtDirty = (repo: MockRepo) => repo.wt.staged.length + repo.wt.unstaged.filter((f) => f.status !== "untracked").length > 0;
 const wouldConflict = (name: string) => /spike|conflict/i.test(name);
 
-function enterConflictState(repo: MockRepo, kind: "merging" | "rebasing" | "cherryPicking" | "reverting"): void {
+function enterConflictState(repo: MockRepo, kind: "merging" | "rebasing" | "cherryPicking" | "reverting", theirs: string): void {
   repo.state = kind;
   const pool = repo.filePool;
-  repo.wt.conflicted = [pool[1 % pool.length], pool[4 % pool.length]].map((p) => ({ path: p, oldPath: null, status: "conflicted", additions: null, deletions: null, binary: false }));
+  const found = genericConflicts([pool[1 % pool.length], pool[4 % pool.length]]);
+  repo.conflicts = new Map(found.map((c) => [c.path, c]));
+  repo.wt.conflicted = found.map((c) => ({ path: c.path, oldPath: null, status: "conflicted", additions: null, deletions: null, binary: false }));
+  const head = repo.byOid.get(repo.head.oid);
+  repo.conflictCtx = { theirs, replayed: kind === "rebasing" ? `${short(repo.head.oid)} ${head?.subject ?? ""}`.trim() : undefined };
+}
+
+// ---------------------------------------------------------------- conflicts (mirror of gitcore::conflicts)
+
+/** The same checks as `check_path` of the Rust backend (same messages). */
+function checkConflictPath(path: string): void {
+  if (path === "") fail("empty path");
+  if (path.startsWith("-")) fail(`Invalid path ${JSON.stringify(path)}: it cannot start with '-'.`);
+  if (/[\0\n\r]/.test(path)) fail(`Invalid path ${JSON.stringify(path)}: it contains a control character.`);
+  if (path.startsWith("/") || path.split("/").includes("..")) fail(`path outside the repo: ${path}`);
+}
+
+function conflictOf(repo: MockRepo, path: string): MockConflict {
+  return repo.conflicts.get(path) ?? fail(`${path} is no longer in conflict.`);
+}
+
+const isRebasing = (repo: MockRepo) => repo.state === "rebasing";
+
+function conflictLabels(repo: MockRepo): ConflictLabels {
+  const ctx = repo.conflictCtx;
+  const branch = repo.head.branch ?? `HEAD ${short(repo.head.oid)}`;
+  const ours = isRebasing(repo) && ctx?.replayed ? `${branch} (${ctx.replayed})` : branch;
+  return { ours, theirs: ctx?.theirs ?? "Theirs", base: "Base" };
+}
+
+/** The file is resolved: it leaves the conflict list and (like `git add`) shows up as staged. */
+function markConflictResolved(repo: MockRepo, path: string, status: "modified" | "deleted"): void {
+  repo.conflicts.delete(path);
+  repo.wt.conflicted = repo.wt.conflicted.filter((f) => f.path !== path);
+  const next = toFileChange(path, null, status, "wt-staged-" + path);
+  const prev = repo.wt.staged.findIndex((f) => f.path === path);
+  if (prev >= 0) repo.wt.staged[prev] = next;
+  else repo.wt.staged.push(next);
 }
 
 function rebaseOnto(repo: MockRepo, ontoOid: string): string {
@@ -682,6 +720,7 @@ const handlers: Record<string, Handler> = {
         const i = list.findIndex((f) => f.path === p);
         if (i < 0) continue;
         const [f] = list.splice(i, 1);
+        repo.conflicts.delete(p);
         const status = f.status === "untracked" ? "added" : f.status === "conflicted" ? "modified" : f.status;
         const prev = repo.wt.staged.findIndex((s) => s.path === p);
         const next = f.status === "conflicted" ? toFileChange(p, null, "modified", "wt-staged-" + p) : { ...f, status };
@@ -709,6 +748,7 @@ const handlers: Record<string, Handler> = {
     const paths = strs(a.paths);
     repo.wt.unstaged = repo.wt.unstaged.filter((f) => !paths.includes(f.path));
     repo.wt.conflicted = repo.wt.conflicted.filter((f) => !paths.includes(f.path));
+    for (const p of paths) repo.conflicts.delete(p);
     c.git(repo, ["restore", "--worktree", "--", ...paths]);
     emitChanged(repo);
   },
@@ -876,7 +916,7 @@ const handlers: Record<string, Handler> = {
       fail("Cannot fast-forward: the branches have diverged. Choose another merge mode.", "fatal: Not possible to fast-forward, aborting.");
     }
     if (wouldConflict(target)) {
-      enterConflictState(repo, "merging");
+      enterConflictState(repo, "merging", target);
       c.git(repo, gitArgs, { stdout: `Auto-merging ${repo.wt.conflicted[0].path}\nCONFLICT (content): Merge conflict in ${repo.wt.conflicted[0].path}\nAutomatic merge failed; fix conflicts and then commit the result.\n`, exit: 1 });
       emitChanged(repo);
       return conflict(`CONFLICT (content): Merge conflict in ${repo.wt.conflicted[0].path}\nAutomatic merge failed; fix conflicts and then commit the result.`);
@@ -916,7 +956,7 @@ const handlers: Record<string, Handler> = {
       return ok("Fast-forwarded");
     }
     if (wouldConflict(onto)) {
-      enterConflictState(repo, "rebasing");
+      enterConflictState(repo, "rebasing", onto);
       c.git(repo, ["rebase", onto], { stdout: `CONFLICT (content): Merge conflict in ${repo.wt.conflicted[0].path}\nerror: could not apply ${short(repo.head.oid)}... \n`, exit: 1 });
       emitChanged(repo);
       return conflict(`CONFLICT (content): Merge conflict in ${repo.wt.conflicted[0].path}`);
@@ -977,6 +1017,9 @@ const handlers: Record<string, Handler> = {
       return conflict(`${repo.wt.conflicted.length} files still have conflicts`);
     }
     repo.state = "clean";
+    pendingMerges.delete(repo);
+    repo.conflicts.clear();
+    repo.conflictCtx = null;
     c.git(repo, [sub, "--continue"], { stdout: "Successfully rebased\n" });
     emitChanged(repo);
     return ok("Operation completed");
@@ -988,6 +1031,8 @@ const handlers: Record<string, Handler> = {
     repo.state = "clean";
     repo.wt.conflicted = [];
     if (pendingMerges.delete(repo)) repo.wt.staged = [];
+    repo.conflicts.clear();
+    repo.conflictCtx = null;
     c.git(repo, [sub, "--abort"]);
     emitChanged(repo);
     return ok("Operation aborted");
@@ -998,6 +1043,8 @@ const handlers: Record<string, Handler> = {
     const sub = repo.state === "rebasing" ? "rebase" : "cherry-pick";
     repo.state = "clean";
     repo.wt.conflicted = [];
+    repo.conflicts.clear();
+    repo.conflictCtx = null;
     c.git(repo, [sub, "--skip"]);
     emitChanged(repo);
     return ok("Skipped");
@@ -1148,6 +1195,65 @@ const handlers: Record<string, Handler> = {
       running.cancelled = true;
       running.abort.abort(); // closes a login dialog that is open
     }
+  },
+
+  // ---- merge conflicts (PLAN.md 5.8)
+  conflicts: (a, c): ConflictEntry[] => {
+    const repo = repoOf(a.repoId);
+    c.git(repo, ["ls-files", "--unmerged", "-z"]);
+    const list = [...repo.conflicts.values()].sort((x, y) => (x.path < y.path ? -1 : x.path > y.path ? 1 : 0));
+    if (list.length > 0) c.git(repo, ["cat-file", "--batch"]);
+    return list.map((x) => entryOf(x, isRebasing(repo)));
+  },
+  conflict_versions: (a, c): ConflictVersions => {
+    const repo = repoOf(a.repoId);
+    const path = str(a.path);
+    checkConflictPath(path);
+    const conflict = conflictOf(repo, path);
+    c.git(repo, ["ls-files", "--unmerged", "-z", "--", path]);
+    c.git(repo, ["cat-file", "--batch"]);
+    return versionsOf(conflict, isRebasing(repo), conflictLabels(repo));
+  },
+  accept_side: (a, c) => {
+    const repo = repoOf(a.repoId);
+    const paths = strs(a.paths);
+    const side = str(a.side);
+    if (side !== "ours" && side !== "theirs") fail(`unknown variant \`${side}\`, expected \`ours\` or \`theirs\``);
+    if (paths.length === 0) return;
+    for (const p of paths) checkConflictPath(p);
+    const found = paths.map((p) => conflictOf(repo, p));
+    const st = sideStages(isRebasing(repo));
+    const stageNo = side === "ours" ? st.yours : st.theirs;
+    const keep = found.filter((x) => hasStage(x, stageNo));
+    const remove = found.filter((x) => !hasStage(x, stageNo));
+    if (keep.length > 0) {
+      const names = keep.map((x) => x.path);
+      c.git(repo, ["--literal-pathspecs", "checkout", stageNo === 2 ? "--ours" : "--theirs", "--", ...names]);
+      c.git(repo, ["--literal-pathspecs", "add", "-A", "--", ...names]);
+      for (const x of keep) markConflictResolved(repo, x.path, "modified");
+    }
+    if (remove.length > 0) {
+      const names = remove.map((x) => x.path);
+      c.git(repo, ["--literal-pathspecs", "rm", "-q", "--", ...names]);
+      for (const x of remove) markConflictResolved(repo, x.path, "deleted");
+    }
+    emitChanged(repo);
+  },
+  save_resolution: (a, c) => {
+    const repo = repoOf(a.repoId);
+    const path = str(a.path);
+    const content = str(a.content);
+    checkConflictPath(path);
+    if (content.includes("\0")) fail("The result contains a NUL byte.");
+    const conflict = conflictOf(repo, path);
+    const expected = optStr(a.expectedOursOid);
+    if (expected !== null && yoursOid(conflict, isRebasing(repo)) !== expected) fail("The conflict changed. Reload the merge.");
+    if (!isTextConflict(conflict)) fail(`${path} is binary, not UTF-8 or too large: accept Yours or Theirs instead.`);
+    if (bool(a.resolved)) {
+      c.git(repo, ["--literal-pathspecs", "add", "-A", "--", path]);
+      markConflictResolved(repo, path, "modified");
+    }
+    emitChanged(repo);
   },
 };
 

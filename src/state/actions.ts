@@ -17,7 +17,7 @@
  */
 import { ApiError, toApiError } from "../api/tauri";
 import * as api from "../api/tauri";
-import type { CloneOpts, CloneProgress, CloneResult, HunkOpts, OpResult } from "../api/types";
+import type { CloneOpts, CloneProgress, CloneResult, ConflictSide, HunkOpts, OpResult } from "../api/types";
 import { joinNames, plural, toast, type ToastAction } from "../components/ui";
 import { beginActivity } from "./activity";
 import { confirmAction, showDialog, type PushResult } from "./dialogs";
@@ -842,4 +842,70 @@ export function startClone(req: CloneRequest, onProgress: (p: CloneProgress) => 
 /** Opens the "clone" dialog. Resolves to what the clone made, or undefined when the user closed the dialog without cloning. */
 export function cloneRepository(url?: string) {
   return showDialog("clone", { url });
+}
+
+// ---------------------------------------------------------------- merge conflicts
+
+const SIDE_VERB: Record<ConflictSide, string> = { ours: "accept Yours", theirs: "accept Theirs" };
+
+/**
+ * Keeps one whole side of each conflicted file ("Accept Yours / Theirs"). A side that deleted the file deletes it
+ * (`git rm`). The user's side is `"ours"`, also during a rebase (the backend swaps the index stages). No success toast;
+ * when it resolved the last conflict of the repo it offers to continue (`opts.offerContinue = false` to skip that).
+ */
+export async function acceptSide(repoId: string, paths: string[], side: ConflictSide, opts: { offerContinue?: boolean } = {}): Promise<BatchResult> {
+  const res = await runBatch({
+    verb: SIDE_VERB[side],
+    past: side === "ours" ? "Accepted Yours" : "Accepted Theirs",
+    what: paths.length === 1 ? paths[0] : plural(paths.length, "file"),
+    repoIds: [repoId],
+    quiet: true,
+    run: () => api.acceptSide(repoId, paths, side).then(() => undefined),
+  });
+  if (res.ok.length > 0 && opts.offerContinue !== false) await offerContinue(repoId);
+  return res;
+}
+
+/**
+ * Saves the merged text of one file (see `api.saveResolution`). `resolved = false` writes it with conflict markers and
+ * leaves the file unmerged. Quiet on success; a refused save (the conflict changed, the file is no longer conflicted)
+ * shows an error toast and comes back in `failed`.
+ */
+export function saveResolution(repoId: string, path: string, content: string, expectedOursOid: string | null, resolved: boolean): Promise<BatchResult> {
+  return runBatch({
+    verb: "save the merge result",
+    past: resolved ? "Resolved" : "Saved with conflict markers",
+    what: path,
+    repoIds: [repoId],
+    quiet: true,
+    run: () => api.saveResolution(repoId, path, content, expectedOursOid, resolved).then(() => undefined),
+  });
+}
+
+/** After a conflict was resolved: when the repo has none left, offers to continue the merge / rebase / cherry-pick / revert. */
+export async function offerContinue(repoId: string): Promise<void> {
+  await refreshSummaries([repoId]);
+  const s = summary(repoId);
+  if (!s || s.state === "clean" || s.state === "bisecting" || s.conflicted > 0) return;
+  const op = opName(repoId);
+  toast({
+    kind: "success",
+    title: `All conflicts resolved in ${nameOf(repoId)}`,
+    body: `Continue the ${op} to finish it.`,
+    actions: [{ label: `Continue ${op}`, onClick: () => void opContinue(repoId) }],
+  });
+}
+
+/** Opens the conflicts dialog (files grouped by repo, Accept Yours / Theirs, Merge…). */
+export async function openConflicts(repoIds: RepoIds): Promise<void> {
+  const ids = toIds(repoIds);
+  if (ids.length === 0) return;
+  await showDialog("conflicts", { repoIds: ids });
+}
+
+/** Opens the merge window of one file. Resolves to true when the file was resolved. */
+export async function openMerge(repoId: string, path: string, opts: { offerContinue?: boolean } = {}): Promise<boolean> {
+  const r = await showDialog("mergeFile", { repoId, path });
+  if (r?.resolved && opts.offerContinue !== false) await offerContinue(repoId);
+  return r?.resolved ?? false;
 }

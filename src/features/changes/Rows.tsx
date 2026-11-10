@@ -31,6 +31,9 @@ export interface RowCtl {
   stage: (row: FileRow | DirRow) => void;
   unstage: (row: FileRow | DirRow) => void;
   discard: (row: FileRow | DirRow) => void;
+  /** Conflicts section: keep one whole side of the file (of the row's selection), or open the merge window. */
+  acceptSide: (row: FileRow, side: "ours" | "theirs") => void;
+  merge: (row: FileRow) => void;
   sectionStage: (row: SectionRow) => void;
   sectionUnstage: (row: SectionRow) => void;
   sectionDiscard: (row: SectionRow) => void;
@@ -90,6 +93,28 @@ function Action(props: { icon: "plus" | "minus" | "undo" | "check"; label: strin
         props.onClick();
       }}
     />
+  );
+}
+
+/** Small text button of a conflicted row: "Yours", "Theirs", "Merge…". */
+function TextAction(props: { label: string; title: string; primary?: boolean; onClick: () => void }): JSX.Element {
+  return (
+    <button
+      type="button"
+      class="dg-changes-txtact"
+      classList={{ "is-primary": props.primary }}
+      tabIndex={-1}
+      aria-label={props.title}
+      {...tip(props.title)}
+      onMouseDown={keep}
+      onClick={(e) => {
+        e.stopPropagation();
+        props.onClick();
+      }}
+      onDblClick={(e) => e.stopPropagation()}
+    >
+      {props.label}
+    </button>
   );
 }
 
@@ -282,6 +307,11 @@ export function FileRowView(props: { row: FileRow; ctl: RowCtl }): JSX.Element {
       <span class="dg-grow" />
       <Counts file={file()} />
       <span class="dg-changes-actions">
+        <Show when={props.row.section === "conflicts"}>
+          <TextAction label="Yours" title={`Accept Yours: keep your version of ${split().name}`} onClick={() => props.ctl.acceptSide(props.row, "ours")} />
+          <TextAction label="Theirs" title={`Accept Theirs: keep their version of ${split().name}`} onClick={() => props.ctl.acceptSide(props.row, "theirs")} />
+          <TextAction label="Merge…" primary title={`Merge ${split().name} in the merge window`} onClick={() => props.ctl.merge(props.row)} />
+        </Show>
         <Show
           when={staged()}
           fallback={<Action icon={props.row.section === "conflicts" ? "check" : "plus"} label={resolvingLabel()} shortcut="Space" onClick={() => props.ctl.stage(props.row)} />}

@@ -410,6 +410,56 @@ export interface AuthNotice {
   message: string;
 }
 
+// ---------------------------------------------------------------- merge conflicts
+
+/** Status of one side of a conflicted file versus the common ancestor. */
+export type SideStatus = "modified" | "added" | "deleted" | "missing";
+
+/** `"ours"` is the user's own side ("Yours"): stage 2 of the index, but stage 3 during a rebase. */
+export type ConflictSide = "ours" | "theirs";
+
+/** One unmerged file. `ours` / `theirs` already follow the user's view (rebase swap done by the backend). */
+export interface ConflictEntry {
+  path: string;
+  /** Reserved for rename conflicts; always null for now. */
+  oldPath: string | null;
+  ours: SideStatus;
+  theirs: SideStatus;
+  /** Binary, not UTF-8, over 2 MiB, a symlink or a submodule: only "Accept Yours / Theirs". */
+  binary: boolean;
+}
+
+/** One version of a conflicted file. */
+export interface ConflictBlob {
+  /** Object id; send it back as `expectedOursOid` when saving. */
+  oid: string;
+  /** The content, only when it is valid UTF-8, not binary and at most 2 MiB. */
+  text: string | null;
+  bytesLen: number;
+  binary: boolean;
+}
+
+export interface ConflictLabels {
+  /** The user's side: a branch name, or "branch (abc1234 subject)" during a rebase. */
+  ours: string;
+  /** MERGE_HEAD, the picked / reverted commit, or the branch a rebase goes onto. */
+  theirs: string;
+  base: string;
+}
+
+export interface ConflictVersions {
+  /** null: add/add conflict. */
+  base: ConflictBlob | null;
+  /** null: the user's side deleted the file. */
+  ours: ConflictBlob | null;
+  theirs: ConflictBlob | null;
+  labels: ConflictLabels;
+  /** True during a rebase (the backend already swapped `ours` / `theirs` for you). */
+  swapped: boolean;
+  /** Line ending of the file; the editor works with LF and the backend converts back when saving. */
+  eol: "lf" | "crlf";
+}
+
 /** Shape of every rejection of an API call (see `ApiError` in `./tauri`). */
 export interface ApiErrorShape {
   message: string;

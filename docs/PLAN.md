@@ -28,6 +28,7 @@ crates/gitcore/            pure Rust library, no Tauri dependency
   src/status.rs            working tree status (porcelain v2)
   src/diff.rs              unified diff parser, commit file list
   src/ops.rs               write operations
+  src/conflicts.rs         unmerged files, their three versions, accept a side, save a resolution (section 5.8)
   src/state.rs             in-progress operation detection
   src/auth.rs              AuthMode, AuthBroker trait, apply_auth_env (section 5.6)
 crates/askpass/            helper mode of the app binary, local IPC, credential broker (no Tauri dependency)
@@ -58,6 +59,7 @@ src/                       SolidJS UI
   features/titlebar/  features/sidebar/  features/log/  features/details/
   features/diff/      features/changes/  features/palette/ features/console/
   features/dialogs/   features/statusbar/ features/welcome/
+  features/merge/          conflicts dialog and the three-pane merge window (section 5.8)
 ```
 
 ## 3. Git runner rules (gitcore/runner.rs)
@@ -196,6 +198,19 @@ pub struct OpResult { pub ok: bool, pub message: String /* git stdout+stderr sum
   pub conflicts: bool }
 
 pub enum ResetMode { Soft, Mixed, Hard, Keep }
+
+// Merge conflicts (section 5.8). "ours" is always the user's own side ("Yours" in the UI).
+pub enum SideStatus { Modified, Added, Deleted, Missing }   // camelCase strings
+pub enum ConflictSide { Ours, Theirs }                      // "ours" | "theirs"
+pub struct ConflictEntry { pub path: String, pub old_path: Option<String> /* reserved, always None */,
+  pub ours: SideStatus, pub theirs: SideStatus,
+  pub binary: bool /* binary, not UTF-8, > 2 MiB, symlink or submodule: only accept a whole side */ }
+pub struct Blob { pub oid: String, pub text: Option<String> /* only valid UTF-8 without NUL, <= 2 MiB */,
+  pub bytes_len: u64, pub binary: bool }                    // TS name: ConflictBlob
+pub struct ConflictLabels { pub ours: String, pub theirs: String, pub base: String }
+pub enum Eol { Lf, Crlf }                                   // "lf" | "crlf"
+pub struct ConflictVersions { pub base: Option<Blob>, pub ours: Option<Blob>, pub theirs: Option<Blob>,
+  pub labels: ConflictLabels, pub swapped: bool, pub eol: Eol }
 
 // Error sent to the frontend:
 pub struct ApiError { pub message: String, pub detail: Option<String> /* stderr */ }
@@ -394,6 +409,42 @@ before the clone starts) and `{ kind: "newProject" }` adds a project whose folde
 `gitcore::clone::default_dir_name(url)` is the folder name git would pick (`https://h/o/r.git/` -> `r`,
 `git@h:o/r.git` -> `r`, `file:///x/r` -> `r`, `/x/r/.git` -> `r`).
 
+### 5.8 Merge conflicts (gitcore/conflicts.rs)
+| command | args | returns |
+|---|---|---|
+| `conflicts` | `repoId` | `Vec<ConflictEntry>` (`git ls-files --unmerged -z`, sorted by path; empty when nothing is unmerged) |
+| `conflict_versions` | `repoId, path` | `ConflictVersions` (stages 1, 2, 3 read with `git cat-file --batch`; a missing stage is `None`) |
+| `accept_side` (write) | `repoId, paths: Vec<String>, side: ConflictSide` | `()` |
+| `save_resolution` (write) | `repoId, path, content: String, expectedOursOid: Option<String>, resolved: bool` | `()` |
+
+**Yours and Theirs, and the rebase swap.** Git calls stage 2 "ours" and stage 3 "theirs". During a
+**rebase** git replays the user's commit on top of the upstream, so stage 2 is the upstream and stage 3 is
+the user's commit. Every type and argument of this section speaks the user's language: `ours` is
+**Yours** and `theirs` is **Theirs**. `conflicts::side_stages` is the one function that maps them to
+stages (`rebase-merge/` or `rebase-apply/` without `rebase-apply/applying` = rebase: yours = 3, theirs = 2;
+merge, cherry-pick, revert, `git am`: yours = 2, theirs = 3). `ConflictVersions.swapped` tells the UI
+which case it got; the UI does not map anything.
+
+- `SideStatus` per side, from the stage and the base: present with a base = `modified`, present without =
+  `added`, absent with a base = `deleted`, absent without = `missing`. Modify/modify, add/add (no base),
+  delete/modify and modify/delete are all this one table.
+- Labels: Yours = the branch (`HEAD <short>` when detached); during a rebase `branch (abc1234 subject)` of
+  the commit being replayed (`REBASE_HEAD`, `rebase-merge/stopped-sha`, `rebase-apply/original-commit`).
+  Theirs = `MERGE_HEAD` as a branch name (else `abc1234 subject`), the cherry-picked / reverted commit
+  (`CHERRY_PICK_HEAD`, `REVERT_HEAD`), or the branch the rebase goes onto (`onto`). Without an operation: "Theirs".
+- `accept_side`: each path must be conflicted now (else `Invalid`: "<path> is no longer in conflict.").
+  A side that has the file: `checkout --ours|--theirs -- paths` (git's own flag, after the swap), then
+  `add -A -- paths`. A side that deleted it: `rm -q -- paths`. Paths: `check_name` (no leading `-`, no NUL or newline),
+  no `..` or absolute path, `--literal-pathspecs` and `--` on every call.
+- `save_resolution`: writes `content` (UTF-8, LF line ends) to the worktree file in the file's line ending
+  (`eol`: the worktree file, else the first version that has line breaks; CRLF is the majority rule), never through
+  a symlink and never outside the repo, keeping the file mode of an existing file (a new file gets the exec bit
+  when an index entry has it). `resolved = true` then runs `git add`; `false` only writes (the file keeps conflict
+  markers and stays unmerged; the UI writes the markers). Refused (`Invalid`) when: the path is no longer conflicted;
+  `expectedOursOid` (the `oid` of the Yours blob the editor loaded) is not the current Yours blob ("The conflict
+  changed. Reload the merge."); any version is binary, not UTF-8, over 2 MiB, a symlink or a submodule; the content has a NUL.
+  Content is never rebuilt from lossy-decoded text: a non-UTF-8 file only allows `accept_side`.
+
 ## 6. Graph layout algorithm (gitcore/graph.rs)
 
 Input: rows in display order, each with `key` (repoId + oid) and `parent keys`.
@@ -435,11 +486,16 @@ Colour index is unbounded; the UI takes `color % paletteSize`.
 - Each feature folder exports one root component, named in DESIGN.md. Feature code imports
   only from `api/`, `state/`, `components/ui/` and its own folder.
 - Keyboard: a single `src/state/keymap.ts` registry. Search Everywhere: Shift Shift and Ctrl+K.
+- Conflicts: the conflicts dialog and the merge window open through `actions.openConflicts(repoIds)` and
+  `actions.openMerge(repoId, path)`; writes go through `actions.acceptSide` and `actions.saveResolution`.
+  The merge logic is the pure model `features/merge/model.ts` (a port of IntelliJ's merge model, vitest-tested).
+  The mock has two demo repos: `docs-site` merging (4 files) and `ledger-service` rebasing (2 files, swapped).
 - No `any` in exported types. No network requests at runtime.
 
 ## 9. Verification
 
-- `cargo test --workspace` (tests create temporary repos with `git init` in `tempfile` dirs). `crates/askpass/tests/e2e.rs` runs the real helper against the broker with real `git credential fill` and `ssh-add`; `src-tauri/tests/helper_mode.rs` runs the real app binary as a helper with no display.
+- `cargo test --workspace` (tests create temporary repos with `git init` in `tempfile` dirs; `gitcore/tests/conflicts.rs` covers modify/modify, add/add, delete/modify both ways, binary, non-UTF-8, CRLF, rebase swap, cherry-pick, file mode). `crates/askpass/tests/e2e.rs` runs the real helper against the broker with real `git credential fill` and `ssh-add`; `src-tauri/tests/helper_mode.rs` runs the real app binary as a helper with no display.
+- `npx vitest run` (the merge model, the mock backend and the other pure logic).
 - `cargo clippy --workspace -- -D warnings`.
 - `npm run build` (tsc + vite).
 - Browser: `npm run dev` + Playwright screenshots of the main views on the mock backend.

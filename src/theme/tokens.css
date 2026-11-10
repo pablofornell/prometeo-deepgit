@@ -376,6 +376,18 @@
   --dg-diff-hunk-active-border: #3871E1; /* left 2px bar on the focused hunk */
   --dg-diff-connector: #FFFFFF0D;      /* band between the two sides */
 
+  /* ---- Merge window (three-way editor). JetBrains merge colours: conflict red, modified blue, inserted green, deleted grey. ---- */
+  --dg-merge-conflict-bg: #4A2B2F;
+  --dg-merge-conflict-marker: #C75450;
+  --dg-merge-modified-bg: #22314D;
+  --dg-merge-modified-marker: #375FAD;
+  --dg-merge-inserted-bg: #1F3527;
+  --dg-merge-inserted-marker: #549159;
+  --dg-merge-deleted-bg: #2E3035;
+  --dg-merge-deleted-marker: #7B7F87;
+  --dg-merge-resolved-mix: 35%;         /* a resolved change in the Result pane: its colour at this strength */
+  --dg-merge-ribbon-alpha: 55%;         /* the bands between the panes */
+
   /* ---- Avatars (initials). Colour = palette[hash(lower(email)) % 12]. Text is #FFFFFF at 600. ---- */
   --dg-avatar-0: #3F6FC9;
   --dg-avatar-1: #2E8A6B;
@@ -615,6 +627,17 @@
   --dg-diff-hunk-header-fg: #4A6CA8;
   --dg-diff-hunk-active-border: #3871E1;
   --dg-diff-connector: #0000000A;
+
+  --dg-merge-conflict-bg: #FBE3E4;
+  --dg-merge-conflict-marker: #D9696A;
+  --dg-merge-modified-bg: #E3EDFC;
+  --dg-merge-modified-marker: #6F9BEA;
+  --dg-merge-inserted-bg: #E2F4E4;
+  --dg-merge-inserted-marker: #6DBB75;
+  --dg-merge-deleted-bg: #ECEEF1;
+  --dg-merge-deleted-marker: #A1A5AD;
+  --dg-merge-resolved-mix: 40%;
+  --dg-merge-ribbon-alpha: 70%;
 
   --dg-avatar-0: #3F6FC9;
   --dg-avatar-1: #2E8A6B;

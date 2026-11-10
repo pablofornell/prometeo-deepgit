@@ -6,6 +6,7 @@ import { type JSX, Show, onCleanup, onMount } from "solid-js";
 import { Gallery } from "./components/ui/Gallery";
 import { DialogHost, MenuHost, ToastHost, TooltipHost } from "./components/ui";
 import { registerAllDialogs } from "./features/dialogs";
+import { registerMergeDialogs } from "./features/merge";
 import { SearchEverywhere } from "./features/palette/SearchEverywhere";
 import { SettingsHost, registerSettings } from "./features/settings";
 import { Shell } from "./features/shell/Shell";
@@ -24,6 +25,7 @@ export default function App(): JSX.Element {
     startAutoFetch();
     registerAllDialogs();
     registerSettings();
+    registerMergeDialogs();
     registerGlobalShortcuts();
     onCleanup(installKeymap());
     void loadWorkspace();

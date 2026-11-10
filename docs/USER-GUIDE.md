@@ -579,21 +579,103 @@ When a repository is in this state:
 
 | Button | What it does |
 |---|---|
-| **Resolve conflicts** | Opens the **Local changes** tab for that repository. |
+| **Resolve conflicts** | Opens the **Conflicts** dialog for that repository. |
 | **Continue** | Continues the operation. In **Local changes**, the button is off while conflicts remain. |
 | **Skip** | Skips the current step. Only for rebase and cherry-pick. |
 | **Abort** | Cancels the operation. DeepGit asks first. The conflict resolutions that you made are lost. |
 
 ### Resolve conflicts
 
-DeepGit has no built-in merge editor. Resolve conflicts in your editor.
+DeepGit has a conflicts dialog and a three-pane merge window. You do not need an external editor.
+Open the dialog with **Resolve conflicts** in a banner, with **Resolve conflicts…** in the banner of the **Local changes** tab,
+or from Search Everywhere (type "Resolve conflicts").
 
-1. Open **Local changes**. The **Conflicts** section lists the files with status `U`.
-2. Open each file in your editor. Remove the conflict markers and save the file.
-3. In DeepGit, select the file and press `Space`, or click **Mark resolved**. This stages the file.
-4. When no conflicts remain, click **Continue**.
+#### Yours and Theirs
 
-If **Continue** fails because of unresolved conflicts, the log banner turns red.
+- **Yours** is your side. **Theirs** is the other side.
+- In a merge, Yours is the branch you are on and Theirs is the branch you merge in.
+- In a cherry-pick or a revert, Theirs is the commit.
+- **In a rebase the sides swap.** Git replays your commits on top of the other branch, so in a rebase **Yours is your commit**
+  that is being replayed and **Theirs is the branch you rebase onto**. DeepGit does the swap for you and writes
+  "your commit" and "upstream" in the headers of the merge window. "Accept Yours" always keeps the change that you made.
+
+#### The Conflicts dialog
+
+The dialog lists the files with conflicts, grouped by repository. A line above each group names the branches.
+The columns **Yours** and **Theirs** tell what each side did to the file: **Modified**, **Added** or **Deleted**.
+A file that is binary shows a **binary** tag.
+
+| Button | What it does |
+|---|---|
+| **Accept Yours** | Keeps your whole version of the selected files and stages them. If you deleted a file, it is deleted. |
+| **Accept Theirs** | Keeps their whole version of the selected files and stages them. If they deleted a file, it is deleted. |
+| **Merge…** | Opens the merge window for the selected file. Double click on a file or `Enter` does the same. |
+| **Resolve simple conflicts automatically** | Merges every text file whose changes do not collide. A file is saved only when it ends fully resolved. The others stay in the list. |
+
+Select several files with `Ctrl`+click, `Shift`+click or `Ctrl+A`. When the last conflict is resolved, the dialog offers **Continue merge**
+(or rebase, cherry-pick, revert). In **Local changes**, a file in the **Conflicts** section has the buttons **Yours**, **Theirs** and **Merge…**
+on hover, and the same commands are in its context menu. A double click on the file opens the merge window.
+
+#### The merge window
+
+![The merge window](screenshots/merge-window.png)
+
+The window has three panes: **Yours** on the left, **Result** in the middle and **Theirs** on the right. The headers show the branch
+or commit of each side. The two outer panes are read only. The **Result** is an editor that you can type in. It starts as the common
+ancestor (the "base") of both sides. The panes scroll together.
+
+Colours show what changed: **red** is a conflict (both sides changed the lines in different ways), **blue** is a change, **green** is a
+new line and **grey** is a deleted line. The bands between the panes join each change to its place in the Result.
+
+For each change, the gutters show two buttons:
+
+| Button | What it does |
+|---|---|
+| **»** (left) or **«** (right) | Applies this side to the Result. In a conflict, the other side stays open. Click the other side too to keep both: **Yours first, then Theirs**. `Shift`+click applies the side and closes the change. |
+| **×** | Ignores this side. The Result stays as it is. |
+
+A conflict is solved when both of its sides are applied or ignored. A change that only one side made is solved with one click.
+If you type inside a change, it counts as solved by you. If you undo the typing, it is open again.
+
+The toolbar:
+
+| Control | What it does |
+|---|---|
+| **Apply non-conflicting** **Yours**, **All**, **Theirs** | Applies every change that only that side made (or only one side made, for **All**). Conflicts are not touched. |
+| **Magic resolve** | Merges a conflict at word level when the two sides changed different words, for example one changed a name and the other a number on the same line. It never resolves a conflict when both sides changed the same word, or when one side deleted lines. |
+| **↑** **↓** | Previous and next change. Keys: `Shift+F7` and `F7`, or `Alt+↑` and `Alt+↓`. |
+| Counter | "2 conflicts left", then "All changes processed". |
+| **Accept Yours**, **Accept Theirs** | Replaces the Result with that whole version. DeepGit asks first when you already changed something. |
+| **Reset** | Goes back to the base with all changes open. |
+
+Undo (`Ctrl+Z`) and redo (`Ctrl+Shift+Z`) work in the Result, also for the buttons above.
+
+**Apply** saves the Result and stages the file. If conflicts are still open, DeepGit asks "Save with unresolved conflicts?".
+If you agree, the file is saved with the usual markers (`<<<<<<<`, `=======`, `>>>>>>>`) around each open conflict. It is **not**
+staged and stays in the list. Changes that only one side made and that you did not ignore are applied when you click **Apply**.
+**Cancel** closes the window. DeepGit asks first when you changed something.
+
+The file keeps its line ending (LF or CRLF) and its file mode. DeepGit refuses to save when the conflict changed in the meantime
+(for example because you continued the rebase in a terminal): close the window and open it again.
+
+#### Files that cannot be merged line by line
+
+- **One side deleted the file.** The window shows both sides and two buttons: **Keep this version** and **Delete the file**.
+- **Binary files, files that are not UTF-8 text, files over 2 MiB, symbolic links and submodules.** The window shows the size of each
+  side and the same two choices. DeepGit never rewrites such a file from text, so the bytes of the side you pick are kept.
+
+#### Keys in the merge window
+
+| Key | Action |
+|---|---|
+| `F7`, `Alt+↓` | Next change |
+| `Shift+F7`, `Alt+↑` | Previous change |
+| `Alt+→` | Apply Yours to the current change (`Shift` also closes it) |
+| `Alt+←` | Apply Theirs to the current change |
+| `Ctrl+Enter` | Apply (save) |
+| `Esc` | Cancel |
+
+The current change is the one under the cursor in the Result, or the one you went to last. Its edges are drawn thicker.
 
 ---
 
@@ -663,7 +745,7 @@ What a result does:
 - **Repo**: shows only this repository in the log and focuses it.
 
 The palette remembers your last ten picks.
-Actions without a shortcut live only here, for example **Add project…**, **Rescan project for repositories**, **Toggle commit graph**, **Push all repositories…** and **Toggle dark / light theme**.
+Actions without a shortcut live only here, for example **Resolve conflicts…**, **Add project…**, **Rescan project for repositories**, **Toggle commit graph**, **Push all repositories…** and **Toggle dark / light theme**.
 
 ---
 
@@ -856,6 +938,8 @@ While a menu, popup or dialog is open, most shortcuts do not work.
 | `Ctrl+Enter` | Commit (also works in the message box) |
 | `Ctrl+Alt+K` | Commit and push (also works in the message box) |
 
+In the **Conflicts** section, double click on a file opens the merge window. See [Resolve conflicts](#resolve-conflicts).
+
 ### Diff
 
 | Key | Action |
@@ -893,6 +977,10 @@ The diff shortcuts act on the diff viewer that you used last.
 | Search Everywhere | `Esc` | Close |
 | Dialog | `Enter` | Run the main action |
 | Dialog | `Esc` | Cancel |
+| Conflicts dialog | `↑` `↓` `Enter` `Ctrl+A` | Move, open the merge window, select all files |
+| Merge window | `F7` `Shift+F7` | Next and previous change |
+| Merge window | `Alt+→` `Alt+←` | Apply Yours or Theirs to the current change |
+| Merge window | `Ctrl+Enter` `Esc` | Apply (save), cancel |
 | Menu | `↑` `↓` `→` `←` `Enter` `Esc` | Move, open or close a submenu, choose, close |
 
 ---

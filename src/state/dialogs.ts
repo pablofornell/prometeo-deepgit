@@ -148,6 +148,25 @@ export interface AuthProps {
   prompt: AuthPrompt;
 }
 
+export interface ConflictsProps {
+  /** Repos whose conflicted files are listed (grouped by repo); the first one is focused. */
+  repoIds: string[];
+}
+export interface ConflictsResult {
+  /** Always true: the dialog has no result, it only closes. */
+  closed: true;
+}
+
+export interface MergeFileProps {
+  repoId: string;
+  /** Path of the conflicted file, relative to the repo. */
+  path: string;
+}
+export interface MergeFileResult {
+  /** The file was resolved (staged, or its deleted / kept side accepted). False: saved with conflict markers. */
+  resolved: boolean;
+}
+
 /** Props and result of every dialog name. */
 export interface DialogRegistry {
   newBranch: { props: NewBranchProps; result: NewBranchResult };
@@ -163,6 +182,8 @@ export interface DialogRegistry {
   settings: { props: SettingsProps; result: void };
   clone: { props: CloneProps; result: CloneDialogResult };
   auth: { props: AuthProps; result: AuthDialogResult };
+  conflicts: { props: ConflictsProps; result: ConflictsResult };
+  mergeFile: { props: MergeFileProps; result: MergeFileResult };
 }
 
 export type DialogName = keyof DialogRegistry;

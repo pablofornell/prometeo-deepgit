@@ -4,7 +4,7 @@ mod common;
 
 use common::*;
 use gitcore::conflicts::{accept_side, conflict_versions, conflicts, save_resolution};
-use gitcore::{ops, ConflictSide, Eol, GitError, SideStatus};
+use gitcore::{ops, ConflictSide, Eol, GitError, MergeOpts, SideStatus};
 
 fn strs(v: &[&str]) -> Vec<String> {
     v.iter().map(|s| s.to_string()).collect()
@@ -18,7 +18,7 @@ fn merge_conflict(r: &TestRepo) {
     r.commit_file("f", "one\nTHEIRS\nthree\n", "feature change");
     r.sh(&["checkout", "-q", "main"]);
     r.commit_file("f", "one\nOURS\nthree\n", "main change");
-    let res = ops::merge(&git(), &r.info, "feature", false, false).unwrap();
+    let res = ops::merge(&git(), &r.info, "feature", &MergeOpts::default()).unwrap();
     assert!(res.conflicts, "{res:?}");
 }
 
@@ -93,7 +93,7 @@ fn add_add_has_no_base() {
     r.sh(&["checkout", "-q", "main"]);
     r.commit_file("new", "from main\n", "add on main");
     assert!(
-        ops::merge(&g, &r.info, "feature", false, false)
+        ops::merge(&g, &r.info, "feature", &MergeOpts::default())
             .unwrap()
             .conflicts
     );
@@ -129,7 +129,7 @@ fn delete_modify(r: &TestRepo, we_delete: bool) {
         r.commit_file("f", "one\nMAIN\n", "main modifies");
     }
     assert!(
-        ops::merge(&git(), &r.info, "feature", false, false)
+        ops::merge(&git(), &r.info, "feature", &MergeOpts::default())
             .unwrap()
             .conflicts
     );
@@ -197,7 +197,7 @@ fn binary_conflict_allows_only_accepting_a_side() {
     std::fs::write(r.path().join("img.bin"), [0u8, 7, 7, 7, 7]).unwrap();
     r.sh(&["commit", "-qam", "main"]);
     assert!(
-        ops::merge(&g, &r.info, "feature", false, false)
+        ops::merge(&g, &r.info, "feature", &MergeOpts::default())
             .unwrap()
             .conflicts
     );
@@ -238,7 +238,7 @@ fn non_utf8_file_has_no_text_and_cannot_be_saved() {
     std::fs::write(r.path().join("l.txt"), latin1(0xe8)).unwrap();
     r.sh(&["commit", "-qam", "main"]);
     assert!(
-        ops::merge(&g, &r.info, "feature", false, false)
+        ops::merge(&g, &r.info, "feature", &MergeOpts::default())
             .unwrap()
             .conflicts
     );
@@ -379,7 +379,7 @@ fn crlf_file_is_saved_with_crlf() {
     r.sh(&["checkout", "-q", "main"]);
     r.commit_file("f", "one\r\nOURS\r\nthree\r\n", "main");
     assert!(
-        ops::merge(&g, &r.info, "feature", false, false)
+        ops::merge(&g, &r.info, "feature", &MergeOpts::default())
             .unwrap()
             .conflicts
     );
@@ -406,7 +406,7 @@ fn utf8_text_round_trips_byte_for_byte() {
     r.sh(&["checkout", "-q", "main"]);
     r.commit_file("f", "caf\u{e9}\nOURS\n", "main");
     assert!(
-        ops::merge(&g, &r.info, "feature", false, false)
+        ops::merge(&g, &r.info, "feature", &MergeOpts::default())
             .unwrap()
             .conflicts
     );
@@ -562,7 +562,7 @@ fn file_mode_is_kept() {
     r.sh(&["checkout", "-q", "main"]);
     r.commit_file("run.sh", "#!/bin/sh\necho ours\n", "main");
     assert!(
-        ops::merge(&g, &r.info, "feature", false, false)
+        ops::merge(&g, &r.info, "feature", &MergeOpts::default())
             .unwrap()
             .conflicts
     );
@@ -630,7 +630,7 @@ fn several_files_are_listed_and_accepted_together() {
     r.write("dir/c", "c-main\n");
     r.sh(&["commit", "-qam", "main"]);
     assert!(
-        ops::merge(&g, &r.info, "feature", false, false)
+        ops::merge(&g, &r.info, "feature", &MergeOpts::default())
             .unwrap()
             .conflicts
     );

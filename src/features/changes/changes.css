@@ -85,6 +85,14 @@
 .dg-changes-list:focus-within .dg-changes-row.is-selected .dg-changes-actions { background: var(--dg-selection-bg); }
 .dg-changes-row:hover:not(.is-selected) .dg-changes-actions { background: var(--dg-island-bg); }
 .dg-changes-action-danger:hover:not(:disabled) .dg-icon { color: var(--dg-text-error); }
+/* conflicted rows: "Yours", "Theirs", "Merge…" */
+.dg-changes-txtact {
+  height: 18px; padding: 0 7px; border-radius: var(--dg-pill-radius); line-height: 1; font-size: var(--dg-font-size-small); color: var(--dg-text);
+  background: var(--dg-chip-bg); box-shadow: inset 0 0 0 1px var(--dg-chip-border);
+}
+.dg-changes-txtact:hover { background: var(--dg-hover-bg); }
+.dg-changes-txtact.is-primary { background: var(--dg-button-primary-bg); color: var(--dg-text-over-accent); box-shadow: none; }
+.dg-changes-txtact.is-primary:hover { background: var(--dg-button-primary-hover-bg, var(--dg-button-primary-bg)); filter: brightness(1.08); }
 
 .dg-changes-stashcount { font-size: var(--dg-font-size-small); color: var(--dg-text-secondary); }
 

@@ -6,7 +6,6 @@ import { For, type JSX, Show, createMemo, createSignal } from "solid-js";
 import type { RepoStateKind, SkippedRepo } from "../../api/types";
 import { Button, Icon, plural } from "../../components/ui";
 import * as actions from "../../state/actions";
-import { setChangesRepoId, setMainTab } from "../../state/selection";
 import { repoById, selectedRepoIds, summary, toggleRepo } from "../../state/workspace";
 
 const WORD: Record<Exclude<RepoStateKind, "clean">, string> = {
@@ -21,8 +20,7 @@ const WORD: Record<Exclude<RepoStateKind, "clean">, string> = {
 const [failed, setFailed] = createSignal<Set<string>>(new Set());
 
 function resolveConflicts(repoId: string): void {
-  setChangesRepoId(repoId);
-  setMainTab("changes");
+  void actions.openConflicts(repoId);
 }
 
 async function run(repoId: string, op: "continue" | "abort" | "skip"): Promise<void> {

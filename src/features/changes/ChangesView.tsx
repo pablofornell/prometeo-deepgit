@@ -258,6 +258,18 @@ export function ChangesView(): JSX.Element {
   const pathsText = (list: FileItem[], absolute: boolean): string =>
     list.map((i) => (absolute ? `${repoById(i.repoId)?.path ?? ""}/${i.file.path}` : i.file.path)).join("\n");
 
+  /** The conflicted files a conflict action applies to, by repo. */
+  const conflictPaths = (row: Row): Map<string, string[]> => {
+    const by = new Map<string, string[]>();
+    for (const i of row.kind === "file" || row.kind === "dir" ? targets(row) : []) {
+      if (i.section === "conflicts") by.set(i.repoId, [...(by.get(i.repoId) ?? []), i.file.path]);
+    }
+    return by;
+  };
+  const acceptConflicts = async (row: Row, side: "ours" | "theirs"): Promise<void> => {
+    for (const [repoId, paths] of conflictPaths(row)) await actions.acceptSide(repoId, paths, side);
+  };
+
   const rowMenu = (row: Row, e: MouseEvent): void => {
     e.preventDefault();
     if (row.kind === "file" || row.kind === "dir") {
@@ -271,7 +283,12 @@ export function ChangesView(): JSX.Element {
       const plain = list.filter((i) => i.section === "unstaged");
       const staged = list.filter((i) => i.section === "staged");
       const n = (l: FileItem[]) => (l.length > 1 ? ` ${l.length} files` : "");
-      if (conflicts.length) menu.push({ label: `Mark${n(conflicts)} resolved`, icon: "check", onSelect: () => void stageItems(conflicts) });
+      if (conflicts.length) {
+        if (conflicts.length === 1 && row.kind === "file") menu.push({ label: "Merge…", icon: "merge", onSelect: () => void actions.openMerge(row.repoId, row.file.path) });
+        menu.push({ label: `Accept Yours${n(conflicts)}`, icon: "conflict", onSelect: () => void acceptConflicts(row, "ours") });
+        menu.push({ label: `Accept Theirs${n(conflicts)}`, icon: "conflict", onSelect: () => void acceptConflicts(row, "theirs") });
+        menu.push({ label: `Mark${n(conflicts)} resolved`, icon: "check", onSelect: () => void stageItems(conflicts) });
+      }
       if (plain.length) menu.push({ label: `Stage${n(plain)}`, icon: "plus", shortcut: "Space", onSelect: () => void stageItems(plain) });
       if (staged.length) menu.push({ label: `Unstage${n(staged)}`, icon: "minus", shortcut: staged.length === list.length ? "Space" : undefined, onSelect: () => void unstageItems(staged) });
       menu.push({ separator: true });
@@ -320,6 +337,7 @@ export function ChangesView(): JSX.Element {
     click,
     doubleClick: (row) => {
       if (row.kind === "dir") toggleCollapsed(row.key);
+      else if (row.kind === "file" && row.section === "conflicts") void actions.openMerge(row.repoId, row.file.path);
       else showDiff(row);
     },
     context: rowMenu,
@@ -328,6 +346,8 @@ export function ChangesView(): JSX.Element {
     stage: (row) => void stageItems(targets(row)),
     unstage: (row) => void unstageItems(targets(row)),
     discard: (row) => void discardItems(targets(row)),
+    acceptSide: (row, side) => void acceptConflicts(row, side),
+    merge: (row) => void actions.openMerge(row.repoId, row.file.path),
     sectionStage: (row: SectionRow) => void stageItems(allItems(row.repoId, row.section)),
     sectionUnstage: (row: SectionRow) => void unstageItems(allItems(row.repoId, row.section)),
     sectionDiscard: (row: SectionRow) => void discardItems(allItems(row.repoId, row.section)),
@@ -488,9 +508,12 @@ export function ChangesView(): JSX.Element {
                       {conflicts() > 0 ? `${plural(conflicts(), "conflicted file")} left. Resolve them, then continue.` : "All conflicts are resolved. Continue to finish."}
                     </span>
                   </span>
+                  <Show when={conflicts() > 0}>
+                    <Button size="small" variant="primary" title="Open the list of conflicted files" onClick={() => void actions.openConflicts(repo.id)}>Resolve conflicts…</Button>
+                  </Show>
                   <Button
                     size="small"
-                    variant="primary"
+                    variant={conflicts() > 0 ? "default" : "primary"}
                     disabled={conflicts() > 0}
                     title={conflicts() > 0 ? `Resolve ${plural(conflicts(), "conflicted file")} first` : `Continue the ${label().toLowerCase()}`}
                     onClick={() => void actions.opContinue(repo.id)}

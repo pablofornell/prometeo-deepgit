@@ -13,8 +13,9 @@
  * toasts, conflict handling and multi-repo fan-out.
  */
 import type {
-  ApiErrorShape, AuthNotice, AuthPrompt, CloneOpts, CloneProgress, CloneResult, CloneTarget, CommitDetails, ConsoleEntry, DiffSpec, FileDiff, LogQuery,
-  LogSessionInfo, MergeOpts, OpResult, Project, CommitRow, HunkOpts, RepoChanged, RepoInfo, RepoSummary, Refs, ResetMode, Workspace, WorkingTree,
+  ApiErrorShape, AuthNotice, AuthPrompt, CloneOpts, CloneProgress, CloneResult, CloneTarget, CommitDetails, ConflictEntry, ConflictSide, ConflictVersions,
+  ConsoleEntry, DiffSpec, FileDiff, LogQuery, LogSessionInfo, MergeOpts, OpResult, Project, CommitRow, HunkOpts, RepoChanged, RepoInfo, RepoSummary, Refs,
+  ResetMode, Workspace, WorkingTree,
 } from "./types";
 
 /** True when running inside the Tauri webview (false in a plain browser). */
@@ -216,3 +217,19 @@ export const onAuthNotice = (cb: (n: AuthNotice) => void) => listen<AuthNotice>(
 export const onRepoChanged = (cb: (e: RepoChanged) => void) => listen<RepoChanged>("repo-changed", cb);
 /** Progress of a running `cloneRepo` (filter on `operationId`). */
 export const onCloneProgress = (cb: (e: CloneProgress) => void) => listen<CloneProgress>("clone-progress", cb);
+
+// ---------------------------------------------------------------- 5.8 merge conflicts
+
+/** The unmerged files of a repo; `ours` / `theirs` are the user's view (swapped during a rebase). */
+export const conflicts = (repoId: string) => invoke<ConflictEntry[]>("conflicts", { repoId });
+/** Base, yours and theirs of one conflicted file with labels, the swap flag and the line ending. */
+export const conflictVersions = (repoId: string, path: string) => invoke<ConflictVersions>("conflict_versions", { repoId, path });
+/** Keeps one whole side of each path (`checkout --ours|--theirs` + `add`, or `rm` when that side deleted the file). Emits repo-changed. */
+export const acceptSide = (repoId: string, paths: string[], side: ConflictSide) => invoke<void>("accept_side", { repoId, paths, side });
+/**
+ * Writes the merged text (LF line ends; the backend restores the file's line ending and mode). `resolved = true` stages it,
+ * `false` only writes it (the file keeps conflict markers and stays unmerged). Refused when the file is no longer
+ * conflicted or its "Yours" blob is not `expectedOursOid`.
+ */
+export const saveResolution = (repoId: string, path: string, content: string, expectedOursOid: string | null, resolved: boolean) =>
+  invoke<void>("save_resolution", { repoId, path, content, expectedOursOid, resolved });

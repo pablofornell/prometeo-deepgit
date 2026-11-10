@@ -35,6 +35,7 @@ The backend is written in Rust and runs the `git` command-line program. The inte
 ### Local changes and commit
 
 - Staged, unstaged and conflicted files, grouped by repository.
+- Conflicts dialog (Accept Yours / Theirs, Merge…) and a three-pane merge window: Yours, Result, Theirs. It can apply the changes that do not collide, merge a conflict word by word, and it handles delete/modify, binary files and the swap of sides in a rebase.
 - Commit, amend, and commit and push.
 - One commit message can go to several repositories at once.
 - The commit message draft is kept for each project.
