@@ -98,7 +98,7 @@ actions.opContinue(ids); actions.opAbort(ids); actions.opSkip(ids);
 actions.stage(repoId, paths); actions.unstage(repoId, paths); actions.discard(repoId, paths); actions.commit(ids, message, { amend, signOff });
 actions.stageHunk(repoId, path, index, reverse); actions.discardHunk(repoId, path, index);
 actions.openConflicts(ids); actions.openMerge(repoId, path);                // conflicts dialog / merge window
-actions.acceptSide(repoId, paths, "ours" | "theirs"); actions.saveResolution(repoId, path, content, expectedOursOid, resolved);
+actions.acceptSide(repoId, paths, "ours" | "theirs"); actions.saveResolution(repoId, path, content, expectedOids(versions), resolved);
 ```
 
 Every action resolves to a `BatchResult { ok, skipped, failed, conflicts, cancelled, results }` and never rejects. Toasts, the
@@ -180,7 +180,7 @@ Rules to keep:
 - Text is edited with LF. `normalizeText(text, versions.eol)` turns CRLF into LF for CRLF files; `saveResolution` converts back.
 - Only UTF-8 text without NUL bytes reaches the editor (`ConflictBlob.text` is `null` otherwise); such files only get Accept Yours / Theirs.
 - Save: all conflicts resolved = `saveResolution(..., resolved = true)` (written and staged); conflicts left = the model's
-  `resultWithMarkers` with `resolved = false` (written with `<<<<<<<` blocks, not staged). Pass the `oid` of the Yours blob as `expectedOursOid`.
+  `resultWithMarkers` with `resolved = false` (written with `<<<<<<<` blocks, not staged). Pass the `oid` of all three blobs (`expectedOids(versions)`: Yours, Theirs and base; a stale one is refused).
 - A hand edit inside a change resolves it (`byHand`); undoing the edit opens it again. Model actions are one undo step each.
 - The mock backend mirrors the Rust rules (path checks, "no longer in conflict", stale blob, binary). Extend `mockConflicts.ts` for new demos.
 

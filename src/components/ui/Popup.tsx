@@ -1,6 +1,7 @@
 import { type JSX, Show, createEffect, createSignal, onCleanup } from "solid-js";
 import { Portal } from "solid-js/web";
 import { trackOverlay } from "../../state/keymap";
+import { closeWhenDialogOpens } from "../../state/overlays";
 
 export type PopupPlacement = "bottom-start" | "bottom-end" | "top-start" | "right-start";
 
@@ -59,6 +60,8 @@ export function Popup(props: PopupProps): JSX.Element {
       return;
     }
     queueMicrotask(place);
+    // a popup above the scrim of a dialog that opens now could be clicked: close it (one opened from a dialog stays)
+    closeWhenDialogOpens(() => props.onClose());
     const down = (e: PointerEvent) => {
       const t = e.target as Node;
       if (box?.contains(t) || anchorEl()?.contains(t)) return;

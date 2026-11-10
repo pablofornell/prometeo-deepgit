@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { tryResolveText } from "./resolve";
+import { expectedOids, tryResolveText } from "./resolve";
 
 describe("tryResolveText (magic resolve)", () => {
   it("takes the changed word of each side when they changed different words", () => {
@@ -52,3 +52,14 @@ describe("tryResolveText (magic resolve)", () => {
     expect(tryResolveText("", "", "")).toBe("");
   });
 });
+
+describe("expectedOids", () => {
+  it("sends the ids of all three versions, null for an absent one", () => {
+    const blob = (oid: string) => ({ oid, text: "x", bytesLen: 1, binary: false });
+    const v = { base: blob("b"), ours: blob("o"), theirs: blob("t"), labels: { ours: "", theirs: "", base: "" }, swapped: false, eol: "lf" as const };
+    expect(expectedOids(v)).toEqual({ ours: "o", theirs: "t", base: "b" });
+    expect(expectedOids({ ...v, base: null })).toEqual({ ours: "o", theirs: "t", base: null });
+    expect(expectedOids({ ...v, ours: null })).toEqual({ ours: null, theirs: "t", base: "b" });
+  });
+});
+

@@ -7,7 +7,7 @@
  *                    delete/modify, binary)
  *   ledger-service   rebasing: 2 files (modify/modify, add/add), so Yours is stage 3
  */
-import type { ConflictEntry, ConflictLabels, ConflictVersions, SideStatus } from "./types";
+import type { ConflictEntry, ConflictLabels, ConflictVersions, ExpectedOids, SideStatus } from "./types";
 
 export interface MockStage {
   /** Text content; undefined for a binary version. */
@@ -94,11 +94,14 @@ export function versionsOf(c: MockConflict, rebasing: boolean, labels: ConflictL
   return { base: blob(1), ours: blob(st.yours), theirs: blob(st.theirs), labels, swapped: st.swapped, eol: c.eol ?? "lf" };
 }
 
-/** The blob id of the user's side, for the stale check of `save_resolution`. */
-export function yoursOid(c: MockConflict, rebasing: boolean): string | null {
-  const n = sideStages(rebasing).yours;
-  const s = stageOf(c, n);
-  return s ? stageOid(c, s, n) : null;
+/** The blob ids of Yours, Theirs and the base as they are now, for the stale check of `save_resolution`. */
+export function currentOids(c: MockConflict, rebasing: boolean): ExpectedOids {
+  const st = sideStages(rebasing);
+  const oid = (n: 1 | 2 | 3): string | null => {
+    const s = stageOf(c, n);
+    return s ? stageOid(c, s, n) : null;
+  };
+  return { ours: oid(st.yours), theirs: oid(st.theirs), base: oid(1) };
 }
 
 export function hasStage(c: MockConflict, n: 2 | 3): boolean {

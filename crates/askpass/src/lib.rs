@@ -23,8 +23,8 @@ pub mod server;
 pub mod store;
 
 pub use broker::{
-    is_auth_failure, Broker, Notice, PromptFuture, PromptReply, PromptRequest, Prompter,
-    PROMPT_TIMEOUT,
+    rejected_keys, Broker, Notice, PromptFuture, PromptReply, PromptRequest, Prompter,
+    PROMPT_TIMEOUT, SAVE_WAIT,
 };
 pub use helper::run_from_env;
 pub use prompt::PromptKind;

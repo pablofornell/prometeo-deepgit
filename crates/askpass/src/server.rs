@@ -258,6 +258,8 @@ mod tests {
                     token,
                     prompt,
                     hint: None,
+                    ppid: None,
+                    ssh_port: None,
                 },
             )?;
             read_frame(&mut conn)
@@ -339,6 +341,8 @@ mod tests {
                     token: "good".into(),
                     prompt: "x".into(),
                     hint: None,
+                    ppid: None,
+                    ssh_port: None,
                 },
             )
             .unwrap();

@@ -222,11 +222,8 @@ async fn cancel_makes_git_fail_without_a_password() {
     assert!(!out.status.success());
     assert!(!stdout(&out).contains("password="));
     assert_eq!(prompter.count(), 1);
-    assert_eq!(
-        broker.live_tokens(),
-        1,
-        "the token lives until the ticket finishes"
-    );
+    // the ticket was dropped without `finish`: dropping revokes the token too
+    assert_eq!(broker.live_tokens(), 0);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -293,6 +290,63 @@ async fn remembered_credentials_are_saved_only_after_success_and_used_silently()
         prompter.count(),
         dialogs + 1,
         "asked again after the failure"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn only_the_host_an_error_names_loses_its_saved_login() {
+    let store = new_store();
+    for (k, v) in [
+        ("login:https://example.com", "alice"),
+        ("https://alice@example.com", "s3cret"),
+        ("login:https://other.example.org", "bob"),
+        ("https://bob@other.example.org", "hunter2"),
+    ] {
+        store.set(k, v).unwrap();
+    }
+    let prompter = Scripted::new(|_| None);
+    let broker = broker(prompter, store.clone(), false).await;
+
+    // `fill` uses example.com only; a permission error that is not about logins deletes nothing
+    for text in [
+        "remote: Permission denied to update branch main",
+        "error: unable to unlink old 'x': Permission denied",
+        "fatal: could not create work tree dir 'r': Permission denied",
+    ] {
+        fill(
+            git_with(&broker, AuthMode::Interactive),
+            Some((false, text)),
+        )
+        .await;
+        assert_eq!(store.keys().len(), 4, "{text}: {:?}", store.keys());
+    }
+    // an error that names another host leaves this one alone
+    fill(
+        git_with(&broker, AuthMode::Interactive),
+        Some((
+            false,
+            "fatal: Authentication failed for 'https://other.example.org/r.git'",
+        )),
+    )
+    .await;
+    assert_eq!(store.keys().len(), 4);
+    // naming this host removes its entries, and only those
+    fill(
+        git_with(&broker, AuthMode::Interactive),
+        Some((
+            false,
+            "fatal: Authentication failed for 'https://example.com/r.git'",
+        )),
+    )
+    .await;
+    let mut left = store.keys();
+    left.sort();
+    assert_eq!(
+        left,
+        [
+            "https://bob@other.example.org",
+            "login:https://other.example.org"
+        ]
     );
 }
 

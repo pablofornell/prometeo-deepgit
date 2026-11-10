@@ -736,7 +736,11 @@ pub async fn accept_side(
     .await
 }
 
-/// Writes a hand-made resolution; `resolved` also stages it. See `gitcore::conflicts`.
+/// Writes a hand-made resolution; `resolved` also stages it. The three `expected*Oid` are the blob
+/// ids of the versions the editor loaded; a missing one means "that version was absent". Any
+/// difference from the index refuses the save. See `gitcore::conflicts`.
+// Mirrors the PLAN.md argument list.
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub async fn save_resolution(
     app: AppHandle,
@@ -745,6 +749,8 @@ pub async fn save_resolution(
     path: String,
     content: String,
     expected_ours_oid: Option<String>,
+    expected_theirs_oid: Option<String>,
+    expected_base_oid: Option<String>,
     resolved: bool,
 ) -> Res<()> {
     write(&app, &state, &repo_id, move |g, r| {
@@ -753,7 +759,11 @@ pub async fn save_resolution(
             r,
             &path,
             &content,
-            expected_ours_oid.as_deref(),
+            gitconflicts::ExpectedOids {
+                ours: expected_ours_oid.as_deref(),
+                theirs: expected_theirs_oid.as_deref(),
+                base: expected_base_oid.as_deref(),
+            },
             resolved,
         )
     })

@@ -14,7 +14,7 @@ import {
 } from "./mockData";
 import { addColoredProject, colorizeRepos, parseColorChoice, setProjectColor, setRepoColor } from "./mockColors";
 import { buildFileDiff, fileText, toFileChange } from "./mockDiff";
-import { entryOf, genericConflicts, hasStage, isTextConflict, sideStages, versionsOf, yoursOid, type MockConflict } from "./mockConflicts";
+import { entryOf, genericConflicts, currentOids, hasStage, isTextConflict, sideStages, versionsOf, type MockConflict } from "./mockConflicts";
 import type {
   CloneOpts, CloneProgress, CloneResult, CloneTarget, CommitDetails, CommitRow, ConflictEntry, ConflictLabels, ConflictVersions, ConsoleEntry, DiffSpec,
   FileChange, FileDiff, GraphRow, LocalBranch, LogQuery, LogSessionInfo, MergeMode, MergeOpts, OpResult, Project, RefLabel, Refs, RepoChanged, RepoInfo,
@@ -474,10 +474,9 @@ function enterConflictState(repo: MockRepo, kind: "merging" | "rebasing" | "cher
 
 // ---------------------------------------------------------------- conflicts (mirror of gitcore::conflicts)
 
-/** The same checks as `check_path` of the Rust backend (same messages). */
+/** The same checks as `check_path` of the Rust backend (same messages). A leading `-` is fine: every call uses `--` and literal pathspecs. */
 function checkConflictPath(path: string): void {
   if (path === "") fail("empty path");
-  if (path.startsWith("-")) fail(`Invalid path ${JSON.stringify(path)}: it cannot start with '-'.`);
   if (/[\0\n\r]/.test(path)) fail(`Invalid path ${JSON.stringify(path)}: it contains a control character.`);
   if (path.startsWith("/") || path.split("/").includes("..")) fail(`path outside the repo: ${path}`);
 }
@@ -1261,8 +1260,11 @@ const handlers: Record<string, Handler> = {
     checkConflictPath(path);
     if (content.includes("\0")) fail("The result contains a NUL byte.");
     const conflict = conflictOf(repo, path);
-    const expected = optStr(a.expectedOursOid);
-    if (expected !== null && yoursOid(conflict, isRebasing(repo)) !== expected) fail("The conflict changed. Reload the merge.");
+    // all three versions must match; an omitted id means "absent" (like the backend)
+    const now = currentOids(conflict, isRebasing(repo));
+    if (now.ours !== optStr(a.expectedOursOid) || now.theirs !== optStr(a.expectedTheirsOid) || now.base !== optStr(a.expectedBaseOid)) {
+      fail("The conflict changed. Reload the merge.");
+    }
     if (!isTextConflict(conflict)) fail(`${path} is binary, not UTF-8 or too large: accept Yours or Theirs instead.`);
     if (bool(a.resolved)) {
       c.git(repo, ["--literal-pathspecs", "add", "-A", "--", path]);

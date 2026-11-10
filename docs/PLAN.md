@@ -342,7 +342,7 @@ No window, GTK or Tauri code runs. `SSH_ASKPASS_PROMPT=none` (an ssh info messag
 
 **IPC.** One request and one reply per connection. Frame = 4-byte big-endian length + JSON (max 64 KiB).
 ```
-helper -> app   {"v":1,"token":"<64 hex>","prompt":"Username for 'https://github.com': ","hint":null|"confirm"|"none"}
+helper -> app   {"v":1,"token":"<64 hex>","prompt":"Username for 'https://github.com': ","hint":null|"confirm"|"none","ppid":4242|null,"sshPort":2222|null}
 app -> helper   {"answer":"alice"}     or     {"answer":null}
 ```
 Transport: Unix = domain socket `askpass.sock` (mode 0600) in a fresh directory `deepgit-askpass-<pid>-<random>` (mode 0700) under
@@ -350,8 +350,10 @@ Transport: Unix = domain socket `askpass.sock` (mode 0600) in a fresh directory 
 Windows = TCP on `127.0.0.1`, port chosen by the system (a named pipe would be better; untested). `DEEPGIT_ASKPASS_ENDPOINT` is
 `unix:<path>` or `tcp:127.0.0.1:<port>`.
 Each network command gets a fresh 32-byte random token (64 hex chars), passed only in the child's environment, never in argv. The
-server answers only a live token; the token dies when the command ends (also when it is killed). The frame never carries a
-secret except the answer.
+server answers only a live token; the token dies when the command ends (also when it is killed, and when the `AuthTicket` is
+dropped without `finish`: `Drop` runs the same hook with a failed, empty outcome). The frame never carries a secret except the
+answer. `ppid` (Unix) is the process that ran the helper, the git or ssh child that asks; `sshPort` is the `-p` port of that ssh
+(Linux, read from `/proc`), used for the key of an ssh password.
 
 **Prompts** (`PromptKind`): `username`, `password`, `passphrase`, `pin`, `hostkey`, `unknown`. Parsed from git's
 `Username for 'https://host'` / `Password for 'https://user@host'`, ssh's `Enter passphrase for [key ]'<path>'`, `Bad passphrase, try again for <path>`,
@@ -379,10 +381,11 @@ inactivity timeout does not count; the 60 min cap still does.
 
 **Saved credentials** (system key store through the `keyring` crate: Secret Service, Keychain, Credential Manager; service
 `DeepGit`). Keys: HTTPS password `https://user@host[/path]` (as git prints it), HTTPS user name `login:https://host`, ssh key passphrase = the key path as ssh
-prints it, ssh password `ssh://user@host`, PIN `pin:<label>`. A host-key answer and an `unknown` prompt are never saved.
-- Nothing is saved while the command runs. After exit 0 the credentials the user asked to remember are saved.
-- After a failure whose stderr says `Authentication failed`, `Permission denied`, `HTTP Basic: Access denied`, `Invalid username or password` or HTTP 401 / 403, the saved entries the command used are deleted.
-- A second question for the same key in one command means the answer was wrong: the saved entry is deleted and the dialog is shown with `retry: true`.
+prints it, ssh password `ssh://user@host` (`ssh://user@host:port` when the helper knows a port other than 22), PIN `pin:<label>`.
+git prints a user name percent-encoded in the URL (`alice%40example.com`); `Prompt.user` is decoded, the key keeps the text git printed. A host-key answer and an `unknown` prompt are never saved.
+- Nothing is saved while the command runs. After exit 0 the credentials the user asked to remember are saved, on a thread of their own: the end of the command waits at most 3 s (`SAVE_WAIT`) for a locked key store, and slowness never marks the store unavailable (only an error it returns does).
+- After a failure the saved entries the command used are deleted only on a precise sign tied to a host (`askpass::rejected_keys`): `Authentication failed for '<url>'` and `'<url>': The requested URL returned error: 401|403` (the HTTPS entries of that origin), `HTTP Basic: Access denied` / `Invalid username or password` without a URL (only when the command used one HTTPS origin), ssh's `<user>@<host>: Permission denied (...password...)` (that ssh password). A bare `Permission denied` (a server hook, a local file, a work tree) never deletes anything; neither do key passphrases here.
+- One command may ask the same question many times without being rejected: `git fetch --all` (one git per remote) and submodules (one git each) ask for the same login. The command keeps what it answered and answers a repeat the same way; no dialog opens. A repeat counts as a rejection only where one process asks again after a wrong answer, which is ssh (passphrase, password, PIN: up to 3 times in one process): the same `ppid` asking again deletes the saved entry and opens the dialog with `retry: true`. HTTPS questions are never rejections (git fails right after a rejected login). Without a pid (Windows) every ssh repeat counts as a rejection.
 - The key store does not work (no Secret Service...): `canRemember` is false, `auth-notice` is sent once, login still works.
 - `useCredentialStore` off: nothing is read, saved or offered.
 - The names of saved keys (no secrets) are listed in `<app config dir>/credentials.json`, so `credentials_clear` removes exactly those.
@@ -417,15 +420,19 @@ Two clones into the same target folder cannot run together (the second fails bef
 | `conflicts` | `repoId` | `Vec<ConflictEntry>` (`git ls-files --unmerged -z`, sorted by path; empty when nothing is unmerged) |
 | `conflict_versions` | `repoId, path` | `ConflictVersions` (stages 1, 2, 3 read with `git cat-file --batch`; a missing stage is `None`) |
 | `accept_side` (write) | `repoId, paths: Vec<String>, side: ConflictSide` | `()` |
-| `save_resolution` (write) | `repoId, path, content: String, expectedOursOid: Option<String>, resolved: bool` | `()` |
+| `save_resolution` (write) | `repoId, path, content: String, expectedOursOid, expectedTheirsOid, expectedBaseOid: Option<String>, resolved: bool` | `()` |
 
 **Yours and Theirs, and the rebase swap.** Git calls stage 2 "ours" and stage 3 "theirs". During a
 **rebase** git replays the user's commit on top of the upstream, so stage 2 is the upstream and stage 3 is
 the user's commit. Every type and argument of this section speaks the user's language: `ours` is
 **Yours** and `theirs` is **Theirs**. `conflicts::side_stages` is the one function that maps them to
-stages (`rebase-merge/` or `rebase-apply/` without `rebase-apply/applying` = rebase: yours = 3, theirs = 2;
-merge, cherry-pick, revert, `git am`: yours = 2, theirs = 3). `ConflictVersions.swapped` tells the UI
-which case it got; the UI does not map anything.
+stages, per file: yours = 3 and theirs = 2 only for a conflict the rebase itself made (`rebase-merge/` or
+`rebase-apply/` without `rebase-apply/applying`, no `MERGE_HEAD` / `CHERRY_PICK_HEAD` / `REVERT_HEAD`, and a
+`REBASE_HEAD` whose `<path>` blob is the stage 3 blob, or is not there: a rename); merge, cherry-pick, revert,
+`git am`, and a cherry-pick, revert or `stash pop` done while a rebase is stopped: yours = 2, theirs = 3.
+(`state::detect` puts `CHERRY_PICK_HEAD` / `REVERT_HEAD` before the rebase directories, so such a repo is
+`cherryPicking` / `reverting`.) A stash popped at a conflict stop whose file is identical to the replayed commit's
+looks like the rebase's. `ConflictVersions.swapped` tells the UI which case it got; the UI does not map anything.
 
 - `SideStatus` per side, from the stage and the base: present with a base = `modified`, present without =
   `added`, absent with a base = `deleted`, absent without = `missing`. Modify/modify, add/add (no base),
@@ -435,15 +442,21 @@ which case it got; the UI does not map anything.
   Theirs = `MERGE_HEAD` as a branch name (else `abc1234 subject`), the cherry-picked / reverted commit
   (`CHERRY_PICK_HEAD`, `REVERT_HEAD`), or the branch the rebase goes onto (`onto`). Without an operation: "Theirs".
 - `accept_side`: each path must be conflicted now (else `Invalid`: "<path> is no longer in conflict.").
-  A side that has the file: `checkout --ours|--theirs -- paths` (git's own flag, after the swap), then
-  `add -A -- paths`. A side that deleted it: `rm -q -- paths`. Paths: `check_name` (no leading `-`, no NUL or newline),
-  no `..` or absolute path, `--literal-pathspecs` and `--` on every call.
+  A side that has the file (or a symlink): `checkout --ours|--theirs -- paths` (git's own flag, after the swap),
+  then `add -A -- paths`. A side that has a submodule (gitlink, mode 160000): `update-index --add --cacheinfo
+  160000,<oid>,<path>` from the chosen stage (`checkout` does not move a gitlink and `add` would record the
+  checked-out commit); the submodule's worktree is never touched. A side that deleted it: `rm -q -- paths`
+  (`--cached` for a submodule). Paths: no NUL or line break (a leading `-` is fine), no `..` or absolute path,
+  `--literal-pathspecs` and `--` on every call.
 - `save_resolution`: writes `content` (UTF-8, LF line ends) to the worktree file in the file's line ending
-  (`eol`: the worktree file, else the first version that has line breaks; CRLF is the majority rule), never through
+  (`eol`: the worktree file, else the first version that has line breaks; CRLF is the majority rule; a file whose
+  versions mix CRLF and LF keeps each line's own ending: a line takes the ending it has in Yours, else Theirs, else the
+  base, a new line gets LF), never through
   a symlink and never outside the repo, keeping the file mode of an existing file (a new file gets the exec bit
   when an index entry has it). `resolved = true` then runs `git add`; `false` only writes (the file keeps conflict
   markers and stays unmerged; the UI writes the markers). Refused (`Invalid`) when: the path is no longer conflicted;
-  `expectedOursOid` (the `oid` of the Yours blob the editor loaded) is not the current Yours blob ("The conflict
+  `expectedOursOid`, `expectedTheirsOid` or `expectedBaseOid` (the `oid` of the Yours, Theirs and base blobs the
+  editor loaded; an omitted or null one means "that version is absent") differs from the index ("The conflict
   changed. Reload the merge."); any version is binary, not UTF-8, over 2 MiB, a symlink or a submodule; the content has a NUL.
   Content is never rebuilt from lossy-decoded text: a non-UTF-8 file only allows `accept_side`.
 

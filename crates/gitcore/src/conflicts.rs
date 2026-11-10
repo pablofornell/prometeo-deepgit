@@ -7,12 +7,17 @@
 //! commit on top of the upstream, so stage 2 is the upstream and stage 3 is your commit. The one
 //! place that knows this is `side_stages`; every public function maps through it, so `ours` in
 //! this module's API is always the user's side.
+//!
+//! The swap is per file and only for conflicts that the rebase itself made: a cherry-pick or a
+//! revert done while a rebase is stopped (`CHERRY_PICK_HEAD` / `REVERT_HEAD`) is not swapped, and
+//! neither is a `git stash pop` there (it leaves no marker, so the stage-3 blob is compared with
+//! the replayed commit's, see `rebase_owns`).
 
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 use std::io::Write;
 use std::path::Path;
 
-use crate::error::{check_name, GitError};
+use crate::error::GitError;
 use crate::model::*;
 use crate::ops::{check_rel, stage, with_paths};
 use crate::runner::Git;
@@ -39,26 +44,61 @@ pub(crate) struct SideStages {
     pub swapped: bool,
 }
 
-/// THE place of the rebase swap. Merge, cherry-pick, revert (and `git am`): yours = stage 2,
-/// theirs = stage 3. Rebase: yours = stage 3 (your commit being replayed), theirs = stage 2 (the
-/// upstream). `git am` also uses `rebase-apply/`, but it marks itself with `applying`.
-pub(crate) fn side_stages(repo: &Path) -> Result<SideStages, GitError> {
-    let dir = state::git_dir(repo)?;
+const STRAIGHT: SideStages = SideStages {
+    yours: 2,
+    theirs: 3,
+    swapped: false,
+};
+const SWAPPED: SideStages = SideStages {
+    yours: 3,
+    theirs: 2,
+    swapped: true,
+};
+
+/// THE place of the rebase swap. Merge, cherry-pick, revert, `stash pop` (and `git am`): yours =
+/// stage 2, theirs = stage 3. A conflict made by a rebase: yours = stage 3 (your commit being
+/// replayed), theirs = stage 2 (the upstream). `state::detect` says `Rebasing` only when no
+/// `MERGE_HEAD`, `CHERRY_PICK_HEAD` or `REVERT_HEAD` is there, and `git am` marks itself with
+/// `rebase-apply/applying`; the rest is `rebase_owns`.
+fn side_stages(git: &Git, repo: &RepoInfo, u: &Unmerged) -> Result<SideStages, GitError> {
+    let dir = state::git_dir(repo_path(repo))?;
     let rebasing = state::detect(&dir) == RepoStateKind::Rebasing
         && !dir.join("rebase-apply").join("applying").exists();
-    Ok(if rebasing {
-        SideStages {
-            yours: 3,
-            theirs: 2,
-            swapped: true,
-        }
+    Ok(if rebasing && rebase_owns(git, repo, &dir, u) {
+        SWAPPED
     } else {
-        SideStages {
-            yours: 2,
-            theirs: 3,
-            swapped: false,
-        }
+        STRAIGHT
     })
+}
+
+/// A rebase is stopped, but is this file's conflict the rebase's? A `git stash pop` made while it
+/// is stopped leaves no marker. A rebase that stopped on a conflict has `REBASE_HEAD`, the commit
+/// it is replaying; without it (a stop at `edit`, `break`, a reword) the rebase has no conflict of
+/// its own, so whatever conflicts is not its. With it, stage 3 is the blob of that commit, so a
+/// stage 3 that differs from `REBASE_HEAD:<path>` is not the rebase's. When the path is not in
+/// that commit (a rename) the rebase owns it. A stash whose file is identical to the replayed
+/// commit's looks like the rebase's.
+fn rebase_owns(git: &Git, repo: &RepoInfo, dir: &Path, u: &Unmerged) -> bool {
+    let Some(head) = first_line(dir, "REBASE_HEAD").filter(|h| is_oid(h)) else {
+        return false;
+    };
+    let spec = format!("{head}:{}", u.path);
+    let out = git.run_unchecked(
+        repo_path(repo),
+        Some(&repo.id),
+        &["rev-parse", "--verify", "-q", &spec],
+        false,
+        None,
+    );
+    let in_commit = match out {
+        Ok(o) if o.code == 0 => Some(o.stdout.trim().to_string()),
+        _ => None,
+    };
+    match (in_commit, u.stage(3)) {
+        (None, _) => true,
+        (Some(c), Some(s3)) => c == s3.oid,
+        (Some(_), None) => false,
+    }
 }
 
 // ---------------------------------------------------------------- ls-files --unmerged
@@ -153,11 +193,18 @@ fn side_status(present: bool, base: bool) -> SideStatus {
     }
 }
 
+/// A path of the conflict list. Unlike a branch name it may start with `-` (every call here uses
+/// `--literal-pathspecs` and `--`, and `--cacheinfo` takes one argument); `..`, absolute paths, NUL
+/// and line breaks are refused.
 fn check_path(path: &str) -> Result<(), GitError> {
     if path.is_empty() {
         return Err(GitError::Invalid("empty path".into()));
     }
-    check_name("path", path)?;
+    if path.chars().any(|c| c == '\0' || c == '\n' || c == '\r') {
+        return Err(GitError::Invalid(format!(
+            "Invalid path {path:?}: it contains a control character."
+        )));
+    }
     check_rel(path)
 }
 
@@ -278,24 +325,23 @@ pub fn conflicts(git: &Git, repo: &RepoInfo) -> Result<Vec<ConflictEntry>, GitEr
     if list.is_empty() {
         return Ok(Vec::new());
     }
-    let st = side_stages(repo_path(repo))?;
     let blobs = read_blobs(git, repo, &oids_of(&list))?;
-    Ok(list
-        .iter()
+    list.iter()
         .map(|u| {
+            let st = side_stages(git, repo, u)?;
             let base = u.stage(1).is_some();
             let yours = side_status(u.stage(st.yours).is_some(), base);
             let theirs = side_status(u.stage(st.theirs).is_some(), base);
             let binary = !u.regular() || u.present().any(|e| blob_of(e, blobs.get(&e.oid)).binary);
-            ConflictEntry {
+            Ok(ConflictEntry {
                 path: u.path.clone(),
                 old_path: None,
                 ours: yours,
                 theirs,
                 binary,
-            }
+            })
         })
-        .collect())
+        .collect()
 }
 
 // ---------------------------------------------------------------- the three versions
@@ -308,7 +354,7 @@ pub fn conflict_versions(
 ) -> Result<ConflictVersions, GitError> {
     check_path(path)?;
     let u = unmerged_one(git, repo, path)?;
-    let st = side_stages(repo_path(repo))?;
+    let st = side_stages(git, repo, &u)?;
     let blobs = read_blobs(git, repo, &oids_of(std::slice::from_ref(&u)))?;
     let blob = |n: usize| u.stage(n).map(|e| blob_of(e, blobs.get(&e.oid)));
     let (base, ours, theirs) = (blob(1), blob(st.yours), blob(st.theirs));
@@ -498,9 +544,19 @@ fn labels(git: &Git, repo: &RepoInfo, st: SideStages) -> ConflictLabels {
 
 // ---------------------------------------------------------------- accept one side
 
-/// Keeps one whole side of each path (Accept Yours / Accept Theirs). A side that has the file:
-/// `git checkout --ours|--theirs -- path`, then `git add -- path`. A side that deleted it:
-/// `git rm -- path`. `side` is the user's view; the rebase swap is applied here.
+const GITLINK: &str = "160000";
+
+/// Keeps one whole side of each path (Accept Yours / Accept Theirs). `side` is the user's view; the
+/// rebase swap is applied here, per file.
+///
+/// - A side that has a regular file or a symlink: `git checkout --ours|--theirs -- path`, then
+///   `git add -A -- path`.
+/// - A side that has a submodule (a gitlink, mode 160000): `git checkout` does not move a gitlink
+///   and `git add` would record the submodule's current HEAD (that is Yours, whatever side was
+///   asked), so the index entry is set from the chosen stage with `git update-index --cacheinfo`.
+///   The submodule's worktree is not touched.
+/// - A side that deleted the file: `git rm -- path` (`--cached` for a submodule, which must keep
+///   its worktree).
 pub fn accept_side(
     git: &Git,
     repo: &RepoInfo,
@@ -514,34 +570,48 @@ pub fn accept_side(
         check_path(p)?;
     }
     let listed = list_unmerged(git, repo, Some(paths))?;
-    let st = side_stages(repo_path(repo))?;
-    let stage_no = match side {
-        ConflictSide::Ours => st.yours,
-        ConflictSide::Theirs => st.theirs,
-    };
-    let (mut keep, mut remove) = (Vec::new(), Vec::new());
+    let (mut ours, mut theirs) = (Vec::new(), Vec::new());
+    let (mut gitlinks, mut remove, mut remove_cached) = (Vec::new(), Vec::new(), Vec::new());
     for p in paths {
         let u = listed
             .iter()
             .find(|u| &u.path == p)
             .ok_or_else(|| GitError::Invalid(format!("{p} is no longer in conflict.")))?;
-        if u.stage(stage_no).is_some() {
-            keep.push(p.clone());
-        } else {
-            remove.push(p.clone());
+        let st = side_stages(git, repo, u)?;
+        let stage_no = match side {
+            ConflictSide::Ours => st.yours,
+            ConflictSide::Theirs => st.theirs,
+        };
+        match u.stage(stage_no) {
+            Some(e) if e.mode == GITLINK => gitlinks.push((p.clone(), e.oid.clone())),
+            // Git's own flag: --ours is stage 2, --theirs is stage 3.
+            Some(_) if stage_no == 2 => ours.push(p.clone()),
+            Some(_) => theirs.push(p.clone()),
+            None if u.present().any(|e| e.mode == GITLINK) => remove_cached.push(p.clone()),
+            None => remove.push(p.clone()),
         }
     }
     let rp = repo_path(repo);
-    if !keep.is_empty() {
-        // Git's own flag: --ours is stage 2, --theirs is stage 3.
-        let flag = if stage_no == 2 { "--ours" } else { "--theirs" };
+    for (flag, keep) in [("--ours", &ours), ("--theirs", &theirs)] {
+        if keep.is_empty() {
+            continue;
+        }
         git.run(
             rp,
             Some(&repo.id),
-            &with_paths(&["checkout", flag], &keep),
+            &with_paths(&["checkout", flag], keep),
             true,
         )?;
-        stage(git, repo, &keep)?;
+        stage(git, repo, keep)?;
+    }
+    for (path, oid) in &gitlinks {
+        let info = format!("{GITLINK},{oid},{path}");
+        git.run(
+            rp,
+            Some(&repo.id),
+            &["update-index", "--add", "--cacheinfo", &info],
+            true,
+        )?;
     }
     if !remove.is_empty() {
         git.run(
@@ -551,24 +621,47 @@ pub fn accept_side(
             true,
         )?;
     }
+    if !remove_cached.is_empty() {
+        git.run(
+            rp,
+            Some(&repo.id),
+            &with_paths(&["rm", "-q", "--cached"], &remove_cached),
+            true,
+        )?;
+    }
     Ok(())
 }
 
 // ---------------------------------------------------------------- save a hand-made resolution
 
+/// The blob ids of the three versions the editor loaded (`ConflictBlob::oid`); `None` = that version
+/// was absent. They must match the index exactly (an omitted id means "absent").
+#[derive(Clone, Copy, Debug, Default)]
+pub struct ExpectedOids<'a> {
+    /// The user's side ("Yours").
+    pub ours: Option<&'a str>,
+    pub theirs: Option<&'a str>,
+    pub base: Option<&'a str>,
+}
+
 /// Writes `content` (UTF-8, LF line ends) as the file, in the file's own line ending and with its
 /// file mode, and with `resolved` stages it (`git add`). Without `resolved` the file is only
 /// written (it still holds conflict markers) and stays unmerged.
 ///
-/// Refused when the file is no longer conflicted, when `expected_ours_oid` (the user's version
-/// the editor loaded) is not the current one, when any version is binary or not UTF-8, or when
+/// Line endings: a file whose versions are all LF or all CRLF is written in its majority ending. A
+/// file with mixed endings keeps each line's own: a line whose text is in Yours (else Theirs, else
+/// the base) gets the ending it has there; a new line gets LF.
+///
+/// Refused when the file is no longer conflicted, when any of the three versions the editor
+/// loaded (`expected`) is not the current one (Yours, Theirs and the base when there is one: a
+/// change of either side makes the editor stale), when any version is binary or not UTF-8, or when
 /// the file is a symlink or submodule.
 pub fn save_resolution(
     git: &Git,
     repo: &RepoInfo,
     path: &str,
     content: &str,
-    expected_ours_oid: Option<&str>,
+    expected: ExpectedOids<'_>,
     resolved: bool,
 ) -> Result<(), GitError> {
     check_path(path)?;
@@ -576,18 +669,20 @@ pub fn save_resolution(
         return Err(GitError::Invalid("The result contains a NUL byte.".into()));
     }
     let u = unmerged_one(git, repo, path)?;
-    let st = side_stages(repo_path(repo))?;
+    let st = side_stages(git, repo, &u)?;
     if !u.regular() {
         return Err(GitError::Invalid(format!(
             "{path} is a symlink or a submodule: accept Yours or Theirs instead."
         )));
     }
-    if let Some(want) = expected_ours_oid {
-        if u.stage(st.yours).map(|e| e.oid.as_str()) != Some(want) {
-            return Err(GitError::Invalid(
-                "The conflict changed. Reload the merge.".into(),
-            ));
-        }
+    let oid_of = |n: usize| u.stage(n).map(|e| e.oid.as_str());
+    if oid_of(st.yours) != expected.ours
+        || oid_of(st.theirs) != expected.theirs
+        || oid_of(1) != expected.base
+    {
+        return Err(GitError::Invalid(
+            "The conflict changed. Reload the merge.".into(),
+        ));
     }
     let blobs = read_blobs(git, repo, &oids_of(std::slice::from_ref(&u)))?;
     if u.present().any(|e| blob_of(e, blobs.get(&e.oid)).binary) {
@@ -595,13 +690,21 @@ pub fn save_resolution(
             "{path} is binary, not UTF-8 or too large: accept Yours or Theirs instead."
         )));
     }
-    let eol = detect_eol(repo, path, &u, &st, &blobs);
-    let bytes = match eol {
-        Eol::Lf => content.as_bytes().to_vec(),
-        Eol::Crlf => content
-            .replace("\r\n", "\n")
-            .replace('\n', "\r\n")
-            .into_bytes(),
+    let version_bytes = |n: usize| u.stage(n).and_then(|e| blobs.get(&e.oid)?.bytes.as_deref());
+    let versions: Vec<&[u8]> = [st.yours, st.theirs, 1]
+        .into_iter()
+        .filter_map(version_bytes)
+        .collect();
+    let bytes = if versions.iter().any(|v| is_mixed(v)) {
+        keep_line_endings(content, &versions)
+    } else {
+        match detect_eol(repo, path, &u, &st, &blobs) {
+            Eol::Lf => content.as_bytes().to_vec(),
+            Eol::Crlf => content
+                .replace("\r\n", "\n")
+                .replace('\n', "\r\n")
+                .into_bytes(),
+        }
     };
     let executable = u.present().any(|e| e.mode == "100755");
     write_worktree_file(repo_path(repo), path, &bytes, executable)?;
@@ -609,6 +712,62 @@ pub fn save_resolution(
         stage(git, repo, &[path.to_string()])?;
     }
     Ok(())
+}
+
+/// True when `bytes` has both CRLF and bare LF line ends.
+fn is_mixed(bytes: &[u8]) -> bool {
+    let (mut crlf, mut lf) = (false, false);
+    for (i, b) in bytes.iter().enumerate() {
+        if *b == b'\n' {
+            if i > 0 && bytes[i - 1] == b'\r' {
+                crlf = true;
+            } else {
+                lf = true;
+            }
+        }
+    }
+    crlf && lf
+}
+
+/// `content` (LF line ends) with the line endings the lines have in `versions` (in order of
+/// preference). A line is matched by its text; the n-th time a text appears in the result it takes
+/// the n-th ending that text has in the versions (the last one when it runs out). A line that is in
+/// no version, and the last line when `content` does not end with a newline, get LF / none.
+fn keep_line_endings(content: &str, versions: &[&[u8]]) -> Vec<u8> {
+    const LF: &[u8] = b"\n";
+    const CRLF: &[u8] = b"\r\n";
+    let mut pool: HashMap<&[u8], VecDeque<&[u8]>> = HashMap::new();
+    for v in versions {
+        for line in v.split_inclusive(|b| *b == b'\n') {
+            let (text, eol) = match line.strip_suffix(b"\n") {
+                Some(t) => match t.strip_suffix(b"\r") {
+                    Some(t) => (t, CRLF),
+                    None => (t, LF),
+                },
+                None => continue, // a last line without line end says nothing
+            };
+            pool.entry(text).or_default().push_back(eol);
+        }
+    }
+    let content = content.replace("\r\n", "\n");
+    let mut last: HashMap<&[u8], &[u8]> = HashMap::new();
+    let mut out = Vec::with_capacity(content.len() + 16);
+    for line in content.as_bytes().split_inclusive(|b| *b == b'\n') {
+        let Some(text) = line.strip_suffix(b"\n") else {
+            out.extend_from_slice(line);
+            continue;
+        };
+        out.extend_from_slice(text);
+        let eol = match pool.get_mut(text).and_then(VecDeque::pop_front) {
+            Some(e) => {
+                last.insert(text, e);
+                e
+            }
+            None => last.get(text).copied().unwrap_or(LF),
+        };
+        out.extend_from_slice(eol);
+    }
+    out
 }
 
 /// Writes a regular file inside the repo. An existing file keeps its mode (it is rewritten in
@@ -688,22 +847,22 @@ mod tests {
     }
 
     #[test]
-    fn sides_swap_only_in_a_rebase() {
-        let dir = tempfile::tempdir().unwrap();
-        let git_dir = dir.path().join(".git");
-        std::fs::create_dir(&git_dir).unwrap();
-        let st = side_stages(dir.path()).unwrap();
-        assert_eq!((st.yours, st.theirs, st.swapped), (2, 3, false));
-        std::fs::write(git_dir.join("MERGE_HEAD"), "x\n").unwrap();
-        assert!(!side_stages(dir.path()).unwrap().swapped);
-        std::fs::remove_file(git_dir.join("MERGE_HEAD")).unwrap();
-        std::fs::create_dir(git_dir.join("rebase-merge")).unwrap();
-        let st = side_stages(dir.path()).unwrap();
-        assert_eq!((st.yours, st.theirs, st.swapped), (3, 2, true));
-        std::fs::remove_dir(git_dir.join("rebase-merge")).unwrap();
-        // `git am` shares rebase-apply/ but is not a rebase.
-        std::fs::create_dir_all(git_dir.join("rebase-apply")).unwrap();
-        std::fs::write(git_dir.join("rebase-apply").join("applying"), "").unwrap();
-        assert!(!side_stages(dir.path()).unwrap().swapped);
+    fn mixed_endings_are_kept_line_by_line() {
+        let yours = b"a\r\nb\nc\r\nc\n";
+        assert!(is_mixed(yours));
+        assert!(!is_mixed(b"a\r\nb\r\n"));
+        assert!(!is_mixed(b"a\nb\n"));
+        let kept = |content: &str| String::from_utf8(keep_line_endings(content, &[yours])).unwrap();
+        // unchanged lines keep their ending, new lines get LF
+        assert_eq!(kept("a\nb\nc\nc\n"), "a\r\nb\nc\r\nc\n");
+        assert_eq!(kept("a\nNEW\nb\nc\nc\n"), "a\r\nNEW\nb\nc\r\nc\n");
+        // a text that appears more often than in the versions repeats the last ending it had
+        assert_eq!(kept("c\nc\nc\n"), "c\r\nc\nc\n");
+        // CRLF the editor still holds is not doubled; a last line without a newline stays without
+        assert_eq!(kept("a\r\nb\nlast"), "a\r\nb\nlast");
+        // the first version wins over the later ones
+        let theirs: &[u8] = b"a\nz\r\n";
+        let both = keep_line_endings("a\nz\n", &[yours, theirs]);
+        assert_eq!(String::from_utf8(both).unwrap(), "a\r\nz\r\n");
     }
 }

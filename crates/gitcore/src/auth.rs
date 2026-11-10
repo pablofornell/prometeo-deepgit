@@ -57,7 +57,9 @@ pub struct AuthOutcome<'a> {
 
 type Finish = Box<dyn FnOnce(&AuthOutcome<'_>) + Send>;
 
-/// One command's authentication session. Dropping it (also after `finish`) revokes the token.
+/// One command's authentication session. `finish` reports the outcome; dropping the ticket without
+/// finishing (a panic, an early return) runs the same hook with a failed, empty outcome, so the
+/// token is revoked and open prompts are withdrawn in every case. The hook runs once.
 pub struct AuthTicket {
     pub ctx: AuthContext,
     finish: Option<Finish>,
@@ -75,6 +77,17 @@ impl AuthTicket {
     pub fn finish(mut self, outcome: &AuthOutcome<'_>) {
         if let Some(f) = self.finish.take() {
             f(outcome);
+        }
+    }
+}
+
+impl Drop for AuthTicket {
+    fn drop(&mut self) {
+        if let Some(f) = self.finish.take() {
+            f(&AuthOutcome {
+                success: false,
+                stderr: "",
+            });
         }
     }
 }
@@ -153,6 +166,49 @@ mod tests {
         env.get(k)
             .and_then(|v| v.as_ref())
             .map(|v| v.to_string_lossy().into_owned())
+    }
+
+    fn ticket(calls: &Arc<std::sync::Mutex<Vec<(bool, String)>>>) -> AuthTicket {
+        let calls = calls.clone();
+        AuthTicket::new(
+            ctx(),
+            Box::new(move |o| {
+                calls
+                    .lock()
+                    .unwrap()
+                    .push((o.success, o.stderr.to_string()))
+            }),
+        )
+    }
+
+    #[test]
+    fn a_finished_ticket_runs_its_hook_once_and_dropping_it_adds_nothing() {
+        let calls = Arc::default();
+        let t = ticket(&calls);
+        t.finish(&AuthOutcome {
+            success: true,
+            stderr: "x",
+        });
+        assert_eq!(*calls.lock().unwrap(), vec![(true, "x".to_string())]);
+    }
+
+    #[test]
+    fn a_dropped_ticket_revokes_with_a_failed_empty_outcome() {
+        let calls = Arc::default();
+        drop(ticket(&calls));
+        assert_eq!(*calls.lock().unwrap(), vec![(false, String::new())]);
+    }
+
+    #[test]
+    fn a_ticket_dropped_while_unwinding_is_revoked_too() {
+        let calls: Arc<std::sync::Mutex<Vec<(bool, String)>>> = Arc::default();
+        let c2 = calls.clone();
+        let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || {
+            let _t = ticket(&c2);
+            panic!("the command crashed");
+        }));
+        assert!(r.is_err());
+        assert_eq!(calls.lock().unwrap().len(), 1);
     }
 
     #[test]

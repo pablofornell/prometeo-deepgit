@@ -19,6 +19,7 @@ import { languageFor } from "../diff/syntax";
 import { MAX_WORD_LINE, MAX_WORD_RATIO, wordDiff } from "../diff/wordDiff";
 import { LINE_HEIGHT, createPane, fromModel, minimalChange, modelState, refresh, type LineMark, type WordMark } from "./editor";
 import { MergeModel, normalizeText, type LineEdit, type Side } from "./model";
+import { expectedOids } from "./resolve";
 import { COL, anchorsOf, mapLine, type Col } from "./scrollSync";
 
 export interface ThreeWayProps {
@@ -319,7 +320,7 @@ export function ThreeWay(props: ThreeWayProps): JSX.Element {
     }
     setBusy(true);
     const content = open > 0 ? model.resultWithMarkers(markers) : model.resultText();
-    const res = await actions.saveResolution(props.repoId, props.path, content, v.ours?.oid ?? null, open === 0);
+    const res = await actions.saveResolution(props.repoId, props.path, content, expectedOids(v), open === 0);
     setBusy(false);
     if (res.ok.length > 0) props.done({ resolved: open === 0 });
   };

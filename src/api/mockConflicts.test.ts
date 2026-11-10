@@ -67,11 +67,14 @@ describe("mock conflicts (mirror of gitcore::conflicts)", () => {
 
   it("is as strict as the backend about paths", async () => {
     const { docs } = await repoIds();
-    for (const bad of ["-f", "--ours", "../x", "/etc/passwd", "a/../../x", "", "a\nb"]) {
+    for (const bad of ["../x", "/etc/passwd", "a/../../x", "", "a\nb"]) {
       await expect(call("conflict_versions", { repoId: docs, path: bad })).rejects.toHaveProperty("message");
       await expect(call("accept_side", { repoId: docs, paths: [bad], side: "ours" })).rejects.toHaveProperty("message");
       await expect(call("save_resolution", { repoId: docs, path: bad, content: "x", expectedOursOid: null, resolved: true })).rejects.toHaveProperty("message");
     }
+    // a leading dash is a fine file name (literal pathspecs): it is just not a conflicted file here
+    await expect(call("conflict_versions", { repoId: docs, path: "-f" })).rejects.toMatchObject({ message: "-f is no longer in conflict." });
+    await expect(call("accept_side", { repoId: docs, paths: ["--ours"], side: "ours" })).rejects.toMatchObject({ message: "--ours is no longer in conflict." });
     await expect(call("conflict_versions", { repoId: docs, path: "nope.txt" })).rejects.toMatchObject({ message: "nope.txt is no longer in conflict." });
     await expect(call("accept_side", { repoId: docs, paths: ["docs"], side: "ours" })).rejects.toMatchObject({ message: expect.stringContaining("no longer in conflict") });
     await expect(call("accept_side", { repoId: docs, paths: ["config/site.toml"], side: "mine" })).rejects.toHaveProperty("message");
@@ -79,21 +82,36 @@ describe("mock conflicts (mirror of gitcore::conflicts)", () => {
 
   it("refuses to save a binary file, a stale blob and a NUL byte", async () => {
     const { docs } = await repoIds();
-    await expect(call("save_resolution", { repoId: docs, path: "static/img/architecture.png", content: "x", expectedOursOid: null, resolved: true })).rejects.toMatchObject({
+    const ex = (v: ConflictVersions) => ({ expectedOursOid: v.ours?.oid ?? null, expectedTheirsOid: v.theirs?.oid ?? null, expectedBaseOid: v.base?.oid ?? null });
+    const bin = await call<ConflictVersions>("conflict_versions", { repoId: docs, path: "static/img/architecture.png" });
+    await expect(call("save_resolution", { repoId: docs, path: "static/img/architecture.png", content: "x", ...ex(bin), resolved: true })).rejects.toMatchObject({
       message: expect.stringContaining("binary"),
     });
-    await expect(call("save_resolution", { repoId: docs, path: "config/site.toml", content: "x", expectedOursOid: "0".repeat(40), resolved: true })).rejects.toMatchObject({
-      message: "The conflict changed. Reload the merge.",
-    });
-    await expect(call("save_resolution", { repoId: docs, path: "config/site.toml", content: "a\0b", expectedOursOid: null, resolved: true })).rejects.toHaveProperty("message");
+    const v = await call<ConflictVersions>("conflict_versions", { repoId: docs, path: "config/site.toml" });
+    const stale = "0".repeat(40);
+    // any of the three versions out of date is refused, and an omitted id means "absent"
+    for (const [what, patch] of Object.entries({
+      yours: { expectedOursOid: stale },
+      theirs: { expectedTheirsOid: stale },
+      base: { expectedBaseOid: stale },
+      "a missing base": { expectedBaseOid: null },
+      "a missing theirs": { expectedTheirsOid: null },
+    })) {
+      await expect(call("save_resolution", { repoId: docs, path: "config/site.toml", content: "x", ...ex(v), ...patch, resolved: true }), what).rejects.toMatchObject({
+        message: "The conflict changed. Reload the merge.",
+      });
+    }
+    await expect(call("save_resolution", { repoId: docs, path: "config/site.toml", content: "x", resolved: true })).rejects.toMatchObject({ message: "The conflict changed. Reload the merge." });
+    await expect(call("save_resolution", { repoId: docs, path: "config/site.toml", content: "a\0b", ...ex(v), resolved: true })).rejects.toHaveProperty("message");
   });
 
   it("an unresolved save keeps the file in the list, a resolved one stages it", async () => {
     const { docs } = await repoIds();
     const v = await call<ConflictVersions>("conflict_versions", { repoId: docs, path: "config/site.toml" });
-    await call("save_resolution", { repoId: docs, path: "config/site.toml", content: "<<<<<<<", expectedOursOid: v.ours?.oid ?? null, resolved: false });
+    const ex = { expectedOursOid: v.ours?.oid ?? null, expectedTheirsOid: v.theirs?.oid ?? null, expectedBaseOid: v.base?.oid ?? null };
+    await call("save_resolution", { repoId: docs, path: "config/site.toml", content: "<<<<<<<", ...ex, resolved: false });
     expect((await call<ConflictEntry[]>("conflicts", { repoId: docs })).some((c) => c.path === "config/site.toml")).toBe(true);
-    await call("save_resolution", { repoId: docs, path: "config/site.toml", content: "title = 1\n", expectedOursOid: v.ours?.oid ?? null, resolved: true });
+    await call("save_resolution", { repoId: docs, path: "config/site.toml", content: "title = 1\n", ...ex, resolved: true });
     expect((await call<ConflictEntry[]>("conflicts", { repoId: docs })).some((c) => c.path === "config/site.toml")).toBe(false);
     const wt = await call<WorkingTree>("working_tree", { repoId: docs });
     expect(wt.staged.some((f) => f.path === "config/site.toml")).toBe(true);

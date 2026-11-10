@@ -20,6 +20,7 @@ import { type Accessor, For, Index, type JSX, Show, createEffect, createMemo, cr
 import { Portal } from "solid-js/web";
 import { repoVars } from "../../state/colors";
 import { trackOverlay } from "../../state/keymap";
+import { closeWhenDialogOpens } from "../../state/overlays";
 import type { ColorChoice } from "../../theme/palette";
 import { Icon } from "./Icon";
 import type { IconName } from "./icons";
@@ -313,6 +314,8 @@ function MenuPanel(props: { level: Accessor<Level>; depth: number }): JSX.Elemen
 /** Renders the open menu (and its submenus). Mount once near the root. */
 export function MenuHost(): JSX.Element {
   trackOverlay(isMenuOpen);
+  // a menu above the scrim of a dialog that opens now could be clicked: close it (one opened from the dialog stays)
+  closeWhenDialogOpens(closeMenu);
   onMount(() => {
     const down = (e: PointerEvent) => {
       if (levels().length === 0) return;

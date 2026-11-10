@@ -22,6 +22,7 @@
 import { type Component, For, type JSX, Show, createSignal, onCleanup, onMount } from "solid-js";
 import { Dynamic, Portal } from "solid-js/web";
 import { trackOverlay } from "../../state/keymap";
+import { setDialogDepth } from "../../state/overlays";
 import { Button, IconButton } from "./Button";
 import { copyText } from "./util";
 
@@ -47,12 +48,15 @@ export function openDialog<P extends object, T>(component: Component<P & DialogC
     const id = ++seq;
     const close = (r?: unknown) => {
       setStack((s) => s.filter((d) => d.id !== id));
+      setDialogDepth(stack().length);
       resolve(r as T | undefined);
     };
     setStack((s) => [
       ...s,
       { id, component: component as unknown as Component<never>, props: { ...props, close } as Record<string, unknown>, resolve: resolve as (r: unknown) => void },
     ]);
+    // menus and popups that are open close now (`closeWhenDialogOpens`)
+    setDialogDepth(stack().length);
   });
 }
 

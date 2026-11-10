@@ -47,6 +47,9 @@ pub struct Prompt {
     pub label: Option<String>,
     /// The URL exactly as git printed it, user included (`https://alice@github.com`).
     pub url: Option<String>,
+    /// The port of the ssh connection when the helper could read it (set by the broker; the ssh
+    /// password prompt does not name it).
+    pub port: Option<u16>,
 }
 
 impl Prompt {
@@ -59,6 +62,7 @@ impl Prompt {
             key_path: None,
             label: None,
             url: None,
+            port: None,
         }
     }
 }
@@ -78,9 +82,31 @@ fn strip_prefix_ci<'a>(s: &'a str, prefix: &str) -> Option<&'a str> {
         .then(|| &s[prefix.len()..])
 }
 
+/// `%41` -> `A`. Anything that is not a valid escape stays as it is; bytes that do not make UTF-8
+/// are replaced.
+pub fn percent_decode(s: &str) -> String {
+    let b = s.as_bytes();
+    let mut out = Vec::with_capacity(b.len());
+    let mut i = 0;
+    while i < b.len() {
+        if b[i] == b'%' && i + 2 < b.len() {
+            let hex = std::str::from_utf8(&b[i + 1..i + 3]).ok();
+            if let Some(v) = hex.and_then(|h| u8::from_str_radix(h, 16).ok()) {
+                out.push(v);
+                i += 3;
+                continue;
+            }
+        }
+        out.push(b[i]);
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
 /// Splits `scheme://[user[:pw]@]host[:port][/path]` into `(origin, user)` where `origin` is
-/// `scheme://host[:port]`.
-fn split_url(url: &str) -> Option<(String, Option<String>)> {
+/// `scheme://host[:port]`. git percent-encodes the user name in the URL it prints (`alice%40x.org`
+/// for `alice@x.org`), so the user comes back decoded.
+pub(crate) fn split_url(url: &str) -> Option<(String, Option<String>)> {
     let (scheme, rest) = url.split_once("://")?;
     if scheme.is_empty() {
         return None;
@@ -96,7 +122,7 @@ fn split_url(url: &str) -> Option<(String, Option<String>)> {
     let user = userinfo
         .map(|u| u.split(':').next().unwrap_or(u))
         .filter(|u| !u.is_empty())
-        .map(str::to_string);
+        .map(percent_decode);
     Some((format!("{scheme}://{host}"), user))
 }
 
@@ -185,14 +211,17 @@ pub fn parse(text: &str, hint: Option<&str>) -> Prompt {
 /// - HTTPS password: `https://alice@github.com` (as git prints it)
 /// - HTTPS user name: `login:https://github.com`
 /// - ssh passphrase: the key path
-/// - ssh password: `ssh://alice@host`
+/// - ssh password: `ssh://alice@host`, with `:port` when the port is known and not 22
 /// - smart card PIN: `pin:<label>`
 pub fn store_key(p: &Prompt) -> Option<String> {
     match p.kind {
         PromptKind::Username => p.host.as_ref().map(|h| format!("login:{h}")),
         PromptKind::Password => match (&p.url, &p.host) {
             (Some(url), _) => Some(url.clone()),
-            (None, Some(who)) if p.label.is_none() => Some(format!("ssh://{who}")),
+            (None, Some(who)) if p.label.is_none() => Some(match p.port {
+                Some(port) if port != 22 => format!("ssh://{who}:{port}"),
+                _ => format!("ssh://{who}"),
+            }),
             _ => None,
         },
         PromptKind::Passphrase => p.key_path.clone(),
@@ -236,6 +265,41 @@ mod tests {
             store_key(&p).as_deref(),
             Some("https://bob@git.example.com:8443/team/repo.git")
         );
+    }
+
+    #[test]
+    fn an_email_user_name_is_percent_decoded() {
+        // git 2.43 prints the user name percent-encoded
+        let p = parse(
+            "Password for 'http://alice%40example.com@127.0.0.1:8080': ",
+            None,
+        );
+        assert_eq!(p.user.as_deref(), Some("alice@example.com"));
+        assert_eq!(p.host.as_deref(), Some("http://127.0.0.1:8080"));
+        // the key keeps the text git printed, so it is the same on every run
+        assert_eq!(
+            store_key(&p).as_deref(),
+            Some("http://alice%40example.com@127.0.0.1:8080")
+        );
+        let p = parse("Password for 'https://a%3Ab%25c@h.org': ", None);
+        assert_eq!(p.user.as_deref(), Some("a:b%c"));
+        assert_eq!(percent_decode("100%"), "100%");
+        assert_eq!(percent_decode("%zz%4"), "%zz%4");
+        assert_eq!(percent_decode("%C3%A9"), "é");
+    }
+
+    #[test]
+    fn the_ssh_password_key_has_the_port_when_it_is_not_22() {
+        let mut p = parse("alice@example.com's password: ", None);
+        p.port = Some(2222);
+        assert_eq!(
+            store_key(&p).as_deref(),
+            Some("ssh://alice@example.com:2222")
+        );
+        p.port = Some(22);
+        assert_eq!(store_key(&p).as_deref(), Some("ssh://alice@example.com"));
+        p.port = None;
+        assert_eq!(store_key(&p).as_deref(), Some("ssh://alice@example.com"));
     }
 
     #[test]

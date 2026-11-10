@@ -10,14 +10,16 @@ fn detect_checks_marker_files_in_priority_order() {
     assert_eq!(state::detect(d), RepoStateKind::Clean);
     std::fs::write(d.join("BISECT_LOG"), "").unwrap();
     assert_eq!(state::detect(d), RepoStateKind::Bisecting);
-    std::fs::write(d.join("REVERT_HEAD"), "").unwrap();
-    assert_eq!(state::detect(d), RepoStateKind::Reverting);
-    std::fs::write(d.join("CHERRY_PICK_HEAD"), "").unwrap();
-    assert_eq!(state::detect(d), RepoStateKind::CherryPicking);
     std::fs::create_dir(d.join("rebase-apply")).unwrap();
     assert_eq!(state::detect(d), RepoStateKind::Rebasing);
     std::fs::create_dir(d.join("rebase-merge")).unwrap();
     assert_eq!(state::detect(d), RepoStateKind::Rebasing);
+    // A cherry-pick or revert run by the user while a rebase is stopped is that operation (a
+    // rebase never writes these files for its own conflicts: it has REBASE_HEAD).
+    std::fs::write(d.join("REVERT_HEAD"), "").unwrap();
+    assert_eq!(state::detect(d), RepoStateKind::Reverting);
+    std::fs::write(d.join("CHERRY_PICK_HEAD"), "").unwrap();
+    assert_eq!(state::detect(d), RepoStateKind::CherryPicking);
     std::fs::write(d.join("MERGE_HEAD"), "").unwrap();
     assert_eq!(state::detect(d), RepoStateKind::Merging);
 }

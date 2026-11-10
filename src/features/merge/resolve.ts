@@ -11,6 +11,7 @@
  * the side that changed words. A range changed differently by both sides, or deleted by one side and changed by
  * the other, makes the whole resolve fail (`null`).
  */
+import type { ConflictVersions, ExpectedOids } from "../../api/types";
 import { intern, mergeRanges } from "./seqDiff";
 
 interface Tok {
@@ -110,3 +111,6 @@ function trySimple(left: string, base: string, right: string, ignoreWs: boolean)
 export function tryResolveText(left: string, base: string, right: string): string | null {
   return trySimple(left, base, right, false) ?? trySimple(left, base, right, true);
 }
+
+/** The ids of the three versions the editor loaded, to send back with the result so a changed conflict is refused. */
+export const expectedOids = (v: ConflictVersions): ExpectedOids => ({ ours: v.ours?.oid ?? null, theirs: v.theirs?.oid ?? null, base: v.base?.oid ?? null });

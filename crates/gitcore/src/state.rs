@@ -5,18 +5,21 @@ use std::path::{Path, PathBuf};
 use crate::error::GitError;
 use crate::model::RepoStateKind;
 
-/// Checks marker files in the git dir, in this order: MERGE_HEAD, rebase-merge/rebase-apply,
-/// CHERRY_PICK_HEAD, REVERT_HEAD, the sequencer todo list (a multi-commit cherry-pick or revert
+/// Checks marker files in the git dir, in this order: MERGE_HEAD, CHERRY_PICK_HEAD, REVERT_HEAD,
+/// rebase-merge/rebase-apply, the sequencer todo list (a multi-commit cherry-pick or revert
 /// between two commits has no `*_HEAD` file), BISECT_LOG.
 pub fn detect(git_dir: &Path) -> RepoStateKind {
     if git_dir.join("MERGE_HEAD").exists() {
         RepoStateKind::Merging
-    } else if git_dir.join("rebase-merge").exists() || git_dir.join("rebase-apply").exists() {
-        RepoStateKind::Rebasing
     } else if git_dir.join("CHERRY_PICK_HEAD").exists() {
+        // A rebase does not write CHERRY_PICK_HEAD / REVERT_HEAD for its own conflicts (it has
+        // REBASE_HEAD), so these mean a cherry-pick or revert run by the user, also while a rebase
+        // is stopped: that one is continued or aborted with its own command.
         RepoStateKind::CherryPicking
     } else if git_dir.join("REVERT_HEAD").exists() {
         RepoStateKind::Reverting
+    } else if git_dir.join("rebase-merge").exists() || git_dir.join("rebase-apply").exists() {
+        RepoStateKind::Rebasing
     } else if let Some(kind) = sequencer_state(git_dir) {
         kind
     } else if git_dir.join("BISECT_LOG").exists() {

@@ -27,6 +27,8 @@ use gitcore::{ops, AuthMode, Git, GitError, RepoInfo};
 const HELPER: &str = env!("CARGO_BIN_EXE_askpass-helper");
 /// base64("alice:s3cret")
 const GOOD_AUTH: &str = "Basic YWxpY2U6czNjcmV0";
+/// base64("alice@example.com:s3cret"): an e-mail login
+const EMAIL_AUTH: &str = "Basic YWxpY2VAZXhhbXBsZS5jb206czNjcmV0";
 
 static ISOLATE: Once = Once::new();
 
@@ -133,7 +135,10 @@ fn handle(mut stream: TcpStream, root: &Path, refused: &AtomicUsize) -> std::io:
         body.resize(len, 0);
         reader.read_exact(&mut body)?;
     }
-    if header("authorization").as_deref() != Some(GOOD_AUTH) {
+    if !matches!(
+        header("authorization").as_deref(),
+        Some(GOOD_AUTH | EMAIL_AUTH)
+    ) {
         refused.fetch_add(1, Ordering::SeqCst);
         return stream.write_all(
             b"HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: Basic realm=\"test\"\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
@@ -295,6 +300,33 @@ impl Fixture {
         }
     }
 
+    /// A second repository on the same server and host, as the remote `second` of the client.
+    fn add_second_remote(&self) {
+        let bare = self._tmp.path().join("srv/proj2.git");
+        std::fs::create_dir_all(&bare).unwrap();
+        git_in(&bare, &["init", "--bare", "-b", "main"]);
+        git_in(&self.work, &["push", bare.to_str().unwrap(), "main"]);
+        git_in(
+            Path::new(&self.repo.path),
+            &[
+                "remote",
+                "add",
+                "second",
+                &format!("http://127.0.0.1:{}/proj2.git", self.server.port),
+            ],
+        );
+    }
+
+    fn rev(&self, name: &str) -> String {
+        let out = Command::new("git")
+            .arg("-C")
+            .arg(&self.repo.path)
+            .args(["rev-parse", "--verify", "-q", name])
+            .output()
+            .unwrap();
+        String::from_utf8_lossy(&out.stdout).trim().to_string()
+    }
+
     /// A new commit on the server, so the next fetch has something to download.
     fn publish(&self, n: u32) {
         std::fs::write(self.work.join("a.txt"), format!("{n}\n")).unwrap();
@@ -322,6 +354,12 @@ async fn broker(prompter: Arc<Scripted>, store: Arc<Store>) -> Arc<Broker> {
             .await
             .expect("broker starts"),
     )
+}
+
+async fn fetch_all(git: Git, repo: RepoInfo) -> Result<gitcore::OpResult, GitError> {
+    tokio::task::spawn_blocking(move || ops::fetch(&git, &repo, None, false))
+        .await
+        .unwrap()
 }
 
 async fn fetch(git: Git, repo: RepoInfo) -> Result<gitcore::OpResult, GitError> {
@@ -483,4 +521,109 @@ async fn a_slow_typist_does_not_trip_the_inactivity_timeout() {
         .with_network_timeout(Duration::from_millis(600));
     let res = fetch(git, fx.repo.clone()).await.expect("not killed");
     assert!(res.ok);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn fetch_all_with_two_remotes_on_one_host_keeps_the_saved_login_and_opens_no_retry_dialog() {
+    let fx = Fixture::new();
+    fx.add_second_remote();
+    let prompter = alice(true);
+    let store = new_store();
+    let broker = broker(prompter.clone(), store.clone()).await;
+    let git = Git::new(None).with_auth(broker.clone());
+
+    // Interactive, nothing saved yet: git starts one process per remote and each asks for the
+    // login. One dialog serves both.
+    let res = fetch_all(git.clone(), fx.repo.clone())
+        .await
+        .expect("fetch --all");
+    assert!(res.ok, "{res:?}");
+    assert_ne!(fx.rev("origin/main"), "");
+    assert_ne!(
+        fx.rev("second/main"),
+        "",
+        "the second remote was fetched too"
+    );
+    assert_eq!(prompter.count(), 1);
+    assert!(prompter.asked.lock().unwrap().iter().all(|r| !r.retry));
+    assert_eq!(store.keys().len(), 2, "{:?}", store.keys());
+
+    // Interactive with the saved login: no dialog, the login stays.
+    fx.publish(2);
+    fetch_all(git.clone(), fx.repo.clone())
+        .await
+        .expect("saved login");
+    assert_eq!(prompter.count(), 1);
+    assert_eq!(
+        store.keys().len(),
+        2,
+        "the login was kept: {:?}",
+        store.keys()
+    );
+
+    // Silent (the auto-fetch) with both remotes: it works and keeps the login. The old rule
+    // read the second remote's question as a rejection and deleted the login, so the next
+    // auto-fetch failed for good.
+    for round in 3..=4 {
+        fx.publish(round);
+        let silent = git.clone().with_auth_mode(AuthMode::Silent);
+        let res = fetch_all(silent, fx.repo.clone())
+            .await
+            .expect("silent fetch --all");
+        assert!(res.ok, "round {round}: {res:?}");
+        assert_eq!(store.keys().len(), 2, "round {round}: {:?}", store.keys());
+        assert_eq!(prompter.count(), 1, "Silent never opens a dialog");
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn fetch_all_with_two_remotes_asks_once_when_nothing_is_remembered() {
+    let fx = Fixture::new();
+    fx.add_second_remote();
+    let prompter = alice(false);
+    let store = new_store();
+    let broker = broker(prompter.clone(), store.clone()).await;
+    let git = Git::new(None).with_auth(broker);
+    let res = fetch_all(git, fx.repo.clone()).await.expect("fetch --all");
+    assert!(res.ok);
+    assert_ne!(fx.rev("second/main"), "");
+    assert_eq!(
+        prompter.count(),
+        1,
+        "the typed login serves the second remote"
+    );
+    assert!(prompter.asked.lock().unwrap().iter().all(|r| !r.retry));
+    assert!(store.keys().is_empty());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn an_email_login_is_typed_once_not_twice() {
+    // git 2.43 prints `Password for 'http://alice%40example.com@host'`
+    let fx = Fixture::new();
+    let prompter = Scripted::new(Duration::ZERO, |req| match req.kind {
+        PromptKind::Username => Some(PromptReply {
+            answer: "alice@example.com".into(),
+            secondary: Some("s3cret".into()),
+            remember: true,
+        }),
+        _ => None,
+    });
+    let store = new_store();
+    let broker = broker(prompter.clone(), store.clone()).await;
+    let git = Git::new(None).with_auth(broker);
+    let res = fetch(git.clone(), fx.repo.clone()).await.expect("fetch");
+    assert!(res.ok, "{res:?}");
+    assert_eq!(
+        prompter.count(),
+        1,
+        "one dialog, not a second one for the password"
+    );
+    assert_eq!(store.keys().len(), 2, "{:?}", store.keys());
+
+    // the saved e-mail login works the next time without a dialog
+    fx.publish(2);
+    fetch(git, fx.repo.clone())
+        .await
+        .expect("saved e-mail login");
+    assert_eq!(prompter.count(), 1);
 }

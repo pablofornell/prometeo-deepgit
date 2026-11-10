@@ -433,12 +433,22 @@ export interface ConflictEntry {
 
 /** One version of a conflicted file. */
 export interface ConflictBlob {
-  /** Object id; send it back as `expectedOursOid` when saving. */
+  /** Object id; send the ids of all three versions back as `ExpectedOids` when saving. */
   oid: string;
   /** The content, only when it is valid UTF-8, not binary and at most 2 MiB. */
   text: string | null;
   bytesLen: number;
   binary: boolean;
+}
+
+/**
+ * The blob ids of the three versions the merge editor loaded (`ConflictBlob.oid`, null = that version is absent). A save
+ * is refused unless all three still match the index: a change of either side (or the base) makes the editor stale.
+ */
+export interface ExpectedOids {
+  ours: string | null;
+  theirs: string | null;
+  base: string | null;
 }
 
 export interface ConflictLabels {

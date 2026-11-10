@@ -573,7 +573,7 @@ pub enum SideStatus {
 }
 
 /// Which side of a conflict to keep. `Ours` is the user's own side ("Yours" in the UI): git's
-/// stage 2, except during a rebase where it is stage 3 (see `conflicts::side_stages`).
+/// stage 2, except for a conflict made by a rebase where it is stage 3 (see `conflicts::side_stages`).
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum ConflictSide {

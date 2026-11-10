@@ -14,7 +14,7 @@
  */
 import type {
   ApiErrorShape, AuthNotice, AuthPrompt, CloneOpts, CloneProgress, CloneResult, CloneTarget, CommitDetails, ConflictEntry, ConflictSide, ConflictVersions,
-  ConsoleEntry, DiffSpec, FileDiff, LogQuery, LogSessionInfo, MergeOpts, OpResult, Project, CommitRow, HunkOpts, RepoChanged, RepoInfo, RepoSummary, Refs,
+  ConsoleEntry, DiffSpec, ExpectedOids, FileDiff, LogQuery, LogSessionInfo, MergeOpts, OpResult, Project, CommitRow, HunkOpts, RepoChanged, RepoInfo, RepoSummary, Refs,
   ResetMode, Workspace, WorkingTree,
 } from "./types";
 
@@ -229,7 +229,15 @@ export const acceptSide = (repoId: string, paths: string[], side: ConflictSide) 
 /**
  * Writes the merged text (LF line ends; the backend restores the file's line ending and mode). `resolved = true` stages it,
  * `false` only writes it (the file keeps conflict markers and stays unmerged). Refused when the file is no longer
- * conflicted or its "Yours" blob is not `expectedOursOid`.
+ * conflicted or when any of the three versions (Yours, Theirs, base) is no longer the one in `expected`.
  */
-export const saveResolution = (repoId: string, path: string, content: string, expectedOursOid: string | null, resolved: boolean) =>
-  invoke<void>("save_resolution", { repoId, path, content, expectedOursOid, resolved });
+export const saveResolution = (repoId: string, path: string, content: string, expected: ExpectedOids, resolved: boolean) =>
+  invoke<void>("save_resolution", {
+    repoId,
+    path,
+    content,
+    expectedOursOid: expected.ours,
+    expectedTheirsOid: expected.theirs,
+    expectedBaseOid: expected.base,
+    resolved,
+  });

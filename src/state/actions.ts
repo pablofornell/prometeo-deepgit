@@ -17,7 +17,7 @@
  */
 import { ApiError, toApiError } from "../api/tauri";
 import * as api from "../api/tauri";
-import type { CloneOpts, CloneProgress, CloneResult, ConflictSide, HunkOpts, OpResult } from "../api/types";
+import type { CloneOpts, CloneProgress, CloneResult, ConflictSide, ExpectedOids, HunkOpts, OpResult } from "../api/types";
 import { joinNames, plural, toast, type ToastAction } from "../components/ui";
 import { beginActivity } from "./activity";
 import { confirmAction, showDialog, type PushResult } from "./dialogs";
@@ -875,14 +875,14 @@ export async function acceptSide(repoId: string, paths: string[], side: Conflict
  * leaves the file unmerged. Quiet on success; a refused save (the conflict changed, the file is no longer conflicted)
  * shows an error toast and comes back in `failed`.
  */
-export function saveResolution(repoId: string, path: string, content: string, expectedOursOid: string | null, resolved: boolean): Promise<BatchResult> {
+export function saveResolution(repoId: string, path: string, content: string, expected: ExpectedOids, resolved: boolean): Promise<BatchResult> {
   return runBatch({
     verb: "save the merge result",
     past: resolved ? "Resolved" : "Saved with conflict markers",
     what: path,
     repoIds: [repoId],
     quiet: true,
-    run: () => api.saveResolution(repoId, path, content, expectedOursOid, resolved).then(() => undefined),
+    run: () => api.saveResolution(repoId, path, content, expected, resolved).then(() => undefined),
   });
 }
 

@@ -2,12 +2,17 @@
 //! connection, each a frame of a 4-byte big-endian length followed by that many bytes of JSON.
 //!
 //! ```text
-//! helper -> app   {"v":1,"token":"<64 hex>","prompt":"Username for 'https://github.com': ","hint":null}
+//! helper -> app   {"v":1,"token":"<64 hex>","prompt":"Username for 'https://github.com': ","hint":null,
+//!                  "ppid":4242,"sshPort":null}
 //! app -> helper   {"answer":"alice"}      an answer
 //! app -> helper   {"answer":null}         cancelled, timed out, unknown token or refused
 //! ```
 //!
-//! `hint` is the value of `SSH_ASKPASS_PROMPT` (`confirm`, `none`) when ssh sets it.
+//! `hint` is the value of `SSH_ASKPASS_PROMPT` (`confirm`, `none`) when ssh sets it. `ppid` is the
+//! process that ran the helper (the git or ssh child; Unix only): the broker uses it to tell a
+//! second git child that asks the same question (not a rejection) from ssh asking again after a
+//! wrong answer. `sshPort` is the `-p` port of that ssh process when the helper can read it
+//! (Linux): the prompt `alice@host's password:` does not name the port.
 
 use std::io::{self, Read, Write};
 
@@ -34,6 +39,10 @@ pub struct Request {
     pub prompt: String,
     #[serde(default)]
     pub hint: Option<String>,
+    #[serde(default)]
+    pub ppid: Option<u32>,
+    #[serde(default, rename = "sshPort")]
+    pub ssh_port: Option<u16>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -115,6 +124,8 @@ mod tests {
             token: "abc".into(),
             prompt: "Password for 'https://a@b': ".into(),
             hint: None,
+            ppid: Some(7),
+            ssh_port: Some(2222),
         };
         let bytes = encode(&req).unwrap();
         assert_eq!(
@@ -123,6 +134,15 @@ mod tests {
         );
         let back: Request = read_frame(&mut &bytes[..]).unwrap();
         assert_eq!(back, req);
+    }
+
+    #[test]
+    fn an_old_request_without_ppid_and_port_still_reads() {
+        let body = br#"{"v":1,"token":"t","prompt":"p","hint":null}"#;
+        let mut bytes = (body.len() as u32).to_be_bytes().to_vec();
+        bytes.extend_from_slice(body);
+        let back: Request = read_frame(&mut &bytes[..]).unwrap();
+        assert_eq!((back.ppid, back.ssh_port), (None, None));
     }
 
     #[test]

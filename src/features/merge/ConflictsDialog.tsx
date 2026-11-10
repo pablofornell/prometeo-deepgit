@@ -17,6 +17,7 @@ import { subscribeRepoChanged } from "../../state/events";
 import { refreshSummaries, repoById, summary } from "../../state/workspace";
 import { canMergeAsText } from "./MergeFileDialog";
 import { MergeModel, normalizeText } from "./model";
+import { expectedOids } from "./resolve";
 import "./merge.css";
 
 interface RepoData {
@@ -185,7 +186,7 @@ export function ConflictsDialog(props: ConflictsProps & DialogComponentProps<Con
           const model = new MergeModel(text(v.base), text(v.ours), text(v.theirs));
           const n = model.resolveAutomatically();
           if (model.unresolved().length > 0 || (n === 0 && model.chunks.length > 0)) continue;
-          const res = await actions.saveResolution(f.repoId, e.path, model.resultText(), v.ours?.oid ?? null, true);
+          const res = await actions.saveResolution(f.repoId, e.path, model.resultText(), expectedOids(v), true);
           if (res.ok.length > 0) resolved++;
         } catch {
           /* this file stays in the list: the user can open it */
