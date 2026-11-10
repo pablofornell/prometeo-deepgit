@@ -12,6 +12,7 @@
  * Every stored value is validated on load and on `setSetting` (unknown strings, NaN and out-of-range numbers fall
  * back to the default or are clamped). `resetSettings()` removes the stored values.
  */
+import { createSignal } from "solid-js";
 import { createStore } from "solid-js/store";
 import { setAuthPrefs } from "../api/tauri";
 import {
@@ -150,10 +151,18 @@ function pushAuthPrefs(): void {
   setAuthPrefs(settings.useCredentialStore).catch(() => undefined);
 }
 
-/** "dark" or "light" after resolving "system". */
+/** What the OS prefers now ("dark" when it cannot be asked). */
+function readSystemTheme(): "dark" | "light" {
+  return typeof matchMedia === "function" && matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+}
+
+/** The OS colour scheme as a signal: `initSettings` keeps it current, so everything that reads `resolvedTheme()` follows an OS switch. */
+const [systemTheme, setSystemTheme] = createSignal<"dark" | "light">(readSystemTheme());
+
+/** "dark" or "light" after resolving "system" (reactive: it follows the OS when the preference is "system"). */
 export function resolvedTheme(): "dark" | "light" {
   if (settings.theme !== "system") return settings.theme;
-  return typeof matchMedia === "function" && matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+  return systemTheme();
 }
 
 /** Sets `data-theme` on <html>. Called at startup and whenever `theme` changes. */
@@ -208,7 +217,9 @@ export function initSettings(): void {
   applyAppearance();
   pushAuthPrefs();
   if (typeof matchMedia === "function") {
+    setSystemTheme(readSystemTheme());
     matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+      setSystemTheme(readSystemTheme());
       if (settings.theme === "system") applyTheme();
     });
   }

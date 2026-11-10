@@ -56,7 +56,9 @@ const CONSOLE_CAP: usize = 8 * 1024;
 /// Fetch, pull, push and clone are killed after this long without a single byte on stdout or stderr
 /// (a dead connection); `--progress` keeps a healthy transfer talking.
 const NETWORK_INACTIVITY: Duration = Duration::from_secs(120);
-/// Absolute limit of fetch, pull and push, however much they print.
+/// Absolute limit of fetch, pull and push, however much they print. A clone has none: a big
+/// repository can take hours on a slow line while it keeps printing progress (the inactivity limit
+/// and Cancel still stop it).
 const NETWORK_CAP: Duration = Duration::from_secs(60 * 60);
 /// How long the reader threads get to finish after a killed process before they are left behind
 /// (on Windows a grandchild such as ssh can keep the pipes open).
@@ -157,7 +159,8 @@ impl Git {
         self
     }
 
-    /// Overrides the absolute limit of fetch, pull and push (60 min by default).
+    /// Overrides the absolute limit of fetch, pull and push (60 min by default). A clone has no
+    /// absolute limit.
     pub fn with_network_cap(mut self, d: Duration) -> Self {
         self.network_cap = d;
         self
@@ -336,7 +339,7 @@ impl Git {
         let timer = Instant::now();
         let limits = is_network(args).then_some(Limits {
             inactivity: self.network_timeout,
-            cap: self.network_cap,
+            cap: (subcommand(args) != "clone").then_some(self.network_cap),
         });
         let ticket = limits.and_then(|_| {
             let command = format!("git {}", subcommand(args));
@@ -396,6 +399,7 @@ impl Git {
                 exit_code,
                 stdout,
                 stderr,
+                background: limits.is_some() && self.auth_mode == AuthMode::Silent,
             });
         }
         result
@@ -561,8 +565,8 @@ impl Git {
 struct Limits {
     /// Killed after this long without output.
     inactivity: Duration,
-    /// Killed after this long whatever happens.
-    cap: Duration,
+    /// Killed after this long whatever happens; `None` for a clone.
+    cap: Option<Duration>,
 }
 
 enum SpawnError {
@@ -664,8 +668,8 @@ fn wait(
                 activity.store(now.as_millis() as u64, Ordering::Relaxed);
             }
             let last = Duration::from_millis(activity.load(Ordering::Relaxed));
-            let exceeded = if now >= limits.cap {
-                Some(limits.cap)
+            let exceeded = if let Some(cap) = limits.cap.filter(|cap| now >= *cap) {
+                Some(cap)
             } else if now.saturating_sub(last) >= limits.inactivity {
                 Some(limits.inactivity)
             } else {

@@ -3,10 +3,13 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard, RwLock};
+use std::time::{Duration, Instant};
 
-use gitcore::discover::make_project;
+use gitcore::discover::{make_project, not_found_reason, repo_id};
 use gitcore::palette::ColorChoice;
-use gitcore::{ApiError, CancelToken, CloneResult, CloneTarget, Git, Project, RepoInfo, Workspace};
+use gitcore::{
+    ApiError, CancelToken, CloneResult, CloneTarget, Git, GitError, Project, RepoInfo, Workspace,
+};
 
 use crate::logsession::LogSessions;
 use crate::watcher::WatcherHandle;
@@ -24,6 +27,11 @@ pub fn api_error(message: impl Into<String>) -> ApiError {
         detail: None,
     }
 }
+
+/// How long a cancel for a clone that has not started yet is remembered.
+const EARLY_CANCEL_TTL: Duration = Duration::from_secs(60);
+/// At most this many such cancels are remembered (the oldest go first).
+const EARLY_CANCEL_MAX: usize = 64;
 
 fn repo_map(ws: &Workspace) -> HashMap<String, RepoInfo> {
     workspace::all_repos(ws)
@@ -44,6 +52,9 @@ pub struct AppState {
     pub watcher: Mutex<WatcherHandle>,
     /// Running clones by operation id, to cancel them.
     pub clones: Mutex<HashMap<String, CancelToken>>,
+    /// Operation ids cancelled before their clone started (the UI sends the cancel and the clone
+    /// command through separate calls, so the cancel can win), with the time of the cancel.
+    early_cancels: Mutex<HashMap<String, Instant>>,
 }
 
 impl AppState {
@@ -61,6 +72,7 @@ impl AppState {
             repo_locks: Mutex::new(HashMap::new()),
             watcher: Mutex::new(watcher),
             clones: Mutex::new(HashMap::new()),
+            early_cancels: Mutex::new(HashMap::new()),
         }
     }
 
@@ -200,8 +212,17 @@ impl AppState {
         self.persist(&ws).map(|()| updated)
     }
 
-    /// Registers a clone and returns its cancel token. An id that is running already is refused.
+    /// Registers a clone and returns its cancel token. An id that is running already is refused. An
+    /// id that was cancelled before it got here (see `cancel_clone`) ends at once with the
+    /// "cancelled" error.
     pub fn begin_clone(&self, operation_id: &str) -> Result<CancelToken, ApiError> {
+        self.begin_clone_at(operation_id, Instant::now())
+    }
+
+    fn begin_clone_at(&self, operation_id: &str, now: Instant) -> Result<CancelToken, ApiError> {
+        if take_early_cancel(&mut lock(&self.early_cancels), operation_id, now) {
+            return Err(GitError::Cancelled.into());
+        }
         let mut clones = lock(&self.clones);
         if clones.contains_key(operation_id) {
             return Err(api_error("This clone is already running."));
@@ -211,20 +232,44 @@ impl AppState {
         Ok(token)
     }
 
-    /// Asks a running clone to stop. Unknown ids (already finished) are ignored.
+    /// Asks a clone to stop. A running one is stopped; an id that is not running yet is
+    /// remembered for a minute so `begin_clone` can refuse it. Ids of finished clones are
+    /// remembered too, which is harmless: operation ids are never reused.
     pub fn cancel_clone(&self, operation_id: &str) {
+        self.cancel_clone_at(operation_id, Instant::now());
+    }
+
+    fn cancel_clone_at(&self, operation_id: &str, now: Instant) {
         if let Some(token) = lock(&self.clones).get(operation_id) {
             token.cancel();
+            return;
         }
+        let mut early = lock(&self.early_cancels);
+        early.retain(|_, at| now.saturating_duration_since(*at) < EARLY_CANCEL_TTL);
+        if early.len() >= EARLY_CANCEL_MAX {
+            if let Some(oldest) = early
+                .iter()
+                .min_by_key(|(_, at)| **at)
+                .map(|(k, _)| k.clone())
+            {
+                early.remove(&oldest);
+            }
+        }
+        early.insert(operation_id.to_string(), now);
     }
 
     pub fn end_clone(&self, operation_id: &str) {
         lock(&self.clones).remove(operation_id);
     }
 
-    /// Fails before the clone starts when `target` is a project whose folder will not contain the
-    /// clone (a rescan could never find it).
-    pub fn check_clone_target(&self, parent: &Path, target: &CloneTarget) -> Result<(), ApiError> {
+    /// Fails before the clone starts when `target` is a project that a rescan could not find the
+    /// clone in: `clone_path` (the folder the clone will make) is outside the project folder, or a
+    /// scan skips it (too deep, or below a folder such as `node_modules` or `.hidden`).
+    pub fn check_clone_target(
+        &self,
+        clone_path: &Path,
+        target: &CloneTarget,
+    ) -> Result<(), ApiError> {
         let CloneTarget::Project { project_id } = target else {
             return Ok(());
         };
@@ -234,13 +279,15 @@ impl AppState {
             .iter()
             .find(|p| &p.id == project_id)
             .ok_or_else(|| api_error("unknown project"))?;
-        if parent.starts_with(&project.path) {
-            Ok(())
-        } else {
-            Err(api_error(format!(
+        if !clone_path.starts_with(&project.path) {
+            return Err(api_error(format!(
                 "The parent folder is outside the project folder {}. Choose a folder inside it, or add the clone to a new project.",
                 project.path
-            )))
+            )));
+        }
+        match not_found_reason(Path::new(&project.path), clone_path) {
+            Some(reason) => Err(api_error(reason)),
+            None => Ok(()),
         }
     }
 
@@ -258,6 +305,15 @@ impl AppState {
                 (self.add_project(&path_str)?, !known)
             }
         };
+        // `check_clone_target` should have made this impossible; if the scan still misses the
+        // clone, say where it is instead of claiming it was added.
+        let id = repo_id(path);
+        if !project.repos.iter().any(|r| r.id == id) {
+            return Err(api_error(format!(
+                "The repository was cloned to {path_str}, but DeepGit did not find it when it scanned the project {}, so it was not added. Add that folder as a project to open it.",
+                project.name
+            )));
+        }
         Ok(CloneResult {
             path: path_str,
             project,
@@ -272,6 +328,13 @@ impl AppState {
         }
         self.persist(&ws)
     }
+}
+
+/// Removes and reports a remembered early cancel of `id` (stale ones do not count).
+fn take_early_cancel(early: &mut HashMap<String, Instant>, id: &str, now: Instant) -> bool {
+    early
+        .remove(id)
+        .is_some_and(|at| now.saturating_duration_since(at) < EARLY_CANCEL_TTL)
 }
 
 #[cfg(test)]
@@ -324,10 +387,10 @@ mod tests {
             project_id: project.id.clone(),
         };
 
-        // a parent inside the project folder is fine, one outside is refused before the clone
-        assert!(st.check_clone_target(&root.join("sub"), &join).is_ok());
-        assert!(st.check_clone_target(&root, &join).is_ok());
-        let outside = std::fs::canonicalize(dir.path()).unwrap();
+        // a clone folder inside the project folder is fine, one outside is refused before the clone
+        assert!(st.check_clone_target(&root.join("sub/new"), &join).is_ok());
+        assert!(st.check_clone_target(&root.join("new"), &join).is_ok());
+        let outside = std::fs::canonicalize(dir.path()).unwrap().join("new");
         let err = st.check_clone_target(&outside, &join).unwrap_err();
         assert!(
             err.message.contains("outside the project folder"),
@@ -337,7 +400,7 @@ mod tests {
         let unknown = CloneTarget::Project {
             project_id: "nope".into(),
         };
-        assert!(st.check_clone_target(&root, &unknown).is_err());
+        assert!(st.check_clone_target(&root.join("new"), &unknown).is_err());
         assert!(st
             .check_clone_target(&outside, &CloneTarget::NewProject)
             .is_ok());
@@ -362,6 +425,115 @@ mod tests {
         let again = st.add_cloned(&alone, &CloneTarget::NewProject).unwrap();
         assert!(!again.created_project);
         assert_eq!(st.workspace_snapshot().projects.len(), 2);
+    }
+
+    #[test]
+    fn a_clone_the_scan_would_skip_is_refused_before_it_starts() {
+        let dir = tempfile::tempdir().unwrap();
+        let st = state(dir.path());
+        let root = std::fs::canonicalize(dir.path()).unwrap().join("work");
+        init_repo(&root.join("first"));
+        let project = st.add_project(root.to_str().unwrap()).unwrap();
+        let join = CloneTarget::Project {
+            project_id: project.id.clone(),
+        };
+        let refused = |rel: &str| {
+            st.check_clone_target(&root.join(rel), &join)
+                .unwrap_err()
+                .message
+        };
+
+        // too deep: level 5 (the project folder is level 0)
+        assert!(st.check_clone_target(&root.join("a/b/c/d"), &join).is_ok());
+        let msg = refused("a/b/c/d/e");
+        assert!(msg.contains("4 levels deep"), "{msg}");
+        // below a folder a scan skips
+        for skipped in [
+            "node_modules",
+            "target",
+            "dist",
+            "build",
+            ".venv",
+            ".hidden",
+        ] {
+            let msg = refused(&format!("{skipped}/repo"));
+            assert!(msg.contains(&format!("\"{skipped}\"")), "{msg}");
+        }
+        // and a clone folder that itself starts with a dot
+        assert!(refused(".dotrepo").contains("\".dotrepo\""));
+        // the same paths are fine for a new project
+        assert!(st
+            .check_clone_target(&root.join("a/b/c/d/e"), &CloneTarget::NewProject)
+            .is_ok());
+    }
+
+    #[test]
+    fn a_clone_that_a_rescan_misses_is_an_error_that_says_where_it_is() {
+        let dir = tempfile::tempdir().unwrap();
+        let st = state(dir.path());
+        let root = std::fs::canonicalize(dir.path()).unwrap().join("work");
+        init_repo(&root.join("first"));
+        let project = st.add_project(root.to_str().unwrap()).unwrap();
+        let join = CloneTarget::Project {
+            project_id: project.id.clone(),
+        };
+        // the check before the clone was skipped on purpose: the repo is in a skipped folder
+        let hidden = root.join("node_modules/cloned");
+        init_repo(&hidden);
+        let err = st.add_cloned(&hidden, &join).unwrap_err();
+        assert!(
+            err.message.contains(&hidden.to_string_lossy().to_string()),
+            "{}",
+            err.message
+        );
+        assert!(err.message.contains("was not added"), "{}", err.message);
+    }
+
+    #[test]
+    fn a_cancel_before_the_clone_registers_is_remembered_for_a_short_time() {
+        let dir = tempfile::tempdir().unwrap();
+        let st = state(dir.path());
+        let t0 = Instant::now();
+        st.cancel_clone_at("early", t0);
+        let err = st.begin_clone_at("early", t0).unwrap_err();
+        assert_eq!(err.message, "The operation was cancelled.");
+        // the memory is used up: the id can run now
+        assert!(st.begin_clone_at("early", t0).is_ok());
+        st.end_clone("early");
+
+        // a cancel that is older than the time limit does not count
+        st.cancel_clone_at("stale", t0);
+        let later = t0 + EARLY_CANCEL_TTL + Duration::from_secs(1);
+        assert!(st.begin_clone_at("stale", later).is_ok());
+
+        // other ids are not touched
+        st.cancel_clone_at("a", t0);
+        assert!(st.begin_clone_at("b", t0).is_ok());
+
+        // a cancel of a running clone cancels it and is not remembered
+        let token = st.begin_clone_at("run", t0).unwrap();
+        st.cancel_clone_at("run", t0);
+        assert!(token.is_cancelled());
+        st.end_clone("run");
+        assert!(st.begin_clone_at("run", t0).is_ok());
+    }
+
+    #[test]
+    fn remembered_cancels_are_bounded() {
+        let dir = tempfile::tempdir().unwrap();
+        let st = state(dir.path());
+        let t0 = Instant::now();
+        for i in 0..(EARLY_CANCEL_MAX + 10) {
+            st.cancel_clone_at(&format!("id{i}"), t0 + Duration::from_millis(i as u64));
+        }
+        assert_eq!(lock(&st.early_cancels).len(), EARLY_CANCEL_MAX);
+        // the oldest went first, the newest is still there
+        assert!(lock(&st.early_cancels).contains_key(&format!("id{}", EARLY_CANCEL_MAX + 9)));
+        assert!(!lock(&st.early_cancels).contains_key("id0"));
+        // expired entries are dropped when the next cancel comes
+        let later = t0 + EARLY_CANCEL_TTL + Duration::from_secs(5);
+        st.cancel_clone_at("fresh", later);
+        assert_eq!(lock(&st.early_cancels).len(), 1);
     }
 
     #[test]

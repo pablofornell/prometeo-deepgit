@@ -60,12 +60,17 @@ function repoColorsUsed(ws: Workspace, skipProject: string | null): number[] {
 export function colorizeRepos(ws: Workspace, replacing: string | null, project: Project): void {
   const known = new Map(allRepos(ws).map((r) => [r.id, r]));
   const used = repoColorsUsed(ws, replacing);
+  // every repo id counts once: the repos of the other projects are in `used` already
+  const counted = new Set(ws.projects.filter((p) => p.id !== replacing).flatMap((p) => p.repos.map((r) => r.id)));
   for (const r of project.repos) {
     const old = known.get(r.id);
     if (!old) continue;
     r.color = old.color;
     r.customColor = old.customColor;
-    if (r.customColor === null) used.push(r.color);
+    if (r.customColor === null && !counted.has(r.id)) {
+      counted.add(r.id);
+      used.push(r.color);
+    }
   }
   for (const r of project.repos) {
     if (known.has(r.id)) continue;

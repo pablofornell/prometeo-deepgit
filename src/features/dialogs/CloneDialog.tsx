@@ -7,7 +7,7 @@
  */
 import { type JSX, Show, createMemo, createSignal, onMount } from "solid-js";
 import { pickFolder } from "../../api/dialog";
-import { checkCloneInput, checkCloneUrl, checkDirName, defaultDirName, insideProject, isAbsolutePath, joinPath, looksLikeRepoUrl } from "../../api/cloneRules";
+import { checkCloneInput, checkCloneUrl, checkDirName, defaultDirName, insideProject, isAbsolutePath, joinPath, looksLikeRepoUrl, notFoundReason } from "../../api/cloneRules";
 import type { CloneProgress } from "../../api/types";
 import { Button, Checkbox, Dialog, type DialogComponentProps, ProgressBar, Spinner, TextField } from "../../components/ui";
 import * as actions from "../../state/actions";
@@ -70,7 +70,10 @@ export function CloneDialog(props: CloneProps & DialogComponentProps<CloneDialog
   const depthError = createMemo(() => (depth().trim() !== "" && Number.isNaN(depthValue()) ? "The depth is a whole number." : depthValue() === 0 ? "The depth must be at least 1." : null));
   const inputError = createMemo(() => checkCloneInput(input()));
 
-  const canAddToCurrent = () => !!project && (parentDir().trim() === "" || insideProject(parentDir(), project.path));
+  /** Why a rescan of the project would not find the clone (too deep, below `node_modules` or a dot folder), or null. */
+  const scanProblem = (): string | null =>
+    project && parentDir().trim() !== "" && dirName().trim() !== "" ? notFoundReason(joinPath(trimSep(parentDir().trim()), dirName().trim()), project.path) : null;
+  const canAddToCurrent = () => !!project && (parentDir().trim() === "" || (insideProject(parentDir(), project.path) && scanProblem() === null));
   const target = (): "current" | "new" => (addTo() === "current" && canAddToCurrent() ? "current" : "new");
 
   const targetPath = () => (parentDir().trim() !== "" && dirName().trim() !== "" ? joinPath(trimSep(parentDir().trim()), dirName().trim()) : "<folder>");
@@ -210,12 +213,12 @@ export function CloneDialog(props: CloneProps & DialogComponentProps<CloneDialog
               value={target()}
               onChange={(v) => !running() && setAddTo(v)}
               options={[
-                { value: "current", label: `Current project: ${p().name}`, description: canAddToCurrent() ? "The repository joins the repositories of this project." : `Needs a parent folder inside ${p().path}.` },
+                { value: "current", label: `Current project: ${p().name}`, description: canAddToCurrent() ? "The repository joins the repositories of this project." : `Needs a folder inside ${p().path} that a scan of the project finds.` },
                 { value: "new", label: "New project", description: "A project of its own, with the cloned folder as its root." },
               ]}
             />
             <Show when={!canAddToCurrent()}>
-              <Note kind="info">The parent folder is outside the project folder, so the clone becomes a new project.</Note>
+              <Note kind="info">{scanProblem() ?? "The parent folder is outside the project folder, so the clone becomes a new project."}</Note>
             </Show>
           </>
         )}

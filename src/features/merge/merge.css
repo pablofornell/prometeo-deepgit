@@ -17,7 +17,7 @@
 .dg-cf-group { display: flex; align-items: center; gap: var(--dg-space-4); height: 26px; flex: none; padding: 0 var(--dg-space-5); background: var(--dg-island-bg); }
 .dg-cf-group-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dg-text-secondary); font-size: var(--dg-font-size-medium); }
 .dg-cf-row { height: 26px; flex: none; cursor: default; position: relative; }
-.dg-cf-row:hover { background: var(--dg-row-hover-bg); }
+.dg-cf-row:hover { background-color: var(--dg-row-hover-bg); }
 .dg-cf-row.is-selected { background: var(--dg-selection-inactive-bg); color: var(--dg-selection-fg); }
 .dg-cf-table:focus-within .dg-cf-row.is-selected { background: var(--dg-selection-bg); }
 .dg-cf-table:focus-visible .dg-cf-row.is-cursor { box-shadow: inset 0 0 0 var(--dg-focus-width) var(--dg-focus-ring); }

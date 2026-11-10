@@ -30,18 +30,30 @@ export function checkMergeOpts(o: MergeOpts): string | null {
   return null;
 }
 
-/** What git writes for a merge without `-m`: "Merge branch 'x' into main". `kind` is what `source` names. */
+/** Branches git leaves out of "into <branch>" (`merge.suppressDest` defaults to main and master). */
+const SUPPRESS_DEST = ["main", "master"];
+
+/**
+ * What git writes for a merge without `-m`: "Merge branch 'x' into feature", but only "Merge branch 'x'" into `main` or
+ * `master`. `kind` is what `source` names. The merge dialog does not show this (a user's `merge.suppressDest` can change
+ * it); the browser mock uses it as the default message.
+ */
 export function defaultMergeMessage(source: string, target: string, kind: "branch" | "remote" | "tag" | "commit" = "branch"): string {
   const what = kind === "remote" ? "remote-tracking branch" : kind;
-  return `Merge ${what} '${source}' into ${target}`;
+  return SUPPRESS_DEST.includes(target) ? `Merge ${what} '${source}'` : `Merge ${what} '${source}' into ${target}`;
 }
 
-/** The arguments after `git merge`, in the order the backend passes them (without `--end-of-options`). */
+/**
+ * The arguments after `git merge`, in the order the backend passes them (without `--end-of-options`). With `--no-commit`
+ * git would still fast-forward (and move the branch), so "fast-forward when possible" then sends `--no-ff` as well: the
+ * merge stops before the commit, like IntelliJ.
+ */
 export function mergeArgs(o: MergeOpts, source: string): string[] {
   const args: string[] = [];
   switch (o.mode) {
     case "ff":
       args.push("--no-edit");
+      if (o.noCommit) args.push("--no-ff");
       break;
     case "noFf":
       args.push("--no-edit", "--no-ff");

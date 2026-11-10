@@ -443,6 +443,9 @@ pub struct ConsoleEntry {
     pub exit_code: Option<i32>,
     pub stdout: String,
     pub stderr: String,
+    /// A network command that a background caller started (auto-fetch, `AuthMode::Silent`): the
+    /// console hides it unless "Show background commands" is on.
+    pub background: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

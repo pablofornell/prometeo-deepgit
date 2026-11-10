@@ -8,6 +8,41 @@ use crate::palette::next_color;
 
 const SKIP_DIRS: [&str; 5] = ["node_modules", "target", "dist", "build", ".venv"];
 
+/// How many levels below a project folder a scan looks (the project folder is level 0).
+pub const MAX_DEPTH: usize = 4;
+
+/// True for the folders a scan never enters: names that start with `.` and `SKIP_DIRS`.
+pub fn is_skipped_dir(name: &str) -> bool {
+    name.starts_with('.') || SKIP_DIRS.contains(&name)
+}
+
+/// Why a scan of `root` would not find a repository at `repo` (`None`: it would, or `repo` is not
+/// below `root`). The same rules as `find_repos` with `MAX_DEPTH`: no folder on the way may be
+/// skipped, and the repo is at most `MAX_DEPTH` levels down. The text is for the user.
+pub fn not_found_reason(root: &Path, repo: &Path) -> Option<String> {
+    let rel = repo.strip_prefix(root).ok()?;
+    let names: Vec<String> = rel
+        .components()
+        .map(|c| c.as_os_str().to_string_lossy().into_owned())
+        .collect();
+    if let Some(name) = names.iter().find(|n| is_skipped_dir(n)) {
+        return Some(format!(
+            "A scan of the project folder skips folders named \"{name}\" (names that start with '.', {}), so a repository in {} would not be found. Choose another folder, or add the clone to a new project.",
+            SKIP_DIRS.join(", "),
+            repo.display()
+        ));
+    }
+    if names.len() > MAX_DEPTH {
+        return Some(format!(
+            "A scan of the project folder finds repositories up to {MAX_DEPTH} levels deep, and {} is {} levels below {}. Choose a parent folder closer to the project folder, or add the clone to a new project.",
+            repo.display(),
+            names.len(),
+            root.display()
+        ));
+    }
+    None
+}
+
 /// A directory is a repo if it has `.git` (a directory, or a file for worktrees/submodules).
 pub fn is_repo(dir: &Path) -> bool {
     dir.join(".git").exists()
@@ -60,7 +95,7 @@ fn walk(
         }
         let name = entry.file_name();
         let name = name.to_string_lossy();
-        if name.starts_with('.') || SKIP_DIRS.contains(&name.as_ref()) {
+        if is_skipped_dir(&name) {
             continue;
         }
         walk(&entry.path(), depth + 1, max_depth, found, seen);
@@ -85,13 +120,13 @@ fn folder_name(p: &Path) -> String {
         .unwrap_or_else(|| p.display().to_string())
 }
 
-/// Builds a project for `root` with its repos discovered (depth <= 4). Each repo gets the palette
+/// Builds a project for `root` with its repos discovered (depth <= `MAX_DEPTH`). Each repo gets the palette
 /// colour that is least used in the project so far (lowest index on a tie). The caller (the
 /// workspace) replaces these with colours balanced across all projects.
 pub fn make_project(root: &Path) -> Project {
     let root = std::fs::canonicalize(root).unwrap_or_else(|_| root.to_path_buf());
     let mut used: Vec<u8> = Vec::new();
-    let repos = find_repos(&root, 4)
+    let repos = find_repos(&root, MAX_DEPTH)
         .iter()
         .map(|p| {
             let rel = rel_name(&root, p);

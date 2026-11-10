@@ -134,12 +134,20 @@ fn colorize_repos(ws: &Workspace, replacing: Option<&str>, project: &mut Project
         .map(|r| (r.id.as_str(), r))
         .collect();
     let mut used = repo_colors_used(ws, replacing);
+    // every repo id counts once: the repos of the other projects are in `used` already
+    let mut counted: std::collections::HashSet<String> = ws
+        .projects
+        .iter()
+        .filter(|p| Some(p.id.as_str()) != replacing)
+        .flat_map(|p| p.repos.iter())
+        .map(|r| r.id.clone())
+        .collect();
     // known repos first, so a new repo never takes a colour a later known repo of this project keeps
     for r in &mut project.repos {
         if let Some(old) = known.get(r.id.as_str()) {
             r.color = old.color;
             r.custom_color = old.custom_color.clone();
-            if r.custom_color.is_none() {
+            if r.custom_color.is_none() && counted.insert(r.id.clone()) {
                 used.push(r.color);
             }
         }
@@ -491,6 +499,28 @@ mod tests {
         assert_eq!(b.repos[1].color, find(&ws, "x").color);
         // x shows a custom colour, so only a1 (colour 1) counts: b1 takes colour 0
         assert_eq!(b.repos[0].color, 0);
+    }
+
+    /// The same scenario is in `src/api/mockColors.test.ts` ("counts a shared repo once"): both
+    /// sides must give exactly these colours.
+    #[test]
+    fn a_shared_repo_counts_once_when_the_next_color_is_chosen() {
+        let mut ws = Workspace::default();
+        // a project with 12 repos uses every palette colour once; x has colour 0
+        let ids: Vec<String> = std::iter::once("x".to_string())
+            .chain((1..12).map(|i| format!("a{i}")))
+            .collect();
+        let refs: Vec<&str> = ids.iter().map(String::as_str).collect();
+        let a = add_project(&mut ws, project_with("a", &refs));
+        assert_eq!(colors_of(&a), (0..12).collect::<Vec<u8>>());
+        // b holds x too: the 12 colours are each used once, so b1 takes 0, then b2 takes 1
+        // (counting x twice would give 1 and 2)
+        let b = add_project(&mut ws, project_with("b", &["x", "b1", "b2"]));
+        assert_eq!(colors_of(&b), vec![0, 0, 1]);
+
+        // a rescan of b that keeps only x and adds b3: x is counted once, so b3 takes 0
+        let rescanned = replace_repos(&mut ws, "b", project_with("b", &["x", "b3"])).unwrap();
+        assert_eq!(colors_of(&rescanned), vec![0, 0]);
     }
 
     #[test]

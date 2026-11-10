@@ -10,14 +10,13 @@
  *  - a repo is due `interval` after its last fetch (any fetch counts: the fetch-age ring) or last failed attempt;
  *  - a repo with a write operation running (a fetch included) is skipped and tried again soon;
  *  - nothing runs while the window is hidden; on return, overdue repos are fetched at once;
- *  - no toast, no progress activity; the console marks these fetches as background commands;
+ *  - no toast, no progress activity; the backend tags these fetches `background` in the console entry (hidden unless "Show background commands" is on);
  *  - no login dialog: the backend runs them with `AuthMode::Silent` (`background`), saved credentials only;
  *  - a repo that fails backs off on its own: its interval doubles up to 60 min and resets on its first success.
  */
 import { createEffect, createRoot, createSignal, on, untrack } from "solid-js";
 import * as actions from "./actions";
 import { type AutoFetchStatus, createAutoFetch } from "./autoFetchCore";
-import { markBackgroundFetch } from "./console";
 import { lastFetchAt } from "./fetchAge";
 import { isRepoBusy } from "./repoBusy";
 import { settings } from "./settings";
@@ -56,13 +55,8 @@ export function startAutoFetch(): void {
     isBusy: isRepoBusy,
     lastFetchAt: (id) => untrack(() => lastFetchAt(id)),
     fetch: async (ids, prune) => {
-      const release = markBackgroundFetch(ids);
-      try {
-        const r = await actions.fetch(ids, { prune, silent: true, background: true });
-        return { ok: r.ok, failed: r.failed.map((f) => ({ repoId: f.repoId, message: f.error.message })) };
-      } finally {
-        release();
-      }
+      const r = await actions.fetch(ids, { prune, silent: true, background: true });
+      return { ok: r.ok, failed: r.failed.map((f) => ({ repoId: f.repoId, message: f.error.message })) };
     },
     onStatus: setAutoFetchStatus,
   });

@@ -3,7 +3,7 @@
 // crates/gitcore/src/palette.rs and src-tauri/src/workspace.rs.
 import { describe, expect, it } from "vitest";
 import { mockInvoke } from "./mock";
-import { addColoredProject, nextColor, parseColorChoice, setProjectColor, setRepoColor } from "./mockColors";
+import { addColoredProject, colorizeRepos, nextColor, parseColorChoice, setProjectColor, setRepoColor } from "./mockColors";
 import type { Project, RepoInfo, Workspace } from "./types";
 
 const call = <T>(cmd: string, args?: Record<string, unknown>) => mockInvoke(cmd, args) as Promise<T>;
@@ -71,6 +71,23 @@ describe("assignment", () => {
     expect(b.repos[1].customColor).toBe("#112233");
     // x shows a custom colour, so only a1 (colour 1) counts: b1 takes 0
     expect(b.repos[0].color).toBe(0);
+  });
+});
+
+describe("shared repos", () => {
+  // The same scenario is in src-tauri/src/workspace.rs ("a_shared_repo_counts_once_when_the_next_color_is_chosen").
+  it("counts a shared repo once when the next colour is chosen", () => {
+    const ws = empty();
+    // a project with 12 repos uses every palette colour once; x has colour 0
+    addColoredProject(ws, project("a", ["x", ...Array.from({ length: 11 }, (_, i) => `a${i + 1}`)]));
+    expect(colors(ws.projects[0])).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+    // b holds x too: the 12 colours are each used once, so b1 takes 0, then b2 takes 1 (counting x twice would give 1 and 2)
+    addColoredProject(ws, project("b", ["x", "b1", "b2"]));
+    expect(colors(ws.projects[1])).toEqual([0, 0, 1]);
+    // a rescan of b that keeps only x and adds b3: x is counted once, so b3 takes 0
+    const fresh = project("b", ["x", "b3"]);
+    colorizeRepos(ws, "b", fresh);
+    expect(colors(fresh)).toEqual([0, 0]);
   });
 });
 

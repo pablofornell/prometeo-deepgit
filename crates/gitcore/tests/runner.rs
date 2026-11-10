@@ -118,3 +118,47 @@ fn accepted_exit_codes_and_stdin() {
         )
         .is_err());
 }
+
+#[test]
+fn only_silent_network_commands_are_marked_background() {
+    use gitcore::{ops, AuthMode};
+    let up = TestRepo::new();
+    up.commit_file("a", "1", "one");
+    let r = TestRepo::new();
+    r.commit_file("b", "1", "two");
+    r.sh(&["remote", "add", "origin", &up.path().to_string_lossy()]);
+    let seen: Arc<Mutex<Vec<ConsoleEntry>>> = Arc::default();
+    let sink = seen.clone();
+    let g = Git::new(None).with_sink(Arc::new(move |e| sink.lock().unwrap().push(e)));
+    let silent = g.clone().with_auth_mode(AuthMode::Silent);
+
+    ops::fetch(&silent, &r.info, Some("origin"), false).unwrap();
+    // a read run through the silent handle is not a background command: only network calls are
+    silent
+        .run(r.path(), None, &["status", "--short"], false)
+        .unwrap();
+    // the same fetch started by the user
+    ops::fetch(&g, &r.info, Some("origin"), false).unwrap();
+
+    let seen = seen.lock().unwrap();
+    let flags: Vec<(&str, bool)> = seen
+        .iter()
+        .map(|e| {
+            (
+                e.args
+                    .iter()
+                    .find(|a| !a.starts_with('-'))
+                    .unwrap()
+                    .as_str(),
+                e.background,
+            )
+        })
+        .collect();
+    assert_eq!(
+        flags,
+        vec![("fetch", true), ("status", false), ("fetch", false)]
+    );
+    // the flag reaches the frontend under its camelCase name
+    let json = serde_json::to_value(&seen[0]).unwrap();
+    assert_eq!(json["background"], serde_json::json!(true));
+}

@@ -40,15 +40,23 @@ describe("merge option rules", () => {
     expect(mergeArgs(opts({ mode: "noFf" }), "dev")).toEqual(["--no-edit", "--no-ff", "dev"]);
     expect(mergeArgs(opts({ mode: "ffOnly" }), "dev")).toEqual(["--no-edit", "--ff-only", "dev"]);
     expect(mergeArgs(opts({ mode: "squash" }), "dev")).toEqual(["--squash", "dev"]);
-    expect(mergeArgs(opts({ noCommit: true, allowUnrelatedHistories: true }), "dev")).toEqual(["--no-edit", "--no-commit", "--allow-unrelated-histories", "dev"]);
+    expect(mergeArgs(opts({ mode: "noFf", noCommit: true, allowUnrelatedHistories: true }), "dev")).toEqual(["--no-edit", "--no-ff", "--no-commit", "--allow-unrelated-histories", "dev"]);
     expect(mergeArgs(opts({ mode: "noFf", message: "Join\n\nbody" }), "dev")).toEqual(["--no-edit", "--no-ff", "-m", "Join\n\nbody", "dev"]);
     expect(mergeArgs(opts({ message: "  " }), "dev")).toEqual(["--no-edit", "dev"]);
   });
 
-  it("writes git's default message", () => {
-    expect(defaultMergeMessage("feature/x", "main")).toBe("Merge branch 'feature/x' into main");
-    expect(defaultMergeMessage("origin/x", "main", "remote")).toBe("Merge remote-tracking branch 'origin/x' into main");
-    expect(defaultMergeMessage("v1.0", "main", "tag")).toBe("Merge tag 'v1.0' into main");
-    expect(defaultMergeMessage("abc1234", "main", "commit")).toBe("Merge commit 'abc1234' into main");
+  it("sends --no-ff with --no-commit in fast-forward mode, so the branch cannot move", () => {
+    expect(mergeArgs(opts({ noCommit: true }), "dev")).toEqual(["--no-edit", "--no-ff", "--no-commit", "dev"]);
+    expect(mergeArgs(opts({ mode: "ff" }), "dev")).toEqual(["--no-edit", "dev"]);
+  });
+
+  it("writes git's default message: no 'into' for main and master", () => {
+    expect(defaultMergeMessage("feature/x", "develop")).toBe("Merge branch 'feature/x' into develop");
+    expect(defaultMergeMessage("feature/x", "main")).toBe("Merge branch 'feature/x'");
+    expect(defaultMergeMessage("feature/x", "master")).toBe("Merge branch 'feature/x'");
+    expect(defaultMergeMessage("origin/x", "develop", "remote")).toBe("Merge remote-tracking branch 'origin/x' into develop");
+    expect(defaultMergeMessage("origin/x", "main", "remote")).toBe("Merge remote-tracking branch 'origin/x'");
+    expect(defaultMergeMessage("v1.0", "develop", "tag")).toBe("Merge tag 'v1.0' into develop");
+    expect(defaultMergeMessage("abc1234", "develop", "commit")).toBe("Merge commit 'abc1234' into develop");
   });
 });

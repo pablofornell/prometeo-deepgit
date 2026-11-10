@@ -276,6 +276,30 @@ fn no_commit_stops_before_the_merge_commit() {
 }
 
 #[test]
+fn no_commit_does_not_fast_forward_even_when_it_could() {
+    // git alone would fast-forward and ignore --no-commit; the branch must stay where it is.
+    for mode in [MergeMode::Ff, MergeMode::NoFf] {
+        let r = ahead();
+        let g = git();
+        let before = r.head();
+        let o = MergeOpts {
+            no_commit: true,
+            ..opts(mode)
+        };
+        let res = ops::merge(&g, &r.info, "other", &o).unwrap();
+        assert!(res.ok, "{mode:?}: {}", res.message);
+        assert_eq!(r.head(), before, "{mode:?}: the branch moved");
+        assert!(merge_head_exists(&r), "{mode:?}");
+        assert_eq!(state::repo_state(r.path()).unwrap(), RepoStateKind::Merging);
+        assert_eq!(refs::repo_summary(&g, &r.info).unwrap().staged, 1);
+        // Finishing it makes a merge commit with the branch tip as second parent.
+        ops::commit(&g, &r.info, "Merge by hand", false, false).unwrap();
+        assert_eq!(parents(&r), 2, "{mode:?}");
+        assert_eq!(r.sh(&["rev-parse", "HEAD^1"]), before);
+    }
+}
+
+#[test]
 fn options_that_do_not_go_together_are_refused_and_nothing_runs() {
     let r = diverged();
     let g = git();

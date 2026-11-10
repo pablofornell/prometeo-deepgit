@@ -26,7 +26,7 @@
   position: sticky; left: 0; z-index: 1; display: flex; align-items: center; gap: var(--dg-tree-icon-gap); min-width: 0; padding: 0 var(--dg-space-4);
   background-color: var(--dg-island-bg); text-align: left; border-radius: var(--dg-tree-selection-radius) 0 0 var(--dg-tree-selection-radius);
 }
-.dg-matrix-rowhead:hover { background: var(--dg-row-hover-bg); }
+.dg-matrix-rowhead:hover { background-color: var(--dg-row-hover-bg); }  /* keeps the repo tint (a background-image) under the hover */
 .dg-matrix-rowhead.is-focused { background: var(--dg-selection-inactive-bg); }
 .dg-matrix-rname { flex: none; font-weight: var(--dg-weight-medium); }
 .dg-matrix-rbranch { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dg-text-secondary); font-size: var(--dg-font-size-medium); }
@@ -35,7 +35,7 @@
   display: flex; align-items: center; justify-content: center; gap: var(--dg-space-3); min-width: 0;
   background-color: var(--dg-matrix-cell-bg); box-shadow: inset 0 0 0 0.5px var(--dg-island-bg);
 }
-.dg-matrix-cell:hover { background: var(--dg-matrix-cell-hover-bg); }
+.dg-matrix-cell:hover { background-color: var(--dg-matrix-cell-hover-bg); }  /* keeps the repo tint */
 .dg-matrix-cell.is-selected { background: var(--dg-matrix-column-selected-bg); }
 
 /* ---- glyphs: 8 px */

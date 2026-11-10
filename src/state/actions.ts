@@ -818,7 +818,11 @@ export function startClone(req: CloneRequest, onProgress: (p: CloneProgress) => 
       stop = await api.onCloneProgress((e) => {
         if (e.operationId === id) onProgress(e);
       });
-      const result = await api.cloneRepo(id, req.url, req.parentDir, req.dirName, opts, target);
+      const running = api.cloneRepo(id, req.url, req.parentDir, req.dirName, opts, target);
+      // Cancel may have been pressed while the listener was being set up, before the backend knew this clone: say it
+      // again now that the clone is on its way (the backend also remembers a cancel that came first).
+      if (cancelRequested) void api.cloneCancel(id).catch(() => undefined);
+      const result = await running;
       await adoptClonedProject(result);
       toast({ kind: "success", title: `Cloned ${req.dirName}`, body: result.createdProject ? `New project ${result.project.name}.` : `Added to ${result.project.name}.` });
       return { ok: true, result };

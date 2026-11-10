@@ -4,9 +4,9 @@
  * in-memory repositories (`mockData.ts`); write commands mutate that state and emit `repo-changed`.
  * Every git-backed call also emits a `git-console` entry after a small random delay.
  */
-import { checkCloneInput, joinPath } from "./cloneRules";
+import { checkCloneInput, joinPath, notFoundReason } from "./cloneRules";
 import { layoutGraph } from "./graphLayout";
-import { checkMergeOpts, effectiveMessage, mergeArgs } from "./mergeRules";
+import { checkMergeOpts, defaultMergeMessage, effectiveMessage, mergeArgs } from "./mergeRules";
 import { authReply, beginAuth, credentialsClear, setAuthPrefs, type AuthSession } from "./mockAuth";
 import {
   DEEPGIT_ROOT, PAYMENTS_ROOT, PEOPLE, SCENARIOS, genericScenario, generateRepo, hashStr, hex40, repoId,
@@ -55,7 +55,15 @@ function emit(event: string, payload: unknown): void {
 
 let consoleId = 0;
 
-function emitConsole(repo: MockRepo | null, args: string[], durationMs: number, out: { stdout?: string; stderr?: string; exit?: number } = {}): void {
+interface ConsoleOut {
+  stdout?: string;
+  stderr?: string;
+  exit?: number;
+  /** Set by a network command run with the silent auth mode (`fetch` with `background`), like the Rust runner does. */
+  background?: boolean;
+}
+
+function emitConsole(repo: MockRepo | null, args: string[], durationMs: number, out: ConsoleOut = {}): void {
   const entry: ConsoleEntry = {
     id: ++consoleId,
     repoId: repo?.info.id ?? null,
@@ -65,6 +73,7 @@ function emitConsole(repo: MockRepo | null, args: string[], durationMs: number, 
     exitCode: out.exit ?? 0,
     stdout: out.stdout ?? "",
     stderr: out.stderr ?? "",
+    background: out.background ?? false,
   };
   emit("git-console", entry);
 }
@@ -554,7 +563,7 @@ function mergeOptsOf(v: unknown): MergeOpts {
 
 interface Ctx {
   delay: number;
-  git(repo: MockRepo | null, args: string[], out?: { stdout?: string; stderr?: string; exit?: number }): void;
+  git(repo: MockRepo | null, args: string[], out?: ConsoleOut): void;
 }
 
 type Handler = (a: Args, c: Ctx) => unknown;
@@ -922,7 +931,9 @@ const handlers: Record<string, Handler> = {
       return conflict(`CONFLICT (content): Merge conflict in ${repo.wt.conflicted[0].path}\nAutomatic merge failed; fix conflicts and then commit the result.`);
     }
     const mode: MergeMode = opts.mode;
-    if (fastForward && (mode === "ff" || mode === "ffOnly")) {
+    // `--no-commit` in "fast-forward when possible" goes out as `--no-ff` (git would fast-forward and ignore --no-commit)
+    const fastForwards = fastForward && (mode === "ffOnly" || (mode === "ff" && !opts.noCommit));
+    if (fastForwards) {
       advanceHead(repo, oid);
       c.git(repo, gitArgs, { stdout: `Updating ${short(repo.head.oid)}..${short(oid)}\nFast-forward\n` });
     } else if (mode === "squash") {
@@ -935,14 +946,15 @@ const handlers: Record<string, Handler> = {
       pendingMerges.set(repo, { oid, source: target });
       c.git(repo, gitArgs, { stdout: "Automatic merge went well; stopped before committing as requested\n" });
     } else {
-      const text = message ?? `Merge branch '${target}' into ${repo.head.branch ?? "HEAD"}`;
+      const kind = repo.branches.has(target) ? "branch" : repo.remotes.has(target) ? "remote" : repo.tags.has(target) ? "tag" : "commit";
+      const text = message ?? defaultMergeMessage(target, repo.head.branch ?? "HEAD", kind);
       const [subject, ...rest] = text.trim().split("\n");
       const m = makeCommit(repo, [repo.head.oid, oid], subject, rest.join("\n").trim());
       advanceHead(repo, m.oid);
       c.git(repo, gitArgs, { stdout: "Merge made by the 'ort' strategy.\n" });
     }
     emitChanged(repo);
-    return ok(fastForward && (mode === "ff" || mode === "ffOnly") ? "Fast-forward" : mode === "squash" ? "Squash commit -- not updating HEAD" : "Merge made by the 'ort' strategy.");
+    return ok(fastForwards ? "Fast-forward" : mode === "squash" ? "Squash commit -- not updating HEAD" : "Merge made by the 'ort' strategy.");
   },
   rebase: (a, c) => {
     const repo = repoOf(a.repoId);
@@ -1066,7 +1078,7 @@ const handlers: Record<string, Handler> = {
       repo.remotes.set("origin/main", commit.oid);
       message = `From ${repo.url}\n   ${short(tip)}..${short(commit.oid)}  main       -> origin/main`;
     }
-    c.git(repo, args, { stderr: message });
+    c.git(repo, args, { stderr: message, background: bool(a.background) });
     emitChanged(repo);
     auth.commit();
     return ok(message || "Already up to date.");
@@ -1190,10 +1202,13 @@ const handlers: Record<string, Handler> = {
   // ---- clone
   clone_repo: (a, c) => cloneRepo(a, c),
   clone_cancel: (a) => {
-    const running = runningClones.get(str(a.operationId));
+    const id = str(a.operationId);
+    const running = runningClones.get(id);
     if (running) {
       running.cancelled = true;
       running.abort.abort(); // closes a login dialog that is open
+    } else {
+      rememberEarlyCancel(id);
     }
   },
 
@@ -1262,6 +1277,27 @@ const handlers: Record<string, Handler> = {
 const runningClones = new Map<string, { cancelled: boolean; abort: AbortController }>();
 const CLONE_PHASES = ["Counting objects", "Compressing objects", "Receiving objects", "Resolving deltas", "Updating files"];
 
+/** Cancels of clones that had not started yet, with their time (like `AppState::early_cancels` of the backend). */
+const earlyCancels = new Map<string, number>();
+const EARLY_CANCEL_TTL_MS = 60_000;
+const EARLY_CANCEL_MAX = 64;
+
+function rememberEarlyCancel(id: string, now = Date.now()): void {
+  for (const [k, at] of earlyCancels) if (now - at >= EARLY_CANCEL_TTL_MS) earlyCancels.delete(k);
+  while (earlyCancels.size >= EARLY_CANCEL_MAX) earlyCancels.delete(earlyCancels.keys().next().value as string);
+  earlyCancels.set(id, now);
+}
+
+/** True (once) when this id was cancelled before its clone started. */
+function takeEarlyCancel(id: string, now = Date.now()): boolean {
+  const at = earlyCancels.get(id);
+  earlyCancels.delete(id);
+  return at !== undefined && now - at < EARLY_CANCEL_TTL_MS;
+}
+
+/** Target folders of the running clones: a second clone into one of them is refused. */
+const runningTargets = new Set<string>();
+
 /** The mock disk: every absolute folder exists, except one that has a segment named `missing`. */
 const mockFolderExists = (p: string): boolean => !p.split(/[\\/]/).includes("missing");
 
@@ -1272,6 +1308,8 @@ const mockFolderExists = (p: string): boolean => !p.split(/[\\/]/).includes("mis
  */
 async function cloneRepo(a: Args, c: Ctx): Promise<CloneResult> {
   const operationId = str(a.operationId);
+  // like `begin_clone`: a cancel that came first ends the clone before anything else
+  if (takeEarlyCancel(operationId)) fail("The operation was cancelled.");
   const url = str(a.url).trim();
   const parentDir = str(a.parentDir).trim().replace(/(.)[\\/]+$/, "$1");
   const dirName = str(a.dirName).trim();
@@ -1290,10 +1328,15 @@ async function cloneRepo(a: Args, c: Ctx): Promise<CloneResult> {
     if (parentDir !== project.path && !parentDir.startsWith(project.path + "/")) {
       fail(`The parent folder is outside the project folder ${project.path}. Choose a folder inside it, or add the clone to a new project.`);
     }
+    // a rescan must find the clone: refuse a folder it skips (too deep, node_modules, a dot name...) before cloning
+    const problem = notFoundReason(path, project.path);
+    if (problem) fail(problem);
   }
   if (runningClones.has(operationId)) fail("This clone is already running.");
+  if (runningTargets.has(path)) fail(`Another clone into ${path} is already running.`);
   const state = { cancelled: false, abort: new AbortController() };
   runningClones.set(operationId, state);
+  runningTargets.add(path);
   const gitArgs = ["clone", "--progress", ...(branch ? ["--branch", branch] : []), ...(depth ? ["--depth", String(depth)] : []), ...(opts.recurseSubmodules ? ["--recurse-submodules"] : []), "--", url, path];
   try {
     // Like Rust: the clone runs as an interactive network command, so a private https URL asks for a login.
@@ -1342,6 +1385,7 @@ async function cloneRepo(a: Args, c: Ctx): Promise<CloneResult> {
     return { path, project: structuredClone(project), createdProject: created } satisfies CloneResult;
   } finally {
     runningClones.delete(operationId);
+    runningTargets.delete(path);
   }
 }
 
@@ -1383,7 +1427,7 @@ export async function mockInvoke(cmd: string, args: Args = {}): Promise<unknown>
     const repo = typeof args.repoId === "string" ? repos.get(args.repoId) ?? null : null;
     if (!emitted && repo) {
       const detail = typeof e === "object" && e !== null && "detail" in e ? String((e as { detail: unknown }).detail) : "";
-      emitConsole(repo, [cmd.split("_")[0]], Math.round(delay), { stderr: detail, exit: 1 });
+      emitConsole(repo, [cmd.split("_")[0]], Math.round(delay), { stderr: detail, exit: 1, background: cmd === "fetch" && args.background === true });
     }
     throw e;
   }

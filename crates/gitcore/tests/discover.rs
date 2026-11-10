@@ -74,3 +74,48 @@ fn non_repo_root_without_children_is_empty() {
     assert!(discover::find_repos(root.path(), 4).is_empty());
     assert!(discover::make_project(root.path()).repos.is_empty());
 }
+
+#[test]
+fn not_found_reason_agrees_with_what_a_scan_finds() {
+    let root = tempfile::tempdir().unwrap();
+    let r = root.path();
+    let cases = [
+        "apps/web",
+        "a/b/c/d",
+        "a/b/c/d/e",
+        "node_modules/pkg",
+        "target/x",
+        "dist/x",
+        "build/x",
+        ".venv/x",
+        ".hidden/y",
+        "ok/.dotrepo",
+        "ok/node_modules/deep",
+        "deep/er/est/x",
+    ];
+    for sub in cases {
+        std::fs::create_dir_all(r.join(sub)).unwrap();
+        init_at(&r.join(sub));
+    }
+    let found = discover::find_repos(r, discover::MAX_DEPTH);
+    for sub in cases {
+        let path = r.join(sub);
+        let reason = discover::not_found_reason(r, &path);
+        assert_eq!(
+            reason.is_none(),
+            found.contains(&path),
+            "{sub}: reason {reason:?}"
+        );
+    }
+    let reason = |sub: &str| discover::not_found_reason(r, &r.join(sub)).unwrap();
+    assert!(reason("a/b/c/d/e").contains("4 levels deep"));
+    assert!(reason("a/b/c/d/e").contains("5 levels below"));
+    assert!(reason("node_modules/pkg").contains("\"node_modules\""));
+    assert!(reason("ok/.dotrepo").contains("\".dotrepo\""));
+    // the project folder itself, and paths outside it, are not a problem of the scan
+    assert_eq!(discover::not_found_reason(r, r), None);
+    assert_eq!(
+        discover::not_found_reason(r, std::path::Path::new("/elsewhere/x")),
+        None
+    );
+}

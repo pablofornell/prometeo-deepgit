@@ -111,3 +111,32 @@ export function insideProject(parent: string, projectPath: string): boolean {
   if (a.startsWith("~") !== b.startsWith("~")) return true;
   return a === b || a.startsWith(b + "/") || a.startsWith(b + "\\");
 }
+
+/** How many levels below a project folder a scan looks (mirror of `discover::MAX_DEPTH`). */
+export const SCAN_MAX_DEPTH = 4;
+/** Folders a scan never enters, besides names that start with `.` (mirror of `discover::SKIP_DIRS`). */
+const SKIPPED_DIRS = ["node_modules", "target", "dist", "build", ".venv"];
+
+/** True for the folders a scan of a project never enters (mirror of `discover::is_skipped_dir`). */
+export const isSkippedDir = (name: string): boolean => name.startsWith(".") || SKIPPED_DIRS.includes(name);
+
+/**
+ * Why a rescan of the project folder would not find a repository at `clonePath` (the same rules and texts as
+ * `discover::not_found_reason`), or null when it would, or when the path is not below the project (or cannot be
+ * compared: `~` against an absolute path, which the backend decides).
+ */
+export function notFoundReason(clonePath: string, projectPath: string): string | null {
+  const a = trimSep(clonePath.trim());
+  const b = trimSep(projectPath);
+  if (a.startsWith("~") !== b.startsWith("~")) return null;
+  if (a === b || !(a.startsWith(b + "/") || a.startsWith(b + "\\"))) return null;
+  const names = a.slice(b.length).split(/[\\/]+/).filter((n) => n !== "");
+  const skipped = names.find(isSkippedDir);
+  if (skipped !== undefined) {
+    return `A scan of the project folder skips folders named "${skipped}" (names that start with '.', ${SKIPPED_DIRS.join(", ")}), so a repository in ${a} would not be found. Choose another folder, or add the clone to a new project.`;
+  }
+  if (names.length > SCAN_MAX_DEPTH) {
+    return `A scan of the project folder finds repositories up to ${SCAN_MAX_DEPTH} levels deep, and ${a} is ${names.length} levels below ${b}. Choose a parent folder closer to the project folder, or add the clone to a new project.`;
+  }
+  return null;
+}

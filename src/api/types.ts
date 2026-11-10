@@ -308,6 +308,8 @@ export interface ConsoleEntry {
   exitCode: number | null;
   stdout: string;
   stderr: string;
+  /** A network command started by a background caller (the auto-fetch): hidden from the status bar and, by default, the console. */
+  background: boolean;
 }
 
 export interface RepoChanged {

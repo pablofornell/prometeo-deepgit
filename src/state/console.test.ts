@@ -1,7 +1,7 @@
 // @vitest-environment node
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import type { ConsoleEntry } from "../api/types";
-import { clearConsole, isBackgroundEntry, markBackgroundFetch, pushConsoleEntry, splitGitArgs } from "./console";
+import { clearConsole, isBackgroundEntry, lastUserEntry, pushConsoleEntry, splitGitArgs } from "./console";
 
 const entry = (...args: string[]): ConsoleEntry => ({ args }) as unknown as ConsoleEntry;
 const bg = (...args: string[]) => isBackgroundEntry(entry(...args));
@@ -69,34 +69,25 @@ describe("clone and background fetch", () => {
     expect(bg("clone", "--progress", "--", "https://h/r.git", "/work/r")).toBe(false);
   });
 
-  it("classifies the fetch entries of a repo with a background fetch running as background, once and for good", () => {
-    const e = (id: number, repoId: string, ...args: string[]): ConsoleEntry => ({ id, repoId, args, startedAt: 0, durationMs: 1, exitCode: 0, stdout: "", stderr: "" });
-    vi.useFakeTimers();
+  it("classifies a fetch by the backend's `background` flag only", () => {
+    const e = (id: number, repoId: string, background: boolean, ...args: string[]): ConsoleEntry => ({ id, repoId, args, startedAt: 0, durationMs: 1, exitCode: 0, stdout: "", stderr: "", background });
     try {
-      const release = markBackgroundFetch(["a"]);
-      const auto = e(1, "a", "fetch", "--all", "--prune");
-      const otherRepo = e(2, "b", "fetch", "--all");
-      const read = e(3, "a", "log", "-1");
+      const auto = e(1, "a", true, "fetch", "--all", "--prune");
+      // the same repo, the same moment: a fetch the user started is not hidden
+      const user = e(2, "a", false, "fetch", "origin");
+      const read = e(3, "a", false, "log", "-1");
       pushConsoleEntry(auto);
-      pushConsoleEntry(otherRepo);
+      pushConsoleEntry(user);
       pushConsoleEntry(read);
       expect(isBackgroundEntry(auto)).toBe(true);
-      expect(isBackgroundEntry(otherRepo)).toBe(false);
-      release();
-      // the entry may arrive just after the reply: the mark lasts a moment
-      vi.advanceTimersByTime(1000);
-      const late = e(4, "a", "fetch", "--all");
-      pushConsoleEntry(late);
-      expect(isBackgroundEntry(late)).toBe(true);
-      vi.advanceTimersByTime(2000);
-      const user = e(5, "a", "fetch", "origin");
-      pushConsoleEntry(user);
       expect(isBackgroundEntry(user)).toBe(false);
-      // the earlier verdict does not change
-      expect(isBackgroundEntry(auto)).toBe(true);
+      expect(isBackgroundEntry(read)).toBe(true);
+      // the ticker keeps the user's fetch, not the auto-fetch that came before it
+      expect(lastUserEntry()).toBe(user);
+      pushConsoleEntry(e(4, "a", true, "fetch", "--all"));
+      expect(lastUserEntry()).toBe(user);
     } finally {
       clearConsole();
-      vi.useRealTimers();
     }
   });
 });

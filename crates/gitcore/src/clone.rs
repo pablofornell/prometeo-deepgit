@@ -4,6 +4,7 @@
 //! `plan_clone` validates and touches nothing; `run_clone` clones and, when the clone fails or is
 //! cancelled, removes what the clone made (the folder only if the clone created it).
 
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
@@ -276,8 +277,42 @@ fn clean_up(plan: &ClonePlan) {
     }
 }
 
+/// Target folders of the clones that are running in this process.
+static IN_FLIGHT: Mutex<Option<HashSet<PathBuf>>> = Mutex::new(None);
+
+/// Holds a target folder for the length of a clone, so two clones into the same folder cannot run
+/// together: the one that fails first would clean up the folder of the other.
+struct TargetGuard(PathBuf);
+
+impl TargetGuard {
+    fn acquire(target: &Path) -> Result<Self, GitError> {
+        let mut set = IN_FLIGHT.lock().unwrap_or_else(|e| e.into_inner());
+        if set
+            .get_or_insert_with(HashSet::new)
+            .insert(target.to_path_buf())
+        {
+            Ok(TargetGuard(target.to_path_buf()))
+        } else {
+            Err(invalid(format!(
+                "Another clone into {} is already running.",
+                target.display()
+            )))
+        }
+    }
+}
+
+impl Drop for TargetGuard {
+    fn drop(&mut self) {
+        let mut set = IN_FLIGHT.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(set) = set.as_mut() {
+            set.remove(&self.0);
+        }
+    }
+}
+
 /// Clones into `plan.target`, reporting progress. On a failure or a cancel (`GitError::Cancelled`)
-/// the partial folder is cleaned up as `clean_up` says. Returns the target folder.
+/// the partial folder is cleaned up as `clean_up` says. Returns the target folder. A second clone
+/// into a folder that another running clone uses is refused before it touches anything.
 pub fn run_clone(
     git: &Git,
     plan: &ClonePlan,
@@ -285,6 +320,7 @@ pub fn run_clone(
     cancel: &CancelToken,
     on_progress: ProgressSink,
 ) -> Result<PathBuf, GitError> {
+    let _guard = TargetGuard::acquire(&plan.target)?;
     let args = clone_args(plan, opts);
     let arg_refs: Vec<&str> = args.iter().map(String::as_str).collect();
 

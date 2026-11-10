@@ -655,6 +655,8 @@ fn check_merge_opts(opts: &MergeOpts, message: Option<&str>) -> Result<(), GitEr
 /// `git merge [--no-edit] [--no-ff | --ff-only | --squash] [--no-commit] [--allow-unrelated-histories]
 /// [-m message] [--end-of-options] target`. A blank message means git's default. Squash stages the
 /// changes and leaves no `MERGE_HEAD`; `--ff-only` on diverged branches fails with a clear error.
+/// Git ignores `--no-commit` when it can fast-forward (the branch moves), so "fast-forward when
+/// possible" with `no_commit` runs with `--no-ff` too: the merge stops before the commit.
 pub fn merge(
     git: &Git,
     repo: &RepoInfo,
@@ -671,6 +673,7 @@ pub fn merge(
     check_merge_opts(opts, message)?;
     let mut args = vec!["merge"];
     match opts.mode {
+        MergeMode::Ff if opts.no_commit => args.extend(["--no-edit", "--no-ff"]),
         MergeMode::Ff => args.push("--no-edit"),
         MergeMode::NoFf => args.extend(["--no-edit", "--no-ff"]),
         MergeMode::FfOnly => args.extend(["--no-edit", "--ff-only"]),

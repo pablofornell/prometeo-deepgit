@@ -54,7 +54,25 @@ describe("mock merge", () => {
     const [, , , web] = await repoIds();
     await sideBranch(web, true);
     await merge(web, "side", { message: "  " });
-    expect((await topCommit(web)).subject).toBe("Merge branch 'side' into main");
+    // git leaves " into <branch>" out when the branch is main or master
+    expect((await topCommit(web)).subject).toBe("Merge branch 'side'");
+  });
+
+  it("does not fast-forward with --no-commit: the branch stays, the merge waits for its commit, and abort undoes it", async () => {
+    const [, , refunds] = await repoIds();
+    await sideBranch(refunds, false, "nc-side");
+    const before = (await summaryOf(refunds)).headOid;
+    const seen: ConsoleEntry[] = [];
+    const off = mockListen("git-console", (p) => seen.push(p as ConsoleEntry));
+    const r = await merge(refunds, "nc-side", { mode: "ff", noCommit: true });
+    off();
+    expect(r.ok).toBe(true);
+    expect(seen.find((e) => e.args[0] === "merge")?.args).toEqual(["merge", "--no-edit", "--no-ff", "--no-commit", "--end-of-options", "nc-side"]);
+    const mid = await summaryOf(refunds);
+    expect(mid).toMatchObject({ state: "merging", headOid: before });
+    expect(mid.staged).toBeGreaterThan(0);
+    await call("op_abort", { repoId: refunds });
+    expect(await summaryOf(refunds)).toMatchObject({ state: "clean", headOid: before, staged: 0 });
   });
 
   it("refuses fast-forward only on diverged branches with a clear error, and changes nothing", async () => {
@@ -244,10 +262,61 @@ describe("mock clone", () => {
     off();
     const ws = await settle(call<Workspace>("workspace_load"));
     expect(ws.projects.some((x) => x.path.endsWith("/cancelled"))).toBe(false);
-    // cancelling what is not running is fine, and the id can be used again
-    await settle(call("clone_cancel", { operationId: "op-cancel" }));
-    const again = await settle(clone({ operationId: "op-cancel", dirName: "cancelled" }));
+    // the same folder can be cloned again
+    const again = await settle(clone({ operationId: "op-cancel-2", dirName: "cancelled" }));
     expect(again.path.endsWith("/cancelled")).toBe(true);
+  });
+
+  it("ends a clone at once when its cancel came first, once, like `begin_clone`", async () => {
+    await settle(call("clone_cancel", { operationId: "op-early" }));
+    const events: CloneProgress[] = [];
+    const off = mockListen("clone-progress", (p) => events.push(p as CloneProgress));
+    await expect(settle(clone({ operationId: "op-early", dirName: "early" }))).rejects.toMatchObject({ message: "The operation was cancelled." });
+    off();
+    expect(events).toEqual([]);
+    const ws = await settle(call<Workspace>("workspace_load"));
+    expect(ws.projects.some((x) => x.path.endsWith("/early"))).toBe(false);
+    // the remembered cancel is used up; other ids were never affected
+    const again = await settle(clone({ operationId: "op-early", dirName: "early" }));
+    expect(again.path.endsWith("/early")).toBe(true);
+    // a cancel older than a minute is forgotten
+    await settle(call("clone_cancel", { operationId: "op-stale" }));
+    await vi.advanceTimersByTimeAsync(61_000);
+    expect((await settle(clone({ operationId: "op-stale", dirName: "stale" }))).path.endsWith("/stale")).toBe(true);
+  });
+
+  it("refuses before cloning a folder that a rescan of the project would skip", async () => {
+    const into = (parentDir: string, dirName = "found") => clone({ target: { kind: "project", projectId: "p-payments" }, parentDir, dirName });
+    const refused = async (parentDir: string, dirName: string | undefined, message: string) => {
+      const p = into(parentDir, dirName);
+      p.catch(() => undefined);
+      await vi.advanceTimersByTimeAsync(500);
+      await expect(p).rejects.toMatchObject({ message: expect.stringContaining(message) });
+    };
+    const root = "~/work/payments-platform";
+    await refused(`${root}/node_modules`, undefined, 'skips folders named "node_modules"');
+    await refused(`${root}/.hidden`, undefined, 'skips folders named ".hidden"');
+    await refused(root, ".dotclone", 'skips folders named ".dotclone"');
+    await refused(`${root}/a/b/c/d`, undefined, "5 levels below");
+    const ws = await settle(call<Workspace>("workspace_load"));
+    expect(ws.projects.flatMap((p) => p.repos).some((r) => r.name === "found")).toBe(false);
+    // 4 levels deep is found again
+    const ok = await settle(into(`${root}/a/b/c`, "deep"));
+    expect(ok.project.repos.map((r) => r.name)).toContain("a/b/c/deep");
+    // the same folder for a new project has no such limit
+    const alone = await settle(clone({ parentDir: `${root}/node_modules`, dirName: "alone" }));
+    expect(alone.createdProject).toBe(true);
+  });
+
+  it("refuses a second clone into a folder that a running clone uses", async () => {
+    const first = clone({ operationId: "op-t1", dirName: "twin" });
+    first.catch(() => undefined);
+    await vi.advanceTimersByTimeAsync(400);
+    const second = clone({ operationId: "op-t2", dirName: "twin" });
+    second.catch(() => undefined);
+    await vi.advanceTimersByTimeAsync(300);
+    await expect(second).rejects.toMatchObject({ message: expect.stringContaining("Another clone into ~/work/payments-platform/twin is already running.") });
+    await settle(first);
   });
 
   it("refuses a second clone with the same operation id while it runs", async () => {
@@ -259,5 +328,25 @@ describe("mock clone", () => {
     await vi.advanceTimersByTimeAsync(300);
     await expect(second).rejects.toMatchObject({ message: "This clone is already running." });
     await settle(first);
+  });
+});
+
+describe("mock console background flag", () => {
+  it("tags a fetch run with `background` (also when it fails fast), and nothing else", async () => {
+    const [api, , , , , docs] = await repoIds();
+    const seen: ConsoleEntry[] = [];
+    const off = mockListen("git-console", (p) => seen.push(p as ConsoleEntry));
+    try {
+      await call("fetch", { repoId: api, remote: null, prune: true, background: true });
+      await call("fetch", { repoId: api, remote: null, prune: true });
+      await call("working_tree", { repoId: api });
+      // docs-site needs a login: the background fetch fails fast, and its console entry is still a background one
+      await expect(call("fetch", { repoId: docs, remote: null, prune: false, background: true })).rejects.toBeDefined();
+    } finally {
+      off();
+    }
+    const fetches = seen.filter((e) => e.args[0] === "fetch");
+    expect(fetches.map((e) => e.background)).toEqual([true, false, true]);
+    expect(seen.filter((e) => e.args[0] !== "fetch").every((e) => e.background === false)).toBe(true);
   });
 });

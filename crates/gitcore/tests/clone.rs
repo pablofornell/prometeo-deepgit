@@ -429,3 +429,137 @@ fn a_silent_clone_is_killed_after_the_inactivity_timeout() {
     assert!(t.elapsed() < Duration::from_secs(10));
     assert!(!parent.path().join("r").exists());
 }
+
+// ---------------------------------------------------------------- no absolute cap for a clone
+
+/// A `git` that keeps printing progress for about 2 s when it is asked to clone or fetch, then exits
+/// 0 (a clone leaves its folder). Other commands (the runner asks `git config`) end at once.
+#[cfg(unix)]
+fn chatty_git(dir: &Path) -> PathBuf {
+    use std::os::unix::fs::PermissionsExt;
+    let script = dir.join("chatty-git");
+    let text = r#"#!/bin/sh
+for a in "$@"; do
+  last="$a"
+  [ "$a" = "--version" ] && { echo "git version 2.43.0"; exit 0; }
+  [ "$a" = "clone" ] && is_clone=1
+  [ "$a" = "fetch" ] && is_fetch=1
+done
+[ -n "$is_clone" ] || [ -n "$is_fetch" ] || exit 1
+[ -n "$is_clone" ] && mkdir -p "$last"
+i=0
+while [ $i -lt 10 ]; do
+  printf 'Receiving objects:  %s%% (1/10)\r' "$i" >&2
+  sleep 0.2
+  i=$((i+1))
+done
+exit 0
+"#;
+    std::fs::write(&script, text).unwrap();
+    std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
+    script
+}
+
+#[cfg(unix)]
+#[test]
+fn a_clone_that_keeps_talking_is_not_stopped_by_the_absolute_cap() {
+    let tools = tempfile::tempdir().unwrap();
+    let parent = tempfile::tempdir().unwrap();
+    // the cap is far below the ~2 s the clone runs; the inactivity limit is never reached
+    let g = Git::new(Some(chatty_git(tools.path())))
+        .with_network_timeout(Duration::from_secs(1))
+        .with_network_cap(Duration::from_millis(500));
+    let (events, sink) = collector();
+    let r = clone::clone(
+        &g,
+        "https://example.org/r.git",
+        &parent.path().to_string_lossy(),
+        "r",
+        &CloneOpts::default(),
+        &CancelToken::new(),
+        sink,
+    );
+    assert!(r.is_ok(), "{r:?}");
+    assert!(events.lock().unwrap().len() >= 5, "it kept reporting");
+
+    // the same settings still cap a fetch of that chatty git
+    let t = Instant::now();
+    let err = g
+        .run_streaming(
+            parent.path(),
+            None,
+            &["fetch", "--all"],
+            &CancelToken::new(),
+            Arc::new(|_| {}),
+        )
+        .unwrap_err();
+    assert!(
+        matches!(err, GitError::Timeout { .. }),
+        "{err:?} after {:?}",
+        t.elapsed()
+    );
+    assert!(
+        t.elapsed() < Duration::from_millis(1800),
+        "{:?}",
+        t.elapsed()
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn a_second_clone_into_the_same_folder_is_refused_and_leaves_the_first_alone() {
+    let tools = tempfile::tempdir().unwrap();
+    let parent = tempfile::tempdir().unwrap();
+    let g = Git::new(Some(slow_git(tools.path())));
+    let plan = plan_clone(
+        "https://example.org/r.git",
+        &parent.path().to_string_lossy(),
+        "r",
+        &CloneOpts::default(),
+    )
+    .unwrap();
+    let (events, sink) = collector();
+    let cancel = CancelToken::new();
+    let first = {
+        let (g, plan, cancel) = (g.clone(), plan.clone(), cancel.clone());
+        std::thread::spawn(move || run_clone(&g, &plan, &CloneOpts::default(), &cancel, sink))
+    };
+    wait_for(&events, "same target");
+    assert!(plan.target.join("partial").exists());
+
+    // the same target again: refused at once, and it must not clean up the folder of the first
+    let (_, sink2) = collector();
+    let err = run_clone(&g, &plan, &CloneOpts::default(), &CancelToken::new(), sink2).unwrap_err();
+    assert!(
+        matches!(&err, GitError::Invalid(m) if m.contains("already running")),
+        "{err:?}"
+    );
+    assert!(
+        plan.target.join("partial").exists(),
+        "the first clone's folder was touched"
+    );
+
+    // another folder is fine to clone at the same time
+    let other = plan_clone(
+        "https://example.org/r.git",
+        &parent.path().to_string_lossy(),
+        "r2",
+        &CloneOpts::default(),
+    )
+    .unwrap();
+    let (_, sink3) = collector();
+    let cancel3 = CancelToken::new();
+    cancel3.cancel();
+    let err = run_clone(&g, &other, &CloneOpts::default(), &cancel3, sink3).unwrap_err();
+    assert!(matches!(err, GitError::Cancelled), "{err:?}");
+
+    cancel.cancel();
+    assert!(matches!(first.join().unwrap(), Err(GitError::Cancelled)));
+    assert!(!plan.target.exists());
+    // the folder is free again once the first clone is over
+    let (_, sink4) = collector();
+    let c4 = CancelToken::new();
+    c4.cancel();
+    let err = run_clone(&g, &plan, &CloneOpts::default(), &c4, sink4).unwrap_err();
+    assert!(matches!(err, GitError::Cancelled), "{err:?}");
+}

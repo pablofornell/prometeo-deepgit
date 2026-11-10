@@ -64,49 +64,20 @@ function isWrite(sub: string, rest: readonly string[]): boolean {
   }
 }
 
-/** Repos with a background fetch running (auto-fetch), by repo id: how many. See `markBackgroundFetch`. */
-const backgroundFetching = new Map<string, number>();
-/** Ids of the entries that were background fetches when they arrived. */
-const backgroundIds = new Set<number>();
-/** How long after a background fetch ends its console entry can still arrive (events and replies are separate channels). */
-const BACKGROUND_GRACE_MS = 2000;
-
 /**
- * Marks the `fetch` entries of these repos that arrive from now on as background commands (hidden from the status
- * bar ticker and, unless "Show background commands" is on, from the console). Call the returned function when the
- * fetch has ended; the mark stays for a short grace time because the console event may arrive after the reply.
+ * True for commands the app runs by itself (reads: status, log, diff, stash list..., the auto-fetch), not the result of a
+ * click. The auto-fetch is exactly the entries the backend tagged `background` (a fetch run with the silent auth mode),
+ * so a fetch the user starts is never hidden, whatever else is running.
  */
-export function markBackgroundFetch(repoIds: readonly string[]): () => void {
-  for (const id of repoIds) backgroundFetching.set(id, (backgroundFetching.get(id) ?? 0) + 1);
-  let released = false;
-  return () => {
-    if (released) return;
-    released = true;
-    setTimeout(() => {
-      for (const id of repoIds) {
-        const n = (backgroundFetching.get(id) ?? 1) - 1;
-        if (n <= 0) backgroundFetching.delete(id);
-        else backgroundFetching.set(id, n);
-      }
-    }, BACKGROUND_GRACE_MS);
-  };
-}
-
-/** True for commands the app runs by itself (reads: status, log, diff, stash list..., the auto-fetch), not the result of a click. */
 export function isBackgroundEntry(e: ConsoleEntry): boolean {
-  if (backgroundIds.has(e.id)) return true;
+  if (e.background) return true;
   const { sub, rest } = splitGitArgs(e.args);
   return !isWrite(sub, rest);
 }
 
 /** Appends an entry (called by `events.ts`). Keeps the newest 500. */
 export function pushConsoleEntry(e: ConsoleEntry): void {
-  if (e.repoId && backgroundFetching.has(e.repoId) && splitGitArgs(e.args).sub === "fetch") backgroundIds.add(e.id);
   setEntries((prev) => (prev.length >= CONSOLE_CAPACITY ? [...prev.slice(prev.length - CONSOLE_CAPACITY + 1), e] : [...prev, e]));
-  if (backgroundIds.size > CONSOLE_CAPACITY) {
-    const oldest = entries()[0]?.id ?? 0;
-    for (const id of backgroundIds) if (id < oldest) backgroundIds.delete(id);
-  }
   setLastEntry(e);
   if (!isBackgroundEntry(e)) setLastUser(e);
 }
@@ -119,7 +90,6 @@ export const lastConsoleEntry = lastEntry;
 export const lastUserEntry = lastUser;
 
 export function clearConsole(): void {
-  backgroundIds.clear();
   setEntries([]);
   setLastEntry(null);
   setLastUser(null);

@@ -151,3 +151,50 @@ describe("settings store", () => {
     expect(storage.has("deepgit.ui.showGraph")).toBe(false);
   });
 });
+
+describe("system theme", () => {
+  /** A matchMedia whose answer the test changes, with the listeners the page registers. */
+  function stubMedia(initialLight: boolean) {
+    let light = initialLight;
+    const listeners: (() => void)[] = [];
+    vi.stubGlobal("matchMedia", (q: string) => ({
+      get matches() {
+        return q.includes("light") ? light : !light;
+      },
+      addEventListener: (_: string, cb: () => void) => void listeners.push(cb),
+    }));
+    return {
+      switchTo(next: "light" | "dark") {
+        light = next === "light";
+        listeners.forEach((cb) => cb());
+      },
+    };
+  }
+
+  it("is a signal: an OS switch re-runs what reads resolvedTheme, and applies data-theme", async () => {
+    const os = stubMedia(false);
+    const { initSettings, resolvedTheme, setSetting } = await load();
+    // after `load` (it resets the modules): the effect must come from the same solid as the store
+    const { createRoot, createEffect } = await import("solid-js");
+    setSetting("theme", "system");
+    initSettings();
+    const seen: string[] = [];
+    const dispose = createRoot((d) => {
+      createEffect(() => seen.push(resolvedTheme()));
+      return d;
+    });
+    expect(seen).toEqual(["dark"]);
+    os.switchTo("light");
+    expect(resolvedTheme()).toBe("light");
+    expect(rootAttrs.get("data-theme")).toBe("light");
+    expect(seen).toEqual(["dark", "light"]);
+    os.switchTo("dark");
+    expect(seen).toEqual(["dark", "light", "dark"]);
+    // an explicit choice does not follow the OS
+    setSetting("theme", "light");
+    os.switchTo("dark");
+    expect(resolvedTheme()).toBe("light");
+    dispose();
+  });
+});
+

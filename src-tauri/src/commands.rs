@@ -674,7 +674,7 @@ pub async fn clone_repo(
     let result = blocking(move || {
         let plan =
             gitclone::plan_clone(&url, &parent_dir, &dir_name, &opts).map_err(ApiError::from)?;
-        st.check_clone_target(&plan.parent, &target)?;
+        st.check_clone_target(&plan.target, &target)?;
         let sink: gitclone::ProgressSink = Arc::new(move |progress| {
             let _ = app.emit(
                 "clone-progress",

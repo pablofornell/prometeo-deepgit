@@ -1,7 +1,7 @@
 // @vitest-environment node
 // Same cases as the Rust tests in crates/gitcore/src/clone.rs: the two must agree.
 import { describe, expect, it } from "vitest";
-import { checkCloneInput, checkCloneUrl, checkDirName, defaultDirName, insideProject, isAbsolutePath, joinPath, looksLikeRepoUrl } from "./cloneRules";
+import { checkCloneInput, checkCloneUrl, checkDirName, defaultDirName, insideProject, isAbsolutePath, joinPath, looksLikeRepoUrl, notFoundReason } from "./cloneRules";
 
 describe("defaultDirName", () => {
   it("follows git for URLs and paths", () => {
@@ -92,5 +92,31 @@ describe("clone dialog helpers", () => {
     // `~` cannot be compared with an absolute path: the backend decides
     expect(insideProject("~/work/p", "/home/me/work/p")).toBe(true);
     expect(insideProject("~/work/q", "~/work/p")).toBe(false);
+  });
+});
+
+describe("notFoundReason", () => {
+  const root = "/work/p";
+  it("finds what a rescan finds", () => {
+    for (const rel of ["a", "a/b/c/d", "libs/core"]) expect(notFoundReason(`${root}/${rel}`, root), rel).toBeNull();
+    expect(notFoundReason(root, root)).toBeNull();
+    expect(notFoundReason("/work/p/", root)).toBeNull();
+  });
+
+  it("refuses what a rescan skips, with the backend's texts", () => {
+    expect(notFoundReason(`${root}/a/b/c/d/e`, root)).toBe(
+      "A scan of the project folder finds repositories up to 4 levels deep, and /work/p/a/b/c/d/e is 5 levels below /work/p. Choose a parent folder closer to the project folder, or add the clone to a new project.",
+    );
+    for (const skipped of ["node_modules", "target", "dist", "build", ".venv", ".hidden"]) {
+      expect(notFoundReason(`${root}/${skipped}/repo`, root), skipped).toContain(`skips folders named "${skipped}"`);
+    }
+    expect(notFoundReason(`${root}/ok/.dotrepo`, root)).toContain('skips folders named ".dotrepo"');
+    // skipped names win over depth, like the backend
+    expect(notFoundReason(`${root}/a/b/c/d/node_modules`, root)).toContain("skips folders");
+  });
+
+  it("leaves what it cannot compare to the backend", () => {
+    expect(notFoundReason("/other/x/node_modules/y", root)).toBeNull();
+    expect(notFoundReason("~/work/p/node_modules/y", root)).toBeNull();
   });
 });
