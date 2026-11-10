@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 
 use crate::model::{Project, RepoInfo};
 use crate::palette::next_color;
+use crate::paths::canonicalize;
 
 const SKIP_DIRS: [&str; 5] = ["node_modules", "target", "dist", "build", ".venv"];
 
@@ -50,7 +51,7 @@ pub fn is_repo(dir: &Path) -> bool {
 
 /// First 12 hex chars of sha1(canonical path).
 pub fn repo_id(path: &Path) -> String {
-    let canon = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    let canon = canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
     let mut h = sha1_smol::Sha1::new();
     h.update(canon.to_string_lossy().as_bytes());
     h.digest().to_string()[..12].to_string()
@@ -124,7 +125,7 @@ fn folder_name(p: &Path) -> String {
 /// colour that is least used in the project so far (lowest index on a tie). The caller (the
 /// workspace) replaces these with colours balanced across all projects.
 pub fn make_project(root: &Path) -> Project {
-    let root = std::fs::canonicalize(root).unwrap_or_else(|_| root.to_path_buf());
+    let root = canonicalize(root).unwrap_or_else(|_| root.to_path_buf());
     let mut used: Vec<u8> = Vec::new();
     let repos = find_repos(&root, MAX_DEPTH)
         .iter()

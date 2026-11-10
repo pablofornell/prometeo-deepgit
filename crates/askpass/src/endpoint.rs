@@ -1,7 +1,8 @@
 //! Where the app listens for helpers.
 //!
-//! - Unix: a domain socket `askpass.sock` (mode 0600) inside a private directory (mode 0700)
-//!   under `$XDG_RUNTIME_DIR`, or the temp dir when that is not set.
+//! - Unix: a domain socket `sock` (mode 0600) inside a private directory (mode 0700) under
+//!   `$XDG_RUNTIME_DIR`, or the temp dir when that is not set, or `/tmp` when the temp dir is too
+//!   long for a socket path (macOS: `sun_path` holds 104 bytes).
 //! - Windows: a TCP port on `127.0.0.1` chosen by the system. Only the token protects it there
 //!   (32 random bytes per command, valid until git exits). A named pipe would be better; the
 //!   TCP form works on every platform and is what the tests use too.
@@ -124,8 +125,8 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn unix_endpoints_round_trip() {
-        let e = Endpoint::parse("unix:/run/user/1000/x/askpass.sock").unwrap();
-        assert_eq!(e.to_env(), "unix:/run/user/1000/x/askpass.sock");
+        let e = Endpoint::parse("unix:/run/user/1000/x/sock").unwrap();
+        assert_eq!(e.to_env(), "unix:/run/user/1000/x/sock");
         assert_eq!(Endpoint::parse("unix:"), None);
     }
 }

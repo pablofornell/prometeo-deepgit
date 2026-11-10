@@ -358,7 +358,7 @@ pub fn conflict_versions(
     let blobs = read_blobs(git, repo, &oids_of(std::slice::from_ref(&u)))?;
     let blob = |n: usize| u.stage(n).map(|e| blob_of(e, blobs.get(&e.oid)));
     let (base, ours, theirs) = (blob(1), blob(st.yours), blob(st.theirs));
-    let eol = detect_eol(repo, path, &u, &st, &blobs);
+    let eol = detect_eol(git, repo, path, &u, &st, &blobs);
     Ok(ConflictVersions {
         base,
         ours,
@@ -369,9 +369,12 @@ pub fn conflict_versions(
     })
 }
 
-/// Line ending of the worktree file, else of the first version that has lines (yours, theirs,
-/// base).
+/// Line ending of the worktree file. When the file is gone or has no line end: the ending git
+/// would check the first version that has lines out with (yours, theirs, base). That is not
+/// always the ending of the blob: with `core.autocrlf=true` (the default of Git for Windows) or an
+/// `eol=crlf` attribute the repository holds LF and the worktree CRLF.
 fn detect_eol(
+    git: &Git,
     repo: &RepoInfo,
     path: &str,
     u: &Unmerged,
@@ -384,9 +387,29 @@ fn detect_eol(
     [st.yours, st.theirs, 1]
         .into_iter()
         .filter_map(|n| u.stage(n))
-        .filter_map(|e| blobs.get(&e.oid)?.bytes.as_deref())
-        .find_map(eol_of)
+        .find_map(|e| {
+            let stored = blobs.get(&e.oid)?.bytes.as_deref()?;
+            let stored_eol = eol_of(stored)?;
+            let checked_out = checked_out_bytes(git, repo, path, &e.oid);
+            Some(checked_out.and_then(|b| eol_of(&b)).unwrap_or(stored_eol))
+        })
         .unwrap_or(Eol::Lf)
+}
+
+/// The blob `oid` as git would write it to the worktree at `path` (line-ending conversion and
+/// filters applied): `git cat-file --filters`. `None` when git cannot say.
+fn checked_out_bytes(git: &Git, repo: &RepoInfo, path: &str, oid: &str) -> Option<Vec<u8>> {
+    let at = format!("--path={path}");
+    git.run_unchecked_raw(
+        repo_path(repo),
+        Some(&repo.id),
+        &["cat-file", "--filters", &at, oid],
+        false,
+        None,
+    )
+    .ok()
+    .filter(|o| o.code == 0)
+    .map(|o| o.stdout)
 }
 
 /// The bytes of the regular worktree file (not a symlink, at most the cap), if there is one.
@@ -698,7 +721,7 @@ pub fn save_resolution(
     let bytes = if versions.iter().any(|v| is_mixed(v)) {
         keep_line_endings(content, &versions)
     } else {
-        match detect_eol(repo, path, &u, &st, &blobs) {
+        match detect_eol(git, repo, path, &u, &st, &blobs) {
             Eol::Lf => content.as_bytes().to_vec(),
             Eol::Crlf => content
                 .replace("\r\n", "\n")

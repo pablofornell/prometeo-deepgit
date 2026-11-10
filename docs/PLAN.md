@@ -345,8 +345,9 @@ No window, GTK or Tauri code runs. `SSH_ASKPASS_PROMPT=none` (an ssh info messag
 helper -> app   {"v":1,"token":"<64 hex>","prompt":"Username for 'https://github.com': ","hint":null|"confirm"|"none","ppid":4242|null,"sshPort":2222|null}
 app -> helper   {"answer":"alice"}     or     {"answer":null}
 ```
-Transport: Unix = domain socket `askpass.sock` (mode 0600) in a fresh directory `deepgit-askpass-<pid>-<random>` (mode 0700) under
-`$XDG_RUNTIME_DIR` (else the temp dir); a peer with another uid is dropped; directories of dead processes are swept at start.
+Transport: Unix = domain socket `sock` (mode 0600) in a fresh directory `deepgit-askpass-<pid>-<random>` (mode 0700) under
+`$XDG_RUNTIME_DIR` (else the temp dir, else `/tmp` when the path would not fit `sun_path`: 104 bytes on macOS, where the temp dir is
+long); a peer with another uid is dropped; directories of dead processes (this user's only, never a link) are swept at start.
 Windows = TCP on `127.0.0.1`, port chosen by the system (a named pipe would be better; untested). `DEEPGIT_ASKPASS_ENDPOINT` is
 `unix:<path>` or `tcp:127.0.0.1:<port>`.
 Each network command gets a fresh 32-byte random token (64 hex chars), passed only in the child's environment, never in argv. The

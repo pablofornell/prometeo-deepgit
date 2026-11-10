@@ -20,7 +20,7 @@ pub type ProgressSink = Arc<dyn Fn(CloneProgress) + Send + Sync>;
 pub struct ClonePlan {
     /// The URL or path, trimmed.
     pub url: String,
-    /// The existing parent folder, canonical.
+    /// The existing parent folder, canonical (`paths::canonicalize`).
     pub parent: PathBuf,
     /// `parent/dir_name`.
     pub target: PathBuf,
@@ -189,7 +189,7 @@ pub fn plan_clone(
     if !parent_path.is_absolute() {
         return Err(invalid("The parent folder must be an absolute path."));
     }
-    let parent = std::fs::canonicalize(&parent_path)
+    let parent = crate::paths::canonicalize(&parent_path)
         .ok()
         .filter(|p| p.is_dir())
         .ok_or_else(|| invalid(format!("The parent folder {parent_in} does not exist.")))?;

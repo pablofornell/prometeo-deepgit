@@ -123,7 +123,7 @@ impl AppState {
 
     /// Adds the folder at `path` as a project (blocking: scans the folder).
     pub fn add_project(&self, path: &str) -> Result<Project, ApiError> {
-        let canon = std::fs::canonicalize(Path::new(path))
+        let canon = gitcore::paths::canonicalize(Path::new(path))
             .map_err(|e| api_error(format!("Cannot open {path}: {e}")))?;
         if !canon.is_dir() {
             return Err(api_error(format!("{path} is not a folder")));
@@ -380,7 +380,9 @@ mod tests {
     fn a_cloned_repo_joins_the_project_or_becomes_a_new_one() {
         let dir = tempfile::tempdir().unwrap();
         let st = state(dir.path());
-        let root = std::fs::canonicalize(dir.path()).unwrap().join("work");
+        let root = gitcore::paths::canonicalize(dir.path())
+            .unwrap()
+            .join("work");
         init_repo(&root.join("first"));
         let project = st.add_project(root.to_str().unwrap()).unwrap();
         let join = CloneTarget::Project {
@@ -390,7 +392,9 @@ mod tests {
         // a clone folder inside the project folder is fine, one outside is refused before the clone
         assert!(st.check_clone_target(&root.join("sub/new"), &join).is_ok());
         assert!(st.check_clone_target(&root.join("new"), &join).is_ok());
-        let outside = std::fs::canonicalize(dir.path()).unwrap().join("new");
+        let outside = gitcore::paths::canonicalize(dir.path())
+            .unwrap()
+            .join("new");
         let err = st.check_clone_target(&outside, &join).unwrap_err();
         assert!(
             err.message.contains("outside the project folder"),
@@ -415,7 +419,9 @@ mod tests {
         assert!(st.repo(&r.project.repos[1].id).is_ok());
 
         // or it becomes a project of its own
-        let alone = std::fs::canonicalize(dir.path()).unwrap().join("alone");
+        let alone = gitcore::paths::canonicalize(dir.path())
+            .unwrap()
+            .join("alone");
         init_repo(&alone);
         let r = st.add_cloned(&alone, &CloneTarget::NewProject).unwrap();
         assert!(r.created_project);
@@ -431,7 +437,9 @@ mod tests {
     fn a_clone_the_scan_would_skip_is_refused_before_it_starts() {
         let dir = tempfile::tempdir().unwrap();
         let st = state(dir.path());
-        let root = std::fs::canonicalize(dir.path()).unwrap().join("work");
+        let root = gitcore::paths::canonicalize(dir.path())
+            .unwrap()
+            .join("work");
         init_repo(&root.join("first"));
         let project = st.add_project(root.to_str().unwrap()).unwrap();
         let join = CloneTarget::Project {
@@ -471,7 +479,9 @@ mod tests {
     fn a_clone_that_a_rescan_misses_is_an_error_that_says_where_it_is() {
         let dir = tempfile::tempdir().unwrap();
         let st = state(dir.path());
-        let root = std::fs::canonicalize(dir.path()).unwrap().join("work");
+        let root = gitcore::paths::canonicalize(dir.path())
+            .unwrap()
+            .join("work");
         init_repo(&root.join("first"));
         let project = st.add_project(root.to_str().unwrap()).unwrap();
         let join = CloneTarget::Project {
