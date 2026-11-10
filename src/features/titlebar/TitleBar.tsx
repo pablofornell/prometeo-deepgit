@@ -10,7 +10,7 @@ import { autoFetchLine } from "../../state/autoFetch";
 import { fetchAge } from "../../state/fetchAge";
 import { bottomTool, toggleBottomTool } from "../../state/layout";
 import { runBinding, shortcutLabel } from "../../state/keymap";
-import { AUTO_FETCH_CHOICES, settings, setSetting, type ThemePref } from "../../state/settings";
+import { settings, setSetting, type ThemePref } from "../../state/settings";
 import { focusedRepo, projectRepos, projectTotals, summary } from "../../state/workspace";
 import { BranchWidget } from "./BranchWidget";
 import { ProjectSwitcher } from "./ProjectSwitcher";
@@ -79,15 +79,6 @@ export function TitleBar(): JSX.Element {
       { label: "Comfortable rows", checked: settings.comfortableRows, onSelect: () => setSetting("comfortableRows", !settings.comfortableRows) },
       { separator: true },
       { label: "Show background commands in the console", checked: settings.showBackgroundCommands, onSelect: () => setSetting("showBackgroundCommands", !settings.showBackgroundCommands) },
-      // temporary: the Settings page will hold these (keys `autoFetchMinutes`, `autoFetchPrune`)
-      { separator: true },
-      { label: "Auto-fetch", heading: true },
-      ...AUTO_FETCH_CHOICES.map((m): MenuItem => ({
-        label: m === 0 ? "Auto-fetch: Off" : `Auto-fetch: ${m} min`,
-        checked: settings.autoFetchMinutes === m,
-        onSelect: () => setSetting("autoFetchMinutes", m),
-      })),
-      { label: "Prune when auto-fetching", checked: settings.autoFetchPrune, disabled: settings.autoFetchMinutes === 0, onSelect: () => setSetting("autoFetchPrune", !settings.autoFetchPrune) },
     ]);
   };
 

@@ -44,6 +44,8 @@ export interface NumberFieldProps {
   step?: number;
   /** Text after the number ("px", "%"). */
   unit?: string;
+  /** Shown instead of the unit when the value is 0 ("Off"). */
+  zeroLabel?: string;
   onChange: (value: number) => void;
   /** Accessible name. */
   label: string;
@@ -89,7 +91,7 @@ export function NumberField(props: NumberFieldProps): JSX.Element {
       />
       <IconButton icon="plus" label={`Increase ${props.label}`} size="small" disabled={props.disabled || props.value >= props.max} onClick={() => set(props.value + step())} />
       <Show when={props.unit}>
-        <span class="dg-settings-num-unit">{props.unit}</span>
+        <span class="dg-settings-num-unit">{props.value === 0 && props.zeroLabel ? props.zeroLabel : props.unit}</span>
       </Show>
     </div>
   );
@@ -119,7 +121,7 @@ export function SizeControl(props: SizeControlProps): JSX.Element {
         value={shown()}
         disabled={props.disabled}
         aria-label={props.label}
-        aria-valuetext={`${shown()}${props.unit ?? ""}`}
+        aria-valuetext={shown() === 0 && props.zeroLabel ? props.zeroLabel : `${shown()}${props.unit ?? ""}`}
         style={{ "--dg-fill": `${fill()}%` }}
         onInput={(e) => {
           const v = Number(e.currentTarget.value);

@@ -2,14 +2,14 @@
  * Settings sections. A section is ONE file in `features/settings/sections/` that calls `registerSettingsSection(...)`;
  * `SettingsDialog.tsx` loads every file of that folder (`import.meta.glob`), so nothing else needs to change.
  *
- *   // features/settings/sections/Git.tsx
+ *   // features/settings/sections/Git.tsx (a real one: auto-fetch, sign-off, saved logins)
  *   import { registerSettingsSection } from "../registry";
  *   import { Row, Section } from "../widgets";
  *   function GitSection() {
  *     return <Section title="Fetch"><Row label="Fetch every"><SomeControl /></Row></Section>;
  *   }
  *   registerSettingsSection({ id: "git", title: "Git", order: 40, keywords: ["fetch", "pull", "prune"], component: GitSection,
- *                             reset: () => resetSettings(["autoFetch"]) });
+ *                             reset: () => resetSettings(["autoFetchMinutes", "autoFetchPrune"]) });
  *
  * The dialog shows the title in the left list, filters it by `title` + `keywords`, and renders `component` in the right pane.
  * Changes must apply live: write to a store (`setSetting` or your own) in the control's handler, never on a "Save" step.
@@ -22,7 +22,7 @@ export interface SettingsSection {
   id: string;
   /** Shown in the left list and as the page heading. */
   title: string;
-  /** Position in the list, ascending (Appearance 10, Log 20, Console 30; leave gaps). */
+  /** Position in the list, ascending (Appearance 10, Log 20, Console 30, Git 40, Colors 50; leave gaps). */
   order: number;
   /** Extra words the filter field matches (names of the controls inside). */
   keywords?: string[];

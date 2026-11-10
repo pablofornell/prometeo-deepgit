@@ -42,7 +42,7 @@ The project opens with the combined log of all repositories.
 DeepGit gives each repository its own colour. The colours are bright and spread over the whole rainbow.
 The colour shows as a small square, a coloured spine, and a soft tint behind the rows of that repository.
 
-To change a colour, right-click the repository in the sidebar and choose **Set Color**.
+To change a colour, right-click the repository in the sidebar and choose **Set Color**. **Settings > Colors** lists all of them in one place.
 Pick one of the 12 colours, choose **Auto** to go back to the automatic colour, or choose **Custom…** to type a `#RRGGBB` value.
 You can also press `Shift Shift` and run **Set repository color…**.
 Each project has a colour too. It tints the project button in the title bar and its row in the project switcher.
@@ -558,8 +558,9 @@ Git first tries your SSH agent and your Git credential helper. The dialog appear
 - **Cancel** stops the command with the message "No credentials were given."
 - Background fetches never open a dialog. They use only saved HTTPS logins and SSH agent keys.
 - DeepGit never writes the secret in the Git console. It goes straight from the dialog to `git`.
-- The setting `useCredentialStore` (default on) turns reading and saving off. The Settings page does not show this switch yet.
-- DeepGit can forget every login that it saved. The Settings page does not have this button yet.
+- **Settings > Git > Credentials** has the switch **Save passwords in the system key store** (default on). Off: DeepGit still asks, but it never reads or saves a login.
+- **Forget saved logins…** (same page) removes every login that DeepGit saved. DeepGit asks you to confirm first and then shows how many entries it removed.
+- When there is no key store, the same page shows a note.
 
 ---
 
@@ -739,6 +740,28 @@ In the log, the column widths stay the same when you change the font size. If a 
 | Setting | Values |
 |---|---|
 | **Show background commands** | Show the commands that DeepGit runs by itself (status, log, ...). Off: only your commands. |
+
+### Git
+
+| Setting | Values |
+|---|---|
+| **Auto-fetch** | Off, or every 5, 15, 30 or 60 minutes (default 15). DeepGit fetches all repositories of the project in the background. It never opens a login dialog: it uses saved logins and SSH agent keys only. A repository that fails waits longer before the next try. |
+| **Prune on fetch** | Auto-fetch also removes remote branches that no longer exist. Default on. Needs auto-fetch. |
+| **Sign-off commits by default** | The **Sign-off** box of the commit box starts ticked. Default off. |
+| **Save passwords in the system key store** | Default on. See [Sign in to a remote](#sign-in-to-a-remote). |
+| **Forget saved logins…** | Removes every saved login after you confirm. |
+
+If the system key store is missing, a note says that DeepGit asks for the login every time.
+
+### Colors
+
+| Setting | Values |
+|---|---|
+| **Repository tint strength** | 0% to 200% in steps of 25%, default 100%. How strongly rows and headers are tinted with the colour of their repository. **Off** (0%) removes the tints. |
+| Colors of the project | A list with the project and each of its repositories. Each row shows the colour and has a **Change…** button. The menu has the 12 colours, **Auto** and **Custom…**, like **Set Color** in the sidebar. |
+| **Reset all colors to Auto** | Puts the project and its repositories back to the automatic colours. DeepGit asks you to confirm first. |
+
+**Reset to defaults** on this page puts only the tint strength back to 100%. Your colours are not settings: use **Reset all colors to Auto** for them.
 
 ### Quick settings in the gear menu
 

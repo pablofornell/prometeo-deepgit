@@ -6,7 +6,7 @@
  *   setSetting("diffMode", "unified");
  *
  * `theme` is "dark" | "light" | "system"; `index.html` applies it before first paint with the same
- * rule as `applyTheme()`. The same is true for the sizes (`fontSize`, `editorFontSize`, `uiScale`): see
+ * rule as `applyTheme()`. The same is true for the sizes (`fontSize`, `editorFontSize`, `uiScale`, `repoTintStrength`): see
  * `state/appearance.ts` for the maths and `applyAppearance()` below for what they change.
  *
  * Every stored value is validated on load and on `setSetting` (unknown strings, NaN and out-of-range numbers fall
@@ -14,7 +14,10 @@
  */
 import { createStore } from "solid-js/store";
 import { setAuthPrefs } from "../api/tauri";
-import { UI_SCALE_DEFAULT, appearanceVars, sanitizeEditorFontSize, sanitizeFontSize, sanitizeUiScale, stepUiScale, FONT_SIZE_DEFAULT } from "./appearance";
+import {
+  UI_SCALE_DEFAULT, TINT_STRENGTH_DEFAULT, appearanceVars, sanitizeEditorFontSize, sanitizeFontSize, sanitizeTintStrength, sanitizeUiScale, stepUiScale,
+  FONT_SIZE_DEFAULT,
+} from "./appearance";
 import { bumpAppearance } from "./metrics";
 import { loadPersisted, removePersisted, savePersisted } from "./persist";
 
@@ -53,6 +56,8 @@ export interface Settings {
   editorFontSize: number | null;
   /** Page zoom in percent, 80..200 in steps of 10. */
   uiScale: number;
+  /** Strength of the repo tints in percent, 0..200 in steps of 25 (0 = off). Sets `--dg-repo-tint-k` (value / 100). */
+  repoTintStrength: number;
 
   // ---- Authentication (docs/PLAN.md section 5.6) ---------------------------------------------------------------
   /**
@@ -78,6 +83,7 @@ export const SETTING_DEFAULTS: Readonly<Settings> = {
   fontSize: FONT_SIZE_DEFAULT,
   editorFontSize: null,
   uiScale: UI_SCALE_DEFAULT,
+  repoTintStrength: TINT_STRENGTH_DEFAULT,
   useCredentialStore: true,
 };
 
@@ -102,6 +108,7 @@ export const SANITIZERS: { [K in keyof Settings]: (v: unknown) => Settings[K] } 
   fontSize: sanitizeFontSize,
   editorFontSize: sanitizeEditorFontSize,
   uiScale: sanitizeUiScale,
+  repoTintStrength: sanitizeTintStrength,
   useCredentialStore: (v) => (typeof v === "boolean" ? v : SETTING_DEFAULTS.useCredentialStore),
 };
 
@@ -115,7 +122,7 @@ for (const k of KEYS) {
 const [settings, setStore] = createStore<Settings>(initial);
 export { settings };
 
-const APPEARANCE_KEYS: (keyof Settings)[] = ["fontSize", "editorFontSize", "uiScale"];
+const APPEARANCE_KEYS: (keyof Settings)[] = ["fontSize", "editorFontSize", "uiScale", "repoTintStrength"];
 
 /** Changes one setting (validated) and persists it. */
 export function setSetting<K extends keyof Settings>(key: K, value: Settings[K]): void {
@@ -158,14 +165,16 @@ let lastZoom = 1;
 const inTauri = (): boolean => typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
 /**
- * Writes the size variables on <html> (`--dg-font-base`, `--dg-text-scale`, `--dg-editor-font-base`, `--dg-ui-scale`)
- * and zooms the page. In the desktop app that is the webview zoom (true page zoom: CSS px, `window.innerWidth` and
+ * Writes the size variables on <html> (`--dg-font-base`, `--dg-text-scale`, `--dg-editor-font-base`, `--dg-ui-scale`,
+ * `--dg-repo-tint-k`, and `data-repo-tints="off"` at strength 0) and zooms the page. In the desktop app that is the webview zoom (true page zoom: CSS px, `window.innerWidth` and
  * scroll maths stay consistent); in a browser it is the CSS `zoom` property of <html>.
  */
 export function applyAppearance(): void {
   const root = document.documentElement;
   const vars = appearanceVars(settings);
   for (const [name, value] of Object.entries(vars)) root.style.setProperty(name, value);
+  if (settings.repoTintStrength === 0) root.setAttribute("data-repo-tints", "off");
+  else root.removeAttribute("data-repo-tints");
   const zoom = settings.uiScale / 100;
   if (inTauri()) {
     root.style.removeProperty("zoom");

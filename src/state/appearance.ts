@@ -8,6 +8,7 @@
  *   --dg-text-scale      font-base / 13: every text-dependent token in tokens.css is `N * --dg-u` (1 px * text-scale)
  *   --dg-editor-font-base  mono size of diff, console, hashes (10..20, default 12; follows the UI size until set)
  *   --dg-ui-scale        page zoom as a number (0.8..2); used by the shell minimum size
+ *   --dg-repo-tint-k     strength of the repo tints (0..2, default 1; `repoTintStrength` in percent / 100); `data-repo-tints="off"` at 0
  */
 
 export const FONT_SIZE_MIN = 10;
@@ -21,6 +22,12 @@ export const UI_SCALE_MIN = 80;
 export const UI_SCALE_MAX = 200;
 export const UI_SCALE_STEP = 10;
 export const UI_SCALE_DEFAULT = 100;
+
+/** Strength of the repo tints, in percent (100 = as designed, 0 = off). 200 is the largest the contrast guarantee covers (`TINT_K_MAX`). */
+export const TINT_STRENGTH_MIN = 0;
+export const TINT_STRENGTH_MAX = 200;
+export const TINT_STRENGTH_STEP = 25;
+export const TINT_STRENGTH_DEFAULT = 100;
 
 const isNum = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
 
@@ -44,6 +51,13 @@ export function sanitizeUiScale(v: unknown): number {
   return Math.min(UI_SCALE_MAX, Math.max(UI_SCALE_MIN, stepped));
 }
 
+/** Percent, rounded to the step. */
+export function sanitizeTintStrength(v: unknown): number {
+  if (!isNum(v)) return TINT_STRENGTH_DEFAULT;
+  const stepped = Math.round(v / TINT_STRENGTH_STEP) * TINT_STRENGTH_STEP;
+  return Math.min(TINT_STRENGTH_MAX, Math.max(TINT_STRENGTH_MIN, stepped));
+}
+
 /** Mono size that keeps the 12:13 ratio of the defaults. */
 export function followedEditorFontSize(fontSize: number): number {
   return clampInt(Math.round((fontSize * EDITOR_FONT_SIZE_DEFAULT) / FONT_SIZE_DEFAULT), FONT_SIZE_MIN, FONT_SIZE_MAX, EDITOR_FONT_SIZE_DEFAULT);
@@ -62,6 +76,8 @@ export interface AppearanceInput {
   fontSize: number;
   editorFontSize: number | null;
   uiScale: number;
+  /** Percent; missing = the default. */
+  repoTintStrength?: number;
 }
 
 /** CSS custom properties to set on `<html>`. */
@@ -72,5 +88,6 @@ export function appearanceVars(a: AppearanceInput): Record<string, string> {
     "--dg-text-scale": String(Math.round(textScale(font) * 10000) / 10000),
     "--dg-editor-font-base": `${effectiveEditorFontSize(font, sanitizeEditorFontSize(a.editorFontSize))}px`,
     "--dg-ui-scale": String(sanitizeUiScale(a.uiScale) / 100),
+    "--dg-repo-tint-k": String(sanitizeTintStrength(a.repoTintStrength) / 100),
   };
 }

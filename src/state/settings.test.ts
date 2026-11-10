@@ -4,9 +4,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 /** Minimal localStorage and document so the store can run under node. */
 let storage: Map<string, string>;
 let rootStyle: Map<string, string>;
+let rootAttrs: Map<string, string>;
 beforeEach(() => {
   storage = new Map();
   rootStyle = new Map();
+  rootAttrs = new Map();
   vi.stubGlobal("localStorage", {
     getItem: (k: string) => (storage.has(k) ? storage.get(k)! : null),
     setItem: (k: string, v: string) => void storage.set(k, v),
@@ -15,7 +17,8 @@ beforeEach(() => {
   vi.stubGlobal("window", {});
   vi.stubGlobal("document", {
     documentElement: {
-      setAttribute: () => {},
+      setAttribute: (k: string, v: string) => void rootAttrs.set(k, v),
+      removeAttribute: (k: string) => void rootAttrs.delete(k),
       style: { setProperty: (k: string, v: string) => void rootStyle.set(k, v), removeProperty: (k: string) => void rootStyle.delete(k) },
     },
   });
@@ -75,6 +78,40 @@ describe("settings store", () => {
     expect(rootStyle.has("zoom")).toBe(false);
     setSetting("theme", "nonsense" as never);
     expect(settings.theme).toBe("dark");
+  });
+
+  it("repoTintStrength is stepped, clamped, written as --dg-repo-tint-k and switches the tints off at 0", async () => {
+    const { settings, setSetting, SETTING_DEFAULTS } = await load();
+    expect(SETTING_DEFAULTS.repoTintStrength).toBe(100);
+    setSetting("repoTintStrength", 150);
+    expect(rootStyle.get("--dg-repo-tint-k")).toBe("1.5");
+    expect(rootAttrs.has("data-repo-tints")).toBe(false);
+    setSetting("repoTintStrength", 160); // steps of 25
+    expect(settings.repoTintStrength).toBe(150);
+    setSetting("repoTintStrength", 999);
+    expect(settings.repoTintStrength).toBe(200);
+    expect(storage.get("deepgit.ui.repoTintStrength")).toBe("200");
+    setSetting("repoTintStrength", 0);
+    expect(rootStyle.get("--dg-repo-tint-k")).toBe("0");
+    expect(rootAttrs.get("data-repo-tints")).toBe("off");
+    setSetting("repoTintStrength", "strong" as never);
+    expect(settings.repoTintStrength).toBe(100);
+    expect(rootAttrs.has("data-repo-tints")).toBe(false);
+  });
+
+  it("every Git section key is validated and 'Reset all' puts it back", async () => {
+    const { settings, setSetting, resetSettings } = await load();
+    setSetting("autoFetchMinutes", 7 as never);
+    expect(settings.autoFetchMinutes).toBe(15); // not one of the choices
+    setSetting("autoFetchMinutes", 30);
+    setSetting("autoFetchPrune", false);
+    setSetting("commitSignOff", true);
+    setSetting("useCredentialStore", false);
+    setSetting("useCredentialStore", "yes" as never);
+    expect(settings.useCredentialStore).toBe(true); // garbage falls back to the default
+    setSetting("useCredentialStore", false);
+    resetSettings();
+    expect([settings.autoFetchMinutes, settings.autoFetchPrune, settings.commitSignOff, settings.useCredentialStore]).toEqual([15, true, false, true]);
   });
 
   it("uses the webview zoom instead of CSS zoom in the desktop app", async () => {

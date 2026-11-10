@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 import {
   EDITOR_FONT_SIZE_DEFAULT, FONT_SIZE_DEFAULT, FONT_SIZE_MAX, FONT_SIZE_MIN, UI_SCALE_DEFAULT, UI_SCALE_MAX, UI_SCALE_MIN,
-  appearanceVars, clampInt, effectiveEditorFontSize, followedEditorFontSize, sanitizeEditorFontSize, sanitizeFontSize, sanitizeUiScale,
+  appearanceVars, clampInt, effectiveEditorFontSize, followedEditorFontSize, sanitizeEditorFontSize, sanitizeFontSize, sanitizeTintStrength, sanitizeUiScale,
   stepUiScale, textScale,
 } from "./appearance";
 
@@ -59,15 +59,34 @@ describe("derived sizes", () => {
     expect(effectiveEditorFontSize(18, null)).toBe(17);
     expect(effectiveEditorFontSize(18, 12)).toBe(12);
   });
-  it("appearanceVars writes the four variables, validated", () => {
+  it("appearanceVars writes the five variables, validated", () => {
     expect(appearanceVars({ fontSize: 13, editorFontSize: null, uiScale: 100 })).toEqual({
-      "--dg-font-base": "13px", "--dg-text-scale": "1", "--dg-editor-font-base": "12px", "--dg-ui-scale": "1",
+      "--dg-font-base": "13px", "--dg-text-scale": "1", "--dg-editor-font-base": "12px", "--dg-ui-scale": "1", "--dg-repo-tint-k": "1",
     });
     expect(appearanceVars({ fontSize: 18, editorFontSize: 15, uiScale: 150 })).toEqual({
-      "--dg-font-base": "18px", "--dg-text-scale": "1.3846", "--dg-editor-font-base": "15px", "--dg-ui-scale": "1.5",
+      "--dg-font-base": "18px", "--dg-text-scale": "1.3846", "--dg-editor-font-base": "15px", "--dg-ui-scale": "1.5", "--dg-repo-tint-k": "1",
     });
     expect(appearanceVars({ fontSize: 99, editorFontSize: NaN as unknown as number, uiScale: 7 })).toEqual({
-      "--dg-font-base": "20px", "--dg-text-scale": "1.5385", "--dg-editor-font-base": "18px", "--dg-ui-scale": "0.8",
+      "--dg-font-base": "20px", "--dg-text-scale": "1.5385", "--dg-editor-font-base": "18px", "--dg-ui-scale": "0.8", "--dg-repo-tint-k": "1",
     });
+    expect(appearanceVars({ fontSize: 13, editorFontSize: null, uiScale: 100, repoTintStrength: 150 })["--dg-repo-tint-k"]).toBe("1.5");
+  });
+});
+
+describe("tint strength", () => {
+  it("is rounded to steps of 25 inside 0..200 and falls back to 100", () => {
+    expect(sanitizeTintStrength(100)).toBe(100);
+    expect(sanitizeTintStrength(0)).toBe(0);
+    expect(sanitizeTintStrength(112)).toBe(100);
+    expect(sanitizeTintStrength(113)).toBe(125);
+    expect(sanitizeTintStrength(-50)).toBe(0);
+    expect(sanitizeTintStrength(900)).toBe(200);
+    expect(sanitizeTintStrength("high")).toBe(100);
+    expect(sanitizeTintStrength(null)).toBe(100);
+    expect(sanitizeTintStrength(NaN)).toBe(100);
+  });
+  it("the variable is the percent divided by 100", () => {
+    const k = (v: number) => appearanceVars({ fontSize: 13, editorFontSize: null, uiScale: 100, repoTintStrength: v })["--dg-repo-tint-k"];
+    expect([k(0), k(25), k(100), k(200)]).toEqual(["0", "0.25", "1", "2"]);
   });
 });

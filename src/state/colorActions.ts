@@ -8,7 +8,7 @@
 import * as api from "../api/tauri";
 import { ColorDialog, type MenuItem, openDialog, toast } from "../components/ui";
 import { type ColorChoice, HEX_COLOR, REPO_COLOR_NAMES, REPO_COLOR_ORDER, colorFill, paletteIndex } from "../theme/palette";
-import { applyProjectColor, applyRepoColor } from "./workspace";
+import { activeProject, applyProjectColor, applyRepoColor, projectRepos } from "./workspace";
 
 /** What the user picked: a palette index, a custom `#RRGGBB`, or Auto (back to the automatic colour). */
 export type ColorPick = { kind: "auto" } | { kind: "palette"; index: number } | { kind: "custom"; hex: string };
@@ -34,6 +34,15 @@ export async function setProjectColor(projectId: string, pick: ColorPick): Promi
   } catch (e) {
     toast({ kind: "error", title: "Could not change the color", body: api.toApiError(e).message });
   }
+}
+
+/** Puts the active project and each of its repos back to their automatic colour, one after the other (Settings > Colors). */
+export async function resetColorsToAuto(): Promise<void> {
+  const project = activeProject();
+  if (!project) return;
+  const repoIds = projectRepos().map((r) => r.id);
+  await setProjectColor(project.id, { kind: "auto" });
+  for (const id of repoIds) await setRepoColor(id, { kind: "auto" });
 }
 
 /** Opens the custom colour dialog; resolves to the chosen `#RRGGBB`, or undefined when cancelled. */

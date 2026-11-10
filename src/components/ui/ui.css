@@ -150,8 +150,9 @@
 .dg-select-opt-text { flex: 1; }
 
 /* ---------------------------------------------------------------- Popup / Menu */
+/* above the dialog scrim (1500): menus and drop-downs opened from inside a dialog (Settings) must show */
 .dg-popup {
-  position: fixed; z-index: 1000; background: var(--dg-popup-bg); border: 1px solid var(--dg-popup-border);
+  position: fixed; z-index: 1600; background: var(--dg-popup-bg); border: 1px solid var(--dg-popup-border);
   border-radius: var(--dg-popup-radius); box-shadow: var(--dg-popup-shadow); color: var(--dg-text);
   animation: dg-pop-in var(--dg-dur-fast) var(--dg-ease-out);
 }

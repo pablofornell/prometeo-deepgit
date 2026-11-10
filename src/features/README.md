@@ -54,13 +54,13 @@ feature. Cross-feature communication goes through `state/` (selection, layout, a
 | `workspace.ts` | `workspace` (store), `activeProject()`, `projectRepos()`, `repoById(id)`, `repoColor(repo)`, `selectedRepoIds()` / `selectedRepos()` (the repo filter), `setSelectedRepoIds`, `toggleRepo`, `selectOnlyRepo`, `selectAllRepos`, `isRepoFilterActive()`, `focusedRepo()` / `setFocusedRepoId` (target of single-repo commands), `summary(repoId)` (reactive `RepoSummary`), `projectTotals()` (ahead/behind/changes/operations), `refreshSummaries(ids?)`, `addProject`, `setActiveProject`, `removeProject`, `rescanProject`. Summaries refresh themselves on `repo-changed` (throttled). |
 | `refs.ts` | `repoRefs(repoId)` -> accessor of `Refs` (first read loads it), `refreshRefs`, `ensureRefs(ids)`, `cachedRefs`, `hasLocalBranch`, `hasRemoteBranch`. Auto-refresh on `repo-changed`. |
 | `selection.ts` | `selectedCommit()` / `setSelectedCommit({repoId, oid})`, `selectedFile()` / `selectFile({repoId, spec, path, oldPath?}, { reveal? })`, `detailsTab()` / `setDetailsTab("files" \| "diff")`, `mainTab()` / `setMainTab("log" \| "changes")`, `changesRepoId()` / `setChangesRepoId`, `clearSelection()`. |
-| `settings.ts` | `settings` store (`theme`, `dateFormat`, `diffMode`, `showGraph`, `laneColors`, `comfortableRows`, `showBackgroundCommands`, `useCredentialStore` (default true, synced to the backend with `setAuthPrefs`), `fontSize`, `editorFontSize`, `uiScale`, `autoFetchMinutes` (0 = off, 5, 15, 30, 60; default 15), `autoFetchPrune` (default true), `commitSignOff` (default false, remembered by the commit box)), `setSetting(key, value)` (validated, persisted as `deepgit.ui.<key>`), `resetSettings(keys?)`, `SETTING_DEFAULTS`, `zoomUi(+1 \| -1)`, `toggleTheme()`, `resolvedTheme()`. Add a key: extend `Settings`, `SETTING_DEFAULTS` and `SANITIZERS`. |
-| `appearance.ts` | Pure maths of font size / editor size / UI scale: limits, `sanitize*`, `appearanceVars()` (the CSS variables). `index.html` repeats it before first paint; `prepaint.test.ts` checks both agree. |
+| `settings.ts` | `settings` store (`theme`, `dateFormat`, `diffMode`, `showGraph`, `laneColors`, `comfortableRows`, `showBackgroundCommands`, `useCredentialStore` (default true, synced to the backend with `setAuthPrefs`), `fontSize`, `editorFontSize`, `uiScale`, `repoTintStrength` (percent 0..200 in steps of 25, default 100; sets `--dg-repo-tint-k`, `data-repo-tints="off"` at 0), `autoFetchMinutes` (0 = off, 5, 15, 30, 60; default 15), `autoFetchPrune` (default true), `commitSignOff` (default false, remembered by the commit box)), `setSetting(key, value)` (validated, persisted as `deepgit.ui.<key>`), `resetSettings(keys?)`, `SETTING_DEFAULTS`, `zoomUi(+1 \| -1)`, `toggleTheme()`, `resolvedTheme()`. Add a key: extend `Settings`, `SETTING_DEFAULTS` and `SANITIZERS`. |
+| `appearance.ts` | Pure maths of font size / editor size / UI scale: limits, `sanitize*`, `appearanceVars()` (the CSS variables, tint strength included). `index.html` repeats it before first paint; `prepaint.test.ts` checks both agree. |
 | `metrics.ts` | `cssPx(token, fallback)` (resolved px of a CSS token, reactive to font-size changes), `appearanceRev()`. |
 | `layout.ts` | `sidebarVisible()`, `bottomTool()` ("console" \| "matrix" \| null), `toggleSidebar`, `openBottomTool(tool)`, `toggleBottomTool(tool)`. (The diff island and `diffVisible` / `toggleDiff` are gone.) |
 | `console.ts` | `consoleEntries()` (ring of 500 `ConsoleEntry`), `lastUserEntry()` (ticker), `lastConsoleEntry()`, `isBackgroundEntry(e)`, `clearConsole()`, `formatCommand(e)`. |
 | `events.ts` | `repoVersion(repoId)` / `anyRepoVersion()` (reactive counters bumped on every change), `subscribeRepoChanged(cb)`, `notifyRepoChanged(id)`. Never call `onRepoChanged` / `onGitConsole` yourself. |
-| `auth.ts` | Credential prompts of fetch, pull and push (PLAN.md section 5.6). Started by `startEvents()`; shows the `auth` dialog one prompt at a time (`authQueue.ts`). `clearSavedCredentials()` forgets all saved logins (for the Settings page). Features never call it otherwise. |
+| `auth.ts` | Credential prompts of fetch, pull and push (PLAN.md section 5.6). Started by `startEvents()`; shows the `auth` dialog one prompt at a time (`authQueue.ts`). `clearSavedCredentials()` forgets all saved logins and `credentialStoreUnavailable()` tells that the backend found no key store (both for the Settings page). Features never call it otherwise. |
 | `activity.ts` | `activities()` (running operations for the progress widget), `beginActivity(label, total)`. |
 | `keymap.ts` | See below. |
 | `actions.ts` | See below. |
@@ -178,24 +178,24 @@ The Settings window (`Ctrl+,`, gear menu, Search Everywhere) lists **sections**.
 `src/features/settings/sections/`. The dialog loads every `*.tsx` of that folder (`import.meta.glob`), so you change nothing else.
 
 ```tsx
-// src/features/settings/sections/Git.tsx
+// src/features/settings/sections/Editor.tsx   (example; Git.tsx and Colors.tsx are real ones to copy from)
 import { Checkbox } from "../../../components/ui";
 import { resetSettings, setSetting, settings } from "../../../state/settings";
 import { registerSettingsSection } from "../registry";
-import { Row, Section, SizeControl } from "../widgets";
+import { Row, Section } from "../widgets";
 
-function GitSection() {
+function EditorSection() {
   return (
-    <Section title="Fetch">
-      <Row label="Fetch automatically" hint="Every few minutes.">
-        <Checkbox checked={settings.autoFetch} ariaLabel="Fetch automatically" onChange={(v) => setSetting("autoFetch", v)} />
+    <Section title="Whitespace">
+      <Row label="Show whitespace" hint="In the diff.">
+        <Checkbox checked={settings.showWhitespace} ariaLabel="Show whitespace" onChange={(v) => setSetting("showWhitespace", v)} />
       </Row>
     </Section>
   );
 }
 
-registerSettingsSection({ id: "git", title: "Git", order: 40, icon: "fetch", keywords: ["fetch", "pull", "prune"], component: GitSection,
-                          reset: () => resetSettings(["autoFetch"]) });
+registerSettingsSection({ id: "editor", title: "Editor", order: 60, icon: "file", keywords: ["whitespace", "diff"], component: EditorSection,
+                          reset: () => resetSettings(["showWhitespace"]) });
 ```
 
 `registerSettingsSection({ id, title, order, keywords?, icon?, component, reset? })` (`features/settings/registry.ts`):
@@ -204,10 +204,10 @@ registerSettingsSection({ id: "git", title: "Git", order: 40, icon: "fetch", key
 |---|---|
 | `id` | Stable lower-case id. Same id again replaces the section. `showDialog("settings", { section: "git" })` opens it. |
 | `title` | Entry in the left list and heading of the page. |
-| `order` | Sort key, ascending. Shipped: Appearance 10, Log 20, Console 30. Use 40 for Git, 50 for Colors. |
+| `order` | Sort key, ascending. Shipped: Appearance 10, Log 20, Console 30, Git 40, Colors 50. Use 60 and up for new ones. |
 | `keywords` | Extra words that the filter field matches (names of the controls). |
 | `icon` | Optional `IconName`. |
-| `component` | The page, no props. Use `Section`, `Row`, `NumberField`, `SizeControl` from `widgets.tsx` and the `components/ui` controls. |
+| `component` | The page, no props. Use `Section`, `Row`, `NumberField`, `SizeControl` from `widgets.tsx` (`NumberField` and `SizeControl` take `zeroLabel`, for example "Off") and the `components/ui` controls. |
 | `reset` | Optional. Puts the page back to defaults. It adds the **Reset to defaults** button and runs on **Reset all**. |
 
 Rules: apply changes **live** (write to the store in the handler; there is no OK or Save). Store values with `setSetting` (add the key to
@@ -224,3 +224,4 @@ Zoom keys (`Ctrl+=`, `Ctrl++`, `Ctrl+-`, `Ctrl+0`) are registered in `features/s
   ~1000-2500 commits, project "deepgit"). In dev, `window.__deepgit` exposes `{ actions, workspace, selection, settings, layout, api }`
   for Playwright scripts and the console. If you need data the mock does not have, extend the mock (`src/api/mock*.ts`) and say so.
 - Conflict demos in the mock: merge or rebase a branch whose name contains `spike` or `conflict`.
+- Login demos in the mock: fetch, pull or push of `docs-site`, or a clone of an https URL with "private" in it, opens the login dialog (`api/mockAuth.ts`). The auto-fetch never does (it runs with `background`).

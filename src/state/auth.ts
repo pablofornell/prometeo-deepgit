@@ -2,7 +2,8 @@
  * Credential prompts of the network commands (fetch, pull, push). The backend sends `auth-prompt` while a command
  * waits for a user name, password, token, key passphrase or host-key decision; this module shows the "auth" dialog
  * (`features/dialogs/AuthDialog`) one prompt at a time and sends the answer back with `authReply`.
- * Subscribed once by `startEvents()`; features never call it.
+ * Subscribed once by `startEvents()`; features never call it. The Settings page reads `credentialStoreUnavailable()`
+ * and calls `clearSavedCredentials()`.
  */
 import { createSignal } from "solid-js";
 import * as api from "../api/tauri";
@@ -11,6 +12,11 @@ import { createAuthQueue } from "./authQueue";
 import { showDialog } from "./dialogs";
 
 const [withdrawnId, setWithdrawnId] = createSignal<number | null>(null);
+
+const [storeUnavailable, setStoreUnavailable] = createSignal(false);
+
+/** True once the backend said it found no system key store (`auth-notice`): the Settings page shows a note. */
+export const credentialStoreUnavailable = storeUnavailable;
 
 /** The dialog closes itself when this becomes its prompt id (the backend withdrew the question). */
 export const withdrawnPromptId = withdrawnId;
@@ -31,6 +37,7 @@ export function startAuth(): void {
   void api.onAuthPromptClose((e) => queue.withdraw(e.id));
   void api.onAuthNotice((n) => {
     if (n.kind === "storeUnavailable") {
+      setStoreUnavailable(true);
       toast({
         kind: "warning",
         title: "Passwords cannot be saved",
