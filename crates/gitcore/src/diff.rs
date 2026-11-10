@@ -1,7 +1,7 @@
 //! Commit details, per-file diffs and the unified diff parser.
 
 use std::io::Read;
-use std::path::{Component, Path};
+use std::path::{Component, Path, PathBuf};
 
 use crate::error::{check_name, GitError};
 use crate::model::*;
@@ -314,25 +314,7 @@ pub fn file_content(
             Ok(cap_content(out.stdout.into_bytes()))
         }
         None => {
-            let rel = Path::new(path);
-            if rel
-                .components()
-                .any(|c| !matches!(c, Component::Normal(_) | Component::CurDir))
-            {
-                return Err(GitError::Invalid(format!("path outside the repo: {path}")));
-            }
-            let full = repo_path(repo).join(rel);
-            // The directory that holds the file must really be inside the repo (no symlinked
-            // directory leading out of it).
-            let root = std::fs::canonicalize(repo_path(repo))?;
-            let parent = full
-                .parent()
-                .map(std::fs::canonicalize)
-                .transpose()?
-                .unwrap_or_else(|| root.clone());
-            if !parent.starts_with(&root) {
-                return Err(GitError::Invalid(format!("path outside the repo: {path}")));
-            }
+            let full = worktree_path(repo, path)?;
             let kind = std::fs::symlink_metadata(&full)?.file_type();
             if kind.is_symlink() {
                 let target = std::fs::read_link(&full)?;
@@ -348,6 +330,33 @@ pub fn file_content(
             file.take(MAX_CONTENT_BYTES as u64).read_to_end(&mut buf)?;
             Ok(cap_content(buf))
         }
+    }
+}
+
+/// Return the full path of `path` in the worktree. Refuse `..`, a root or a prefix. Refuse a path
+/// whose folder lies outside the repo, as a symlinked folder can. Check the nearest folder that
+/// exists. The file itself may be missing: `files::write_text_file` creates it.
+pub(crate) fn worktree_path(repo: &RepoInfo, path: &str) -> Result<PathBuf, GitError> {
+    let outside = || GitError::Invalid(format!("path outside the repo: {path}"));
+    let rel = Path::new(path);
+    if rel
+        .components()
+        .any(|c| !matches!(c, Component::Normal(_) | Component::CurDir))
+    {
+        return Err(outside());
+    }
+    let root = std::fs::canonicalize(repo_path(repo))?;
+    let full = repo_path(repo).join(rel);
+    let mut ancestor = full.parent();
+    while let Some(a) = ancestor {
+        if a.exists() {
+            break;
+        }
+        ancestor = a.parent();
+    }
+    match ancestor {
+        Some(a) if std::fs::canonicalize(a)?.starts_with(&root) => Ok(full),
+        _ => Err(outside()),
     }
 }
 

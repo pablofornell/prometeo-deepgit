@@ -14,8 +14,8 @@
  */
 import type {
   ApiErrorShape, AuthNotice, AuthPrompt, CloneOpts, CloneProgress, CloneResult, CloneTarget, CommitDetails, ConflictEntry, ConflictSide, ConflictVersions,
-  ConsoleEntry, DiffSpec, ExpectedOids, FileDiff, LogQuery, LogSessionInfo, MergeOpts, OpResult, Project, CommitRow, HunkOpts, RepoChanged, RepoSummary, Refs,
-  ResetMode, StashUntracked, Workspace, WorkingTree,
+  ConsoleEntry, DiffSpec, ExpectedOids, FileDiff, FileList, LogQuery, LogSessionInfo, MergeOpts, OpResult, Project, CommitRow, HunkOpts, RepoChanged, RepoSummary, Refs,
+  ResetMode, SearchResult, StashUntracked, TextFile, Workspace, WorkingTree,
 } from "./types";
 
 /** True when running inside the Tauri webview (false in a plain browser). */
@@ -98,6 +98,13 @@ export const fileDiff = (repoId: string, spec: DiffSpec, path: string, oldPath: 
 /** File content at `rev`, or the worktree file when `rev` is null (max 2 MiB). */
 export const fileContent = (repoId: string, rev: string | null, path: string) => invoke<string>("file_content", { repoId, rev, path });
 export const lastCommitMessage = (repoId: string) => invoke<string>("last_commit_message", { repoId });
+/** Tracked and untracked files of the worktree, without the ignored ones. Sorted by path. */
+export const listFiles = (repoId: string) => invoke<FileList>("list_files", { repoId });
+/** A worktree file as text (2 MiB at most). Binary and too large files give empty content and a flag. */
+export const readTextFile = (repoId: string, path: string) => invoke<TextFile>("read_text_file", { repoId, path });
+/** Searches the tracked and untracked files that are not ignored. Hits are capped at 2 000. */
+export const searchFiles = (repoId: string, query: string, opts: { caseSensitive: boolean; regex: boolean }) =>
+  invoke<SearchResult>("search_files", { repoId, query, caseSensitive: opts.caseSensitive, regex: opts.regex });
 
 // ---------------------------------------------------------------- 5.4 write (each emits repo-changed)
 
@@ -118,6 +125,13 @@ export const stageHunk = (repoId: string, path: string, hunkIndex: number, rever
   invoke<void>("stage_hunk", { repoId, path, hunkIndex, reverse, ...hunkArgs(opts) });
 export const discardHunk = (repoId: string, path: string, hunkIndex: number, opts: HunkOpts = {}) =>
   invoke<void>("discard_hunk", { repoId, path, hunkIndex, ...hunkArgs(opts) });
+/**
+ * Saves a worktree file with `content` as it is (line ends unchanged). `expectedVersion` is the version that
+ * `readTextFile` returned. The save is refused when the file changed since. Null skips that check.
+ * Returns the new version.
+ */
+export const writeTextFile = (repoId: string, path: string, content: string, expectedVersion: string | null) =>
+  invoke<string>("write_text_file", { repoId, path, content, expectedVersion });
 /** `signOff` adds a `Signed-off-by` trailer (`--signoff`); the backend does not add it twice. */
 export const commit = (repoId: string, message: string, amend = false, signOff = false) =>
   invoke<OpResult>("commit", { repoId, message, amend, signOff });

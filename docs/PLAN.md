@@ -178,6 +178,12 @@ pub struct Hunk { pub old_start: u32, pub old_lines: u32, pub new_start: u32, pu
 pub struct FileDiff { pub path: String, pub old_path: Option<String>, pub binary: bool,
   pub hunks: Vec<Hunk>, pub too_large: bool /* > 20_000 lines: hunks empty */ }
 
+pub struct FileList { pub files: Vec<String> /* tracked + untracked, not ignored; sorted by bytes */, pub truncated: bool /* > 100_000 files: list stops there */ }
+pub struct TextFile { pub content: String /* empty when binary or too_large */, pub version: String /* SHA-1 hex, "-", byte length; send it back on save; empty when too_large */,
+  pub binary: bool /* NUL in the first 8_000 bytes, or not UTF-8 */, pub too_large: bool /* > 2 MiB: not loaded */ }
+pub struct SearchHit { pub path: String, pub line: u32 /* 1-based */, pub column: u32 /* 1-based, in characters */, pub text: String /* cut to 400 characters */ }
+pub struct SearchResult { pub hits: Vec<SearchHit> /* at most 2_000, sorted by path and line; one hit per matching line */, pub truncated: bool }
+
 pub struct ConsoleEntry { pub id: u64, pub repo_id: Option<String>, pub args: Vec<String>,
   pub started_at: i64 /* unix ms */, pub duration_ms: u64, pub exit_code: Option<i32>,
   pub stdout: String, pub stderr: String,
@@ -240,12 +246,16 @@ with the same name in camelCase (e.g. `logOpen`).
 | `working_tree` | `repoId` | `WorkingTree` |
 | `file_diff` | `repoId, spec: DiffSpec, path: String, oldPath: Option<String>, context: u32` | `FileDiff` |
 | `file_content` | `repoId, rev: Option<String> /* None = worktree */, path` | `String` (max 2 MiB) |
+| `list_files` | `repoId` | `FileList` (`git ls-files --cached --others --exclude-standard`; files only, a deleted tracked file and a submodule folder are left out) |
+| `read_text_file` | `repoId, path: String` | `TextFile` (worktree only. Errors: a symlink (`<path> is a symlink.`), a folder or a special file (`not a regular file: <path>`), a missing file (`file not found: <path>`), a path outside the repo (`path outside the repo: <path>`), a path in `.git` (`path inside the git folder: <path>`)) |
+| `search_files` | `repoId, query: String, caseSensitive: bool, regex: bool /* true = POSIX extended regex (-E), false = fixed text (-F) */` | `SearchResult` (`git grep -n --column -I -z --untracked --exclude-standard`, ignored files left out. An empty query gives no hits. A query with a NUL or a line break is refused. An invalid regex gives git's error) |
 | `last_commit_message` | `repoId` | `String` |
 
 ### 5.4 Write (per-repo serialized; each emits `repo-changed` after)
 | `stage` / `unstage` / `discard` | `repoId, paths: Vec<String>` | `()` (discard of untracked = delete file) |
 | `stage_hunk` | `repoId, path, hunkIndex: u32, reverse: bool /* true = unstage */, oldPath: Option<String> /* renamed file */, expected: Option<{oldStart, oldLines, newStart, newLines, hash?: String}> /* hunk identity; stale ("The file changed. Reload the diff.") if the header numbers or, when sent, the body hash no longer match; hash = `hunk_hash`, see below */, context: Option<u32> /* diff context lines, default 3; must match the diff the UI showed */` | `()` (built from Unstaged/Staged diff with context 3, applied with `git apply --cached [-R] --unidiff-zero=false`) |
 | `discard_hunk` | `repoId, path, hunkIndex, expected: Option<{oldStart, oldLines, newStart, newLines}>, context: Option<u32>` (same meaning as in `stage_hunk`) | `()` |
+| `write_text_file` | `repoId, path: String, content: String, expectedVersion: Option<String>` | `String` (the new version. Writes the bytes of `content` unchanged, creates a missing file. With `expectedVersion`, a file whose version differs, or a missing file, is refused: `The file changed on disk. Reload it before you save.`. Same path errors as `read_text_file`; a symlink and a folder are refused) |
 | `commit` | `repoId, message, amend: bool, signOff: bool` | `OpResult` (`signOff` = `--signoff`: a `Signed-off-by: <name> <email>` trailer of the committer; with an empty message and `amend` it is `--amend --no-edit --signoff`. A message that has that exact line already is not signed again: git alone only looks at the last trailer and would add a second line after e.g. a `Co-authored-by`) |
 | `checkout` | `repoId, target: String, newBranch: Option<String>` | `OpResult` (remote branch target + newBranch = `checkout -b new --track remote/x`) |
 | `branch_create` | `repoId, name, startPoint: String, checkout: bool` | `OpResult` |

@@ -424,6 +424,51 @@ pub struct FileDiff {
     pub too_large: bool,
 }
 
+/// Tracked and untracked files of the worktree, without the ignored ones.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct FileList {
+    /// Relative paths, sorted by bytes.
+    pub files: Vec<String>,
+    /// More than 100 000 files: the list stops there.
+    pub truncated: bool,
+}
+
+/// A worktree file read as text.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct TextFile {
+    /// Empty when `binary` or `too_large`.
+    pub content: String,
+    /// A hash of the bytes and their length. Send it back when saving. Empty when `too_large`.
+    pub version: String,
+    /// A NUL byte in the first 8 000 bytes, or not UTF-8.
+    pub binary: bool,
+    /// Over 2 MiB. Not loaded.
+    pub too_large: bool,
+}
+
+/// One matching line of a search.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchHit {
+    pub path: String,
+    /// 1-based.
+    pub line: u32,
+    /// 1-based, in characters.
+    pub column: u32,
+    /// The line, cut to 400 characters.
+    pub text: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchResult {
+    /// At most 2 000 hits, sorted by path and line.
+    pub hits: Vec<SearchHit>,
+    pub truncated: bool,
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct ConsoleEntry {
