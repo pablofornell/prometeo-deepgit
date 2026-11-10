@@ -1,0 +1,31 @@
+/*
+ * Tokens added by the frontend that are not in docs/design/tokens.css (DESIGN.md rule 3: add a token,
+ * never hard-code). Loaded right after tokens.css. Keep this file small; ask the designer to promote values.
+ */
+:root {
+  --dg-window-close-hover: #C42B1C;            /* DESIGN.md 2.4: close button hover, both themes */
+  --dg-project-badge-from: #3E7BD9;            /* project badge gradient (mockup) */
+  --dg-project-badge-to: #8A5CD6;
+  --dg-on-badge: #FFFFFF;
+  --dg-matrix-row-height: 28px;                /* DESIGN.md 11.2: branch matrix row, column, action bar */
+  --dg-matrix-col-width: 120px;
+  --dg-matrix-repo-col-width: 208px;
+  --dg-matrix-action-height: 44px;
+  --dg-titlebar-search-height: 28px;           /* DESIGN.md 5.1 #8 */
+  --dg-titlebar-search-max-width: 440px;
+  --dg-statusbar-widget-height: 22px;          /* DESIGN.md 5.19 */
+  --dg-branch-popup-width: 420px;              /* DESIGN.md 5.20 rule 5 */
+  --dg-log-ruler-width: 14px;                  /* DESIGN.md 5.7 / 11.5: overview ruler column of the log */
+  --dg-log-search-width: 220px;                /* DESIGN.md 5.5: text filter of the log */
+  --dg-log-stripe: 4px;                        /* DESIGN.md 5.5: stripe of the "Uncommitted changes" spine */
+  --dg-log-subject-min-width: 120px;           /* log rows: the subject keeps at least this much next to the ref pills (and 40%) */
+  --dg-changes-list-min-height: 120px;         /* Local changes: the file list never gets shorter than this */
+  --dg-changes-commit-min-height: 176px;       /* Local changes: smallest full commit box (target row, 3 message lines, button bar) */
+  --dg-shell-main-min-height: 260px;           /* shell: the main + details row never gets shorter than this */
+  --dg-seg-selected-bg: var(--dg-toolbar-selected-bg);   /* SegmentedControl selected item */
+  --dg-seg-selected-fg: var(--dg-text-over-accent);
+}
+/* light: toolbar-selected-bg is a pale blue, white text on it is washed out; use the accent (white on it is 4.6:1) */
+:root[data-theme="light"] {
+  --dg-seg-selected-bg: var(--dg-accent);
+}

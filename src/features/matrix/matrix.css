@@ -1,0 +1,68 @@
+/* Branch matrix tool window (DESIGN.md 5.14, 11.2). Prefix dg-matrix-. */
+.dg-matrix { display: flex; flex-direction: column; flex: 1; min-height: 0; min-width: 0; }
+.dg-matrix-toolbar { display: flex; align-items: center; gap: var(--dg-space-5); flex: none; padding: 0 var(--dg-space-5) var(--dg-space-4) var(--dg-space-5); }
+.dg-matrix-filter { width: 220px; flex: none; }
+.dg-matrix-count { color: var(--dg-text-secondary); font-size: var(--dg-font-size-medium); white-space: nowrap; }
+.dg-matrix-legend { display: inline-flex; align-items: center; gap: var(--dg-space-5); color: var(--dg-text-secondary); font-size: var(--dg-font-size-medium); white-space: nowrap; }
+.dg-matrix-legend span { display: inline-flex; align-items: center; gap: var(--dg-space-3); }
+
+/* ---- grid */
+.dg-matrix-scroll { position: relative; flex: 1; min-height: 0; overflow: auto; outline: 0; padding: 0 var(--dg-space-4); }
+.dg-matrix-grid { position: relative; display: grid; width: max-content; min-width: 100%; grid-auto-rows: var(--dg-matrix-row-height); }
+
+.dg-matrix-corner, .dg-matrix-colhead {
+  position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: var(--dg-space-3); min-width: 0; padding: 0 var(--dg-space-4);
+  background: var(--dg-island-bg); color: var(--dg-text-secondary); font-size: var(--dg-font-size-medium); text-align: left;
+}
+.dg-matrix-corner { left: 0; z-index: 4; }
+.dg-matrix-colhead { color: var(--dg-text); border-bottom: 1px solid var(--dg-separator); }
+.dg-matrix-corner { border-bottom: 1px solid var(--dg-separator); }
+.dg-matrix-colhead:hover { background: var(--dg-matrix-cell-hover-bg); }
+.dg-matrix-colhead.is-selected { background: var(--dg-matrix-column-selected-bg); }
+.dg-matrix-colname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--dg-weight-medium); }
+.dg-matrix-colcount { flex: none; color: var(--dg-text-secondary); font-size: var(--dg-font-size-small); font-variant-numeric: tabular-nums; }
+
+.dg-matrix-rowhead {
+  position: sticky; left: 0; z-index: 1; display: flex; align-items: center; gap: var(--dg-tree-icon-gap); min-width: 0; padding: 0 var(--dg-space-4);
+  background: var(--dg-island-bg); text-align: left; border-radius: var(--dg-tree-selection-radius) 0 0 var(--dg-tree-selection-radius);
+}
+.dg-matrix-rowhead:hover { background: var(--dg-row-hover-bg); }
+.dg-matrix-rowhead.is-focused { background: var(--dg-selection-inactive-bg); }
+.dg-matrix-rname { flex: none; font-weight: var(--dg-weight-medium); }
+.dg-matrix-rbranch { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dg-text-secondary); font-size: var(--dg-font-size-medium); }
+
+.dg-matrix-cell {
+  display: flex; align-items: center; justify-content: center; gap: var(--dg-space-3); min-width: 0;
+  background: var(--dg-matrix-cell-bg); box-shadow: inset 0 0 0 0.5px var(--dg-island-bg);
+}
+.dg-matrix-cell:hover { background: var(--dg-matrix-cell-hover-bg); }
+.dg-matrix-cell.is-selected { background: var(--dg-matrix-column-selected-bg); }
+
+/* ---- glyphs: 8 px */
+.dg-matrix-glyph { display: inline-block; flex: none; width: 8px; height: 8px; border-radius: 50%; box-sizing: border-box; }
+.dg-matrix-glyph.is-current { background: var(--dg-matrix-current); }
+.dg-matrix-glyph.is-local { box-shadow: inset 0 0 0 1.5px var(--dg-matrix-local); }
+.dg-matrix-glyph.is-remote { border: 1.5px dashed var(--dg-matrix-remote-only); }
+.dg-matrix-glyph.is-missing { height: 2px; border-radius: 1px; background: var(--dg-matrix-missing); }
+.dg-matrix-glyph.is-busy { background: var(--dg-conflict-dot); box-shadow: 0 0 0 3px color-mix(in srgb, var(--dg-conflict-dot) 22%, transparent); }
+.dg-matrix-glyph.is-failed { box-shadow: 0 0 0 2px var(--dg-conflict-dot); }
+
+/* ---- sweep line while a batch runs: one row per --dg-dur-slow */
+@keyframes dg-matrix-sweep {
+  from { transform: translateY(0); }
+  to { transform: translateY(calc(var(--rows) * var(--dg-matrix-row-height))); }
+}
+.dg-matrix-sweep {
+  position: absolute; z-index: 3; pointer-events: none; height: 2px; background: var(--dg-matrix-sweep);
+  left: calc(var(--dg-matrix-repo-col-width) + var(--col) * var(--dg-matrix-col-width)); top: var(--dg-matrix-row-height); width: var(--dg-matrix-col-width);
+  animation: dg-matrix-sweep calc(var(--dg-dur-slow) * var(--rows)) steps(var(--rows)) infinite;
+}
+
+/* ---- action bar */
+.dg-matrix-bar {
+  display: flex; align-items: center; gap: var(--dg-space-3); flex: none; height: var(--dg-matrix-action-height); padding: 0 var(--dg-space-5);
+  border-top: 1px solid var(--dg-separator); background: var(--dg-layer-1-bg);
+}
+.dg-matrix-bar-title { font-weight: var(--dg-weight-semibold); flex: 0 1 auto; max-width: 200px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dg-matrix-bar-sum { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--dg-text-secondary); font-size: var(--dg-font-size-medium); white-space: nowrap; margin-right: var(--dg-space-4); }
+.dg-matrix-bar .dg-btn { flex: none; }

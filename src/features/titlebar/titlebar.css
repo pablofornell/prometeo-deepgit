@@ -1,0 +1,113 @@
+/* Title bar (DESIGN.md 5.1). Prefix dg-titlebar-. */
+@property --dg-titlebar-age {
+  syntax: "<angle>";
+  inherits: true;
+  initial-value: 0deg;
+}
+
+.dg-titlebar { display: flex; align-items: center; gap: var(--dg-space-2); height: 100%; padding: 0 0 0 var(--dg-space-4); min-width: 0; }
+.dg-titlebar-left, .dg-titlebar-right { display: flex; align-items: center; gap: var(--dg-space-1); min-width: max-content; }
+.dg-titlebar-left { flex: 1 1 0; }
+.dg-titlebar-right { flex: 1 1 0; justify-content: flex-end; }
+.dg-titlebar-center { flex: 0 1 var(--dg-titlebar-search-max-width); display: flex; justify-content: center; min-width: 0; }
+.dg-titlebar-logo { flex: none; margin: 0 var(--dg-space-4) 0 var(--dg-space-1); }
+.dg-titlebar-sep { flex: none; width: 1px; height: 20px; margin: 0 var(--dg-space-3); background: var(--dg-toolbar-separator); }
+
+/* ---- dropdown buttons (project, branch) */
+.dg-titlebar-dd {
+  display: inline-flex; align-items: center; gap: var(--dg-space-3); height: var(--dg-toolbar-dropdown-height); padding: var(--dg-toolbar-dropdown-padding);
+  border-radius: var(--dg-toolbar-dropdown-radius); max-width: var(--dg-toolbar-dropdown-max-width); min-width: 0; color: var(--dg-toolbar-fg);
+}
+.dg-titlebar-dd:hover, .dg-titlebar-dd.is-open { background: var(--dg-hover-bg); }
+.dg-titlebar-dd-main { font-weight: var(--dg-weight-semibold); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.dg-titlebar-dd-main.is-mono { font-family: var(--dg-font-mono); font-size: var(--dg-font-size-mono); }
+.dg-titlebar-dd-sub { color: var(--dg-text-secondary); font-size: var(--dg-font-size-medium); white-space: nowrap; flex: none; }
+.dg-titlebar-chev { color: var(--dg-icon-secondary); flex: none; }
+.dg-titlebar-branch .dg-icon:first-child { flex: none; }
+.dg-titlebar-badge {
+  width: 20px; height: 20px; border-radius: var(--dg-space-2); display: inline-grid; place-items: center; flex: none;
+  font-size: 10px; font-weight: var(--dg-weight-semibold); color: var(--dg-on-badge);
+  background: linear-gradient(135deg, var(--dg-project-badge-from), var(--dg-project-badge-to));
+}
+
+/* ---- icon buttons */
+.dg-titlebar-btn {
+  position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 3px; flex: none;
+  height: var(--dg-toolbar-button-size); min-width: var(--dg-toolbar-button-size); padding: 0 7px; border-radius: var(--dg-toolbar-button-radius);
+  color: var(--dg-toolbar-fg);
+}
+.dg-titlebar-btn:hover { background: var(--dg-hover-bg); }
+.dg-titlebar-btn:active { background: var(--dg-pressed-bg); }
+.dg-titlebar-btn.is-on { background: var(--dg-toolbar-selected-bg); }
+.dg-titlebar-btn.is-on .dg-icon { color: var(--dg-text-over-accent); }
+.dg-titlebar-n { font-size: var(--dg-font-size-small); font-weight: var(--dg-weight-semibold); font-variant-numeric: tabular-nums; color: var(--dg-ahead-fg); }
+.dg-titlebar-n-down { color: var(--dg-behind-fg); }
+.dg-titlebar-push.is-hot { background: color-mix(in srgb, var(--dg-push-bg) 22%, transparent); }
+.dg-titlebar-push.is-hot:hover { background: color-mix(in srgb, var(--dg-push-bg) 34%, transparent); }
+.dg-titlebar-push.is-hot .dg-icon { color: var(--dg-ahead-fg); }
+.dg-titlebar-dot {
+  position: absolute; top: 6px; right: 6px; width: 6px; height: 6px; border-radius: 50%; background: var(--dg-accent);
+  box-shadow: 0 0 0 2px var(--dg-toolbar-bg);
+}
+
+/* ---- fetch age ring (11.4): 22 px ring centred on the 30 px button */
+.dg-titlebar-fetch { --ring: var(--dg-fetch-fresh); }
+.dg-titlebar-fetch.is-aging { --ring: var(--dg-fetch-aging); }
+.dg-titlebar-fetch.is-stale { --ring: var(--dg-fetch-stale); }
+.dg-titlebar-ring {
+  position: absolute; inset: var(--dg-space-2); border-radius: 50%; pointer-events: none; opacity: 0.9;
+  background: conic-gradient(var(--ring) var(--dg-titlebar-age), var(--dg-hover-bg) 0);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 1.5px), #000 calc(100% - 1px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 1.5px), #000 calc(100% - 1px));
+  transition: --dg-titlebar-age var(--dg-dur-slow) var(--dg-ease-out);
+}
+
+/* ---- Search Everywhere field */
+.dg-titlebar-search {
+  display: flex; align-items: center; gap: var(--dg-space-4); width: 100%; height: var(--dg-titlebar-search-height); padding: 0 6px 0 10px; border-radius: var(--dg-toolbar-dropdown-radius);
+  background: var(--dg-hover-bg); color: var(--dg-text-secondary); min-width: 0;
+}
+.dg-titlebar-search:hover { background: var(--dg-pressed-bg); }
+.dg-titlebar-search-text { flex: 1; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---- branch popup (5.20 rule 5) */
+.dg-titlebar-branchpop { width: var(--dg-branch-popup-width); max-width: calc(100vw - 12px); }
+.dg-titlebar-pop { display: flex; flex-direction: column; padding: var(--dg-menu-padding-y) 0 0; min-height: 0; }
+.dg-titlebar-pop-search { padding: 0 var(--dg-space-4) var(--dg-space-3); }
+.dg-titlebar-pop-list { max-height: 360px; overflow-y: auto; padding-bottom: var(--dg-space-2); }
+.dg-titlebar-pop-head {
+  display: flex; align-items: baseline; gap: var(--dg-space-2); padding: var(--dg-space-3) 14px var(--dg-space-1); color: var(--dg-text-secondary);
+  font-size: var(--dg-font-size-small); font-weight: var(--dg-weight-semibold);
+}
+.dg-titlebar-pop-count { color: var(--dg-text-secondary); font-size: var(--dg-font-size-small); font-weight: var(--dg-weight-regular); font-variant-numeric: tabular-nums; flex: none; }
+.dg-titlebar-pop-empty { padding: var(--dg-space-5) 14px; color: var(--dg-text-secondary); text-align: center; }
+.dg-titlebar-brow {
+  display: flex; align-items: center; gap: var(--dg-space-3); height: var(--dg-popup-item-height); margin: 0 var(--dg-space-3); padding: 0 var(--dg-menu-item-padding-x);
+  border-radius: var(--dg-popup-selection-radius); white-space: nowrap; cursor: default;
+}
+.dg-titlebar-brow.is-active { background: var(--dg-selection-bg); }
+.dg-titlebar-brow-ic { flex: none; color: var(--dg-icon-secondary); }
+.dg-titlebar-brow.is-current .dg-titlebar-brow-ic { color: var(--dg-ref-local-fg); }
+.dg-titlebar-brow.is-current .dg-titlebar-brow-name { font-weight: var(--dg-weight-semibold); }
+.dg-titlebar-brow-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.dg-titlebar-brow-n { min-width: 28px; text-align: right; }
+.dg-titlebar-brow-sub { padding-left: 28px; }
+.dg-titlebar-brow-sub .dg-titlebar-brow-name { font-size: var(--dg-font-size-medium); }
+.dg-titlebar-brow-more { color: var(--dg-text-link); font-size: var(--dg-font-size-medium); padding-left: 28px; }
+.dg-titlebar-brow-exp { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 4px; color: var(--dg-icon-secondary); flex: none; margin-right: -4px; }
+.dg-titlebar-brow-exp:hover { background: var(--dg-hover-bg); }
+.dg-titlebar-brow-exp .dg-icon { color: currentColor; transition: transform var(--dg-dur-fast) var(--dg-ease-out); }
+.dg-titlebar-brow-exp.is-open .dg-icon { transform: rotate(90deg); }
+.dg-titlebar-match { background: transparent; color: var(--dg-match-fg); font-weight: var(--dg-weight-semibold); }
+.dg-titlebar-gone { font-size: var(--dg-font-size-small); color: var(--dg-text-secondary); border: 1px solid var(--dg-separator); border-radius: 4px; padding: 0 4px; line-height: 14px; flex: none; }
+.dg-titlebar-dots { display: inline-flex; align-items: center; gap: 3px; flex: none; }
+.dg-titlebar-rdot { width: 7px; height: 7px; border-radius: 50%; background: var(--rc); flex: none; }
+.dg-titlebar-rdot.is-local { background: color-mix(in srgb, var(--rc) 40%, transparent); box-shadow: inset 0 0 0 1px var(--rc); }
+.dg-titlebar-rdot.is-remote { background: transparent; box-shadow: inset 0 0 0 1px var(--rc); }
+.dg-titlebar-pop-foot { display: flex; flex-direction: column; border-top: 1px solid var(--dg-separator); padding: var(--dg-space-2) 0; }
+.dg-titlebar-pop-action {
+  display: flex; align-items: center; gap: var(--dg-space-3); height: var(--dg-popup-item-height); margin: 0 var(--dg-space-3); padding: 0 var(--dg-menu-item-padding-x);
+  border-radius: var(--dg-popup-selection-radius); text-align: left;
+}
+.dg-titlebar-pop-action .dg-titlebar-pop-count { margin-left: auto; }
+.dg-titlebar-pop-action:hover { background: var(--dg-selection-bg); }

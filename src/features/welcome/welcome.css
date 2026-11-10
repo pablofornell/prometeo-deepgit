@@ -1,0 +1,28 @@
+.dg-welcome { display: flex; flex-direction: column; height: 100%; min-height: 0; background: var(--dg-window-bg); color: var(--dg-text); }
+.dg-welcome-bar { height: var(--dg-titlebar-height); display: flex; justify-content: flex-end; flex: none; }
+
+/* centred column; `margin: auto` on the inner box keeps the top reachable when the window is short */
+.dg-welcome-main { flex: 1; min-height: 0; display: flex; overflow: auto; padding: var(--dg-space-6); }
+.dg-welcome-inner { margin: auto; display: flex; flex-direction: column; align-items: center; gap: var(--dg-space-8); text-align: center; }
+
+.dg-welcome-hero { display: flex; flex-direction: column; align-items: center; gap: var(--dg-space-3); }
+.dg-welcome-logo { display: block; width: 48px; height: 48px; }
+.dg-welcome-logo-tile { fill: var(--dg-island-bg); }
+.dg-welcome-logo-ring { stroke: var(--dg-island-bg); }
+.dg-welcome-logo-main { color: var(--dg-accent); }
+.dg-welcome-logo-top { color: var(--dg-text-warning); }
+.dg-welcome-logo-bottom { color: var(--dg-text-success); }
+.dg-welcome-title { margin: var(--dg-space-4) 0 0; font-size: var(--dg-font-size-h1); line-height: 28px; font-weight: var(--dg-weight-semibold); }
+.dg-welcome-tagline { margin: 0; color: var(--dg-text-muted); }
+
+.dg-welcome-action { display: flex; flex-direction: column; align-items: center; gap: var(--dg-space-4); }
+.dg-welcome-error { margin: 0; max-width: 360px; color: var(--dg-text-error); font-size: var(--dg-font-size-medium); line-height: var(--dg-line-height-ui); }
+
+.dg-welcome-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--dg-space-5); width: 100%; max-width: 720px; margin: 0; padding: 0; list-style: none; }
+.dg-welcome-card { display: flex; flex-direction: column; align-items: flex-start; gap: var(--dg-space-3); padding: var(--dg-space-6) var(--dg-space-5); border-radius: var(--dg-island-radius); background: var(--dg-island-bg); text-align: left; }
+.dg-welcome-card-icon { color: var(--dg-icon-secondary); }
+.dg-welcome-card-title { margin: 0; font-size: var(--dg-font-size); line-height: var(--dg-line-height-ui); font-weight: var(--dg-weight-semibold); }
+.dg-welcome-card-body { margin: 0; color: var(--dg-text-muted); font-size: var(--dg-font-size-medium); line-height: var(--dg-line-height-ui); }
+
+.dg-welcome-keys { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--dg-space-7); margin: 0; color: var(--dg-text-muted); font-size: var(--dg-font-size-medium); }
+.dg-welcome-keys > span { display: inline-flex; align-items: center; gap: var(--dg-space-3); }

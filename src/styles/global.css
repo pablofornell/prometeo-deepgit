@@ -1,0 +1,71 @@
+/*
+ * Global reset, base typography, scrollbars and utility classes.
+ * Imported once from src/index.tsx after theme/tokens.css. Only --dg-* tokens (DESIGN.md rule 1-3).
+ */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body, #root { margin: 0; height: 100%; }
+
+body {
+  background: var(--dg-window-bg);
+  color: var(--dg-text);
+  font: var(--dg-weight-regular) var(--dg-font-size) / var(--dg-line-height-ui) var(--dg-font-ui);
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "cv11" 1, "ss01" 0;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+button, input, select, textarea { font: inherit; color: inherit; }
+button { background: none; border: 0; padding: 0; cursor: default; }
+a { color: var(--dg-text-link); text-decoration: none; cursor: default; }
+a:hover { text-decoration: underline; }
+code, kbd, samp, pre { font-family: var(--dg-font-mono); }
+code {
+  font-size: var(--dg-font-size-mono); padding: 0 3px; border-radius: 3px;
+  background: var(--dg-layer-1-bg); color: var(--dg-text);
+}
+h1, h2, h3, h4, p { margin: 0; }
+ul { margin: 0; padding: 0; list-style: none; }
+
+/* text can be selected where it is content */
+input, textarea, [contenteditable], .dg-selectable, .dg-selectable * { user-select: text; -webkit-user-select: text; }
+
+/* keyboard focus: 2px ring, only for :focus-visible (DESIGN.md 5, "Keyboard focus") */
+:focus { outline: none; }
+:focus-visible { outline: var(--dg-focus-width) solid var(--dg-focus-ring); outline-offset: 0; }
+.dg-focus-inset:focus-visible { outline-offset: calc(-1 * var(--dg-focus-width)); }
+
+::selection { background: var(--dg-selection-bg); color: var(--dg-selection-fg); }
+
+/* ---- scrollbars (DESIGN.md 4.3 "Scrollbars"): thin thumb, track appears on hover ---- */
+* { scrollbar-width: thin; scrollbar-color: var(--dg-scrollbar-thumb) transparent; }
+::-webkit-scrollbar { width: var(--dg-scrollbar-width); height: var(--dg-scrollbar-width); }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--dg-scrollbar-thumb); border-radius: 5px;
+  border: 2px solid transparent; background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--dg-scrollbar-thumb-hover); background-clip: padding-box; }
+::-webkit-scrollbar-track:hover { background: var(--dg-scrollbar-track-hover); }
+::-webkit-scrollbar-corner { background: transparent; }
+
+/* ---- utilities ---- */
+.dg-muted { color: var(--dg-text-secondary); }
+.dg-mono { font-family: var(--dg-font-mono); }
+.dg-grow { flex: 1; min-width: 0; }
+.dg-ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dg-tabular { font-variant-numeric: tabular-nums; }
+.dg-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* cursor while dragging a splitter (set on <body> by the Splitter) */
+body.dg-resizing-col, body.dg-resizing-col * { cursor: col-resize !important; }
+body.dg-resizing-row, body.dg-resizing-row * { cursor: row-resize !important; }
+
+@keyframes dg-spin { to { transform: rotate(360deg); } }
+@keyframes dg-indeterminate { 0% { transform: translateX(-100%); } 100% { transform: translateX(250%); } }
+@keyframes dg-pop-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+@keyframes dg-toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes dg-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes dg-scale-in { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: none; } }

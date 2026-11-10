@@ -1,0 +1,45 @@
+/* Window shell (DESIGN.md section 2). Prefix dg-shell-. */
+.dg-shell { display: grid; grid-template-rows: var(--dg-titlebar-height) minmax(0, 1fr) var(--dg-statusbar-height); height: 100%; min-width: 1200px; min-height: 720px; position: relative; }
+.dg-shell-titlebar { background: var(--dg-toolbar-bg); color: var(--dg-toolbar-fg); min-width: 0; }
+.dg-shell-statusbar { background: var(--dg-statusbar-bg); color: var(--dg-statusbar-fg); min-width: 0; }
+.dg-shell-main { display: flex; min-height: 0; min-width: 0; }
+
+/* ---- tool stripe */
+.dg-shell-stripe { width: var(--dg-stripe-width); flex: none; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 2px 0 6px; background: var(--dg-stripe-bg); }
+.dg-shell-stripe-btn {
+  position: relative; width: var(--dg-stripe-button-size); height: var(--dg-stripe-button-size); border-radius: var(--dg-stripe-button-radius);
+  display: grid; place-items: center; color: var(--dg-stripe-button-fg);
+}
+.dg-shell-stripe-btn .dg-icon { color: currentColor; }
+.dg-shell-stripe-btn:hover { background: var(--dg-hover-bg); }
+.dg-shell-stripe-btn.is-on { background: var(--dg-stripe-button-selected-bg); color: var(--dg-stripe-button-selected-fg); }
+.dg-shell-stripe-count {
+  position: absolute; right: -3px; bottom: -1px; min-width: 14px; height: 14px; padding: 0 3px; border-radius: 7px; line-height: 14px;
+  font-size: 9px; font-weight: var(--dg-weight-semibold); text-align: center; font-variant-numeric: tabular-nums;
+  background: var(--dg-layer-2-bg); color: var(--dg-text); box-shadow: 0 0 0 2px var(--dg-window-bg);
+}
+.dg-shell-stripe-btn.is-on .dg-shell-stripe-count { background: var(--dg-accent); color: var(--dg-text-over-accent); }
+.dg-shell-stripe-dot { position: absolute; top: 5px; right: 5px; width: 6px; height: 6px; border-radius: 50%; background: var(--dg-accent); box-shadow: 0 0 0 2px var(--dg-window-bg); }
+
+/* ---- islands */
+.dg-shell-islands { flex: 1; display: flex; min-width: 0; min-height: 0; padding: 0 var(--dg-island-gap) 0 0; }
+.dg-shell-island { background: var(--dg-island-bg); border-radius: var(--dg-island-radius); overflow: hidden; display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.dg-shell-sidebar { flex: none; }
+.dg-shell-center { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.dg-shell-top { flex: 1; min-height: var(--dg-shell-main-min-height); display: flex; min-width: 0; }
+.dg-shell-main-island { flex: 1; min-width: 0; }
+.dg-shell-details { flex: none; }
+.dg-shell-diff, .dg-shell-bottom { flex: none; }
+
+/* ---- island header with tabs */
+.dg-shell-head { height: var(--dg-panel-header-height); flex: none; display: flex; align-items: center; gap: 2px; padding: var(--dg-panel-header-padding); padding-left: 6px; }
+.dg-shell-tab {
+  display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border-radius: 6px; color: var(--dg-text-muted); white-space: nowrap;
+}
+.dg-shell-tab .dg-icon { color: currentColor; }
+.dg-shell-tab:hover:not(.is-on) { background: var(--dg-hover-bg); }
+.dg-shell-tab.is-on { background: var(--dg-selection-muted-bg); box-shadow: inset 0 0 0 1px var(--dg-chip-active-border); color: var(--dg-text); font-weight: var(--dg-weight-medium); }
+.dg-shell-tab-sub { color: var(--dg-text-secondary); font-weight: var(--dg-weight-regular); font-size: var(--dg-font-size-medium); }
+.dg-shell-view { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.dg-app { height: 100%; }
+.dg-shell-view[hidden] { display: none; }
