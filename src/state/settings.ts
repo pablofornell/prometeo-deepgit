@@ -66,7 +66,7 @@ export interface Settings {
 
 export const SETTING_DEFAULTS: Readonly<Settings> = {
   theme: "dark",
-  dateFormat: "relative",
+  dateFormat: "iso",
   diffMode: "sideBySide",
   // ---- auto-fetch and commit sign-off
   autoFetchMinutes: 15,
