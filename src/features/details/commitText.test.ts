@@ -1,19 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { committerDiffers, pushState, whenText } from "./commitText";
-
-const at = (y: number, mo: number, d: number, h: number, mi: number) => new Date(y, mo - 1, d, h, mi).getTime();
-
-describe("whenText", () => {
-  const now = at(2026, 11, 10, 12, 0);
-  it("says today and yesterday", () => {
-    expect(whenText(at(2026, 11, 10, 10, 42) / 1000, now)).toBe("today at 10:42, Tue 10 Nov 2026");
-    expect(whenText(at(2026, 11, 9, 18, 3) / 1000, now)).toBe("yesterday at 18:03, Mon 9 Nov 2026");
-  });
-  it("uses the full date for older commits", () => {
-    expect(whenText(at(2026, 11, 3, 9, 5) / 1000, now)).toBe("on Tue 3 Nov 2026 at 09:05");
-  });
-});
+import { committerDiffers, pushState } from "./commitText";
 
 describe("committerDiffers", () => {
   const a = { name: "A", email: "a@x.dev", time: 1000 };

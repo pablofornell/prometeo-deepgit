@@ -6,7 +6,7 @@
  *     <Row label="Show the graph"><Checkbox checked={...} onChange={...} /></Row>
  *   </Section>
  */
-import { type JSX, Show, createEffect, createSignal, createUniqueId, onCleanup } from "solid-js";
+import { type JSX, For, Show, createEffect, createSignal, createUniqueId, onCleanup } from "solid-js";
 import { IconButton, moveDialogBy } from "../../components/ui";
 import { type NumberRange, type Point, SLIDER_IDLE, type SliderEvent, parseNumberText, pinShift, sliderStep, snapToRange, stepBy } from "./sizeControl";
 
@@ -34,6 +34,32 @@ export function Row(props: { label: string; hint?: JSX.Element; children: JSX.El
         </Show>
       </div>
       <div class="dg-settings-row-control">{props.children}</div>
+    </div>
+  );
+}
+
+export interface Choice<T extends string> {
+  value: T;
+  label: string;
+  /** Shown after the label, muted; may be a live value (read inside the list, so it updates in place). */
+  example?: () => string;
+}
+
+/** Radio list, one choice per line with an optional live example ("Relative  3 h ago"). Arrow keys move the choice. */
+export function ChoiceList<T extends string>(props: { label: string; value: T; options: readonly Choice<T>[]; onChange: (v: T) => void }): JSX.Element {
+  const name = createUniqueId();
+  return (
+    <div class="dg-settings-choices" role="radiogroup" aria-label={props.label}>
+      <For each={props.options}>
+        {(o) => (
+          <label class="dg-settings-choice" classList={{ "is-on": props.value === o.value }}>
+            <input class="dg-settings-choice-input" type="radio" name={name} value={o.value} checked={props.value === o.value} onChange={() => props.onChange(o.value)} />
+            <span class="dg-settings-choice-dot" aria-hidden="true" />
+            <span class="dg-settings-choice-label">{o.label}</span>
+            <Show when={o.example}>{(ex) => <span class="dg-settings-choice-example">{ex()()}</span>}</Show>
+          </label>
+        )}
+      </For>
     </div>
   );
 }

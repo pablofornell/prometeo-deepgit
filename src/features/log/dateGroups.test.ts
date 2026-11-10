@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { DisplayMap, dateGroup, groupStartsOf } from "./dateGroups";
+import { DisplayMap, dateGroup, dateGroupLabel, groupStartsOf } from "./dateGroups";
 
 // Thursday 12 Nov 2026, 12:00 local time
 const NOW = new Date(2026, 10, 12, 12, 0, 0).getTime();
@@ -20,6 +20,24 @@ describe("dateGroup", () => {
 
   it("treats future times as today", () => {
     expect(dateGroup(NOW / 1000 + 86400 * 3, NOW).key).toBe("today");
+  });
+});
+
+describe("dateGroupLabel", () => {
+  it("is the relative label in the relative format", () => {
+    expect(dateGroupLabel("today", "relative", NOW)).toBe("Today");
+    expect(dateGroupLabel("2026-9", "relative", NOW)).toBe("October 2026");
+  });
+  it("adds the day to Today and Yesterday and writes months in the format", () => {
+    expect(dateGroupLabel("today", "iso", NOW)).toBe("Today, 2026-11-12");
+    expect(dateGroupLabel("yesterday", "absolute", NOW, "en-GB")).toBe("Yesterday, 11 Nov 2026");
+    expect(dateGroupLabel("2026-9", "iso", NOW)).toBe("2026-10");
+    expect(dateGroupLabel("2025-8", "absolute", NOW, "en-GB")).toBe("September 2025");
+  });
+  it("keeps the ranges as words", () => {
+    for (const f of ["relative", "absolute", "iso"] as const) {
+      expect([dateGroupLabel("week", f, NOW), dateGroupLabel("lastweek", f, NOW), dateGroupLabel("month", f, NOW)]).toEqual(["This week", "Last week", "Earlier this month"]);
+    }
   });
 });
 

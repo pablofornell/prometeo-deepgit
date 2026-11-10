@@ -784,7 +784,7 @@ Every change applies **at once**. There is no OK button. Press `Esc` or click **
 | **Editor font size** | 10 to 20 px. Diff, console and commit hashes. By default it follows the font size. Clear **Follow the font size** to choose a value. |
 | **UI scale** | 80% to 200% in steps of 10%, default 100%. Zooms the whole window. |
 | **Comfortable rows** | Taller rows in the log |
-| **Date format** | Relative (4 min ago) or Absolute (10 Nov 2026 10:42) |
+| **Date format** | Relative (3 h ago), Absolute (10 Nov 2026, 14:32, in the order and words of your language) or ISO (2026-11-10 14:32). Each choice shows the time 3 hours ago in that format. It applies at once to every date: the log and its date groups, the commit details, the stashes, the notifications and the last commit of **Changes**. Hover a date to see the full date and time. |
 
 The preview under **UI scale** shows the sizes you choose.
 

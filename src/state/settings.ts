@@ -19,11 +19,12 @@ import {
   UI_SCALE_DEFAULT, appearanceVars, sanitizeEditorFontSize, sanitizeFontSize, sanitizeUiScale, stepUiScale,
   FONT_SIZE_DEFAULT,
 } from "./appearance";
+import type { DateFormat } from "./dateFormat";
 import { bumpAppearance } from "./metrics";
 import { loadPersisted, removePersisted, savePersisted } from "./persist";
 
 export type ThemePref = "dark" | "light" | "system";
-export type DateFormat = "relative" | "absolute";
+export type { DateFormat } from "./dateFormat";
 export type DiffMode = "sideBySide" | "unified";
 
 /** Periods the auto-fetch can have, in minutes (0 = off). */
@@ -31,7 +32,7 @@ export const AUTO_FETCH_CHOICES = [0, 5, 15, 30, 60] as const;
 
 export interface Settings {
   theme: ThemePref;
-  /** Date column of the log: "4 min ago" style or "10 Nov 2026 10:42". */
+  /** How every date of the UI is written (`state/dates.ts`): "3 h ago", "10 Nov 2026, 14:32" (the user's locale) or "2026-11-10 14:32". */
   dateFormat: DateFormat;
   diffMode: DiffMode;
   // ---- auto-fetch and commit sign-off (wave 1: git features) -----------------------------------------------------
@@ -90,7 +91,7 @@ const oneOf =
 /** One validator per key: returns a valid value for any input. */
 export const SANITIZERS: { [K in keyof Settings]: (v: unknown) => Settings[K] } = {
   theme: oneOf<ThemePref>("dark", "light", "system")(SETTING_DEFAULTS.theme),
-  dateFormat: oneOf<DateFormat>("relative", "absolute")(SETTING_DEFAULTS.dateFormat),
+  dateFormat: oneOf<DateFormat>("relative", "absolute", "iso")(SETTING_DEFAULTS.dateFormat),
   diffMode: oneOf<DiffMode>("sideBySide", "unified")(SETTING_DEFAULTS.diffMode),
   autoFetchMinutes: (v) => ((AUTO_FETCH_CHOICES as readonly number[]).includes(v as number) ? (v as number) : SETTING_DEFAULTS.autoFetchMinutes),
   autoFetchPrune: (v) => (typeof v === "boolean" ? v : SETTING_DEFAULTS.autoFetchPrune),

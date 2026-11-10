@@ -26,14 +26,17 @@ export interface AuthorInfo {
 export interface ScanResult {
   marks: Mark[];
   groupStarts: number[];
+  /** Label of each group in the relative wording ("Today", "October 2026"). */
   groupLabels: string[];
+  /** Key of each group (`dateGroup().key`): `dateGroupLabel` turns it into the label of another date format. */
+  groupKeys: string[];
   /** First HEAD row of each repo and the lane of its node. */
   heads: Map<string, { row: number; lane: number }>;
   authors: Map<string, AuthorInfo>;
   complete: boolean;
 }
 
-export const emptyScan: ScanResult = { marks: [], groupStarts: [], groupLabels: [], heads: new Map(), authors: new Map(), complete: false };
+export const emptyScan: ScanResult = { marks: [], groupStarts: [], groupLabels: [], groupKeys: [], heads: new Map(), authors: new Map(), complete: false };
 
 export interface PageScan {
   keys: string[];
@@ -110,5 +113,5 @@ export function assembleScan(pages: readonly PageScan[]): ScanResult {
     }
   }
   const { starts, labels: names } = groupStartsOf(keys, (k) => labels.get(k) ?? "");
-  return { marks, groupStarts: starts, groupLabels: names, heads, authors, complete: true };
+  return { marks, groupStarts: starts, groupLabels: names, groupKeys: starts.map((i) => keys[i]), heads, authors, complete: true };
 }

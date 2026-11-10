@@ -6,6 +6,7 @@
 import { type JSX, Match, Show, Switch, createEffect, createMemo, createSignal, on, onCleanup, onMount, untrack } from "solid-js";
 import type { CommitRow, LogQuery } from "../../api/types";
 import { Button, EmptyState, HeaderSlot, IconButton, VirtualList, type VirtualListApi, copyText, openContextMenu, plural, toast } from "../../components/ui";
+import { dateWidthSample } from "../../state/dateFormat";
 import { register } from "../../state/keymap";
 import { notifyRepoChanged, repoVersion } from "../../state/events";
 import { refsVersion } from "../../state/refs";
@@ -15,9 +16,10 @@ import { setSetting, settings } from "../../state/settings";
 import { activeProject, focusedRepo, refreshSummaries, repoById, selectOnlyRepo, selectedRepoIds, selectedRepos, summary } from "../../state/workspace";
 import { resetAuthors, mergeAuthors } from "./authors";
 import { OperationBanners, SkippedBanner } from "./Banner";
-import { DisplayMap } from "./dateGroups";
+import { DisplayMap, dateGroupLabel } from "./dateGroups";
 import { FilterBar } from "./FilterBar";
 import { activeFilters, clearAllFilters, hasContentFilter, query, text } from "./filters";
+import { appearanceRev } from "../../state/metrics";
 import { autoGraphWidth, cssPx, maxLanesOf, readGraphMetrics } from "./graph";
 import { CommitRowView, DateRowView, type RowCtx, type WipInfo, WipRowView } from "./LogRow";
 import { type PickedCommit, commitMenu, refAtTarget, refMenu } from "./menus";
@@ -34,15 +36,22 @@ interface Cols {
   graph: number | null;
   repo: number;
   author: number;
-  date: number;
+  /** null = automatic (fits a date in the user's date format). */
+  date: number | null;
   hash: number;
   hidden: { repo: boolean; author: boolean; date: boolean; hash: boolean };
 }
 
-const DEFAULT_COLS: Cols = { graph: null, repo: 104, author: 124, date: 88, hash: 66, hidden: { repo: false, author: false, date: false, hash: false } };
+const DEFAULT_COLS: Cols = { graph: null, repo: 104, author: 124, date: null, hash: 66, hidden: { repo: false, author: false, date: false, hash: false } };
 const LIMITS: Record<"graph" | "repo" | "author" | "date" | "hash", [number, number]> = {
-  graph: [30, 220], repo: [64, 260], author: [70, 260], date: [48, 160], hash: [56, 120],
+  graph: [30, 220], repo: [64, 260], author: [70, 260], date: [48, 240], hash: [56, 120],
 };
+/** The fixed width the date column had before it became automatic: a saved value equal to it was never chosen by the user. */
+const OLD_DATE_WIDTH = 88;
+/** Left and right padding of a cell. */
+const CELL_PAD = 16;
+/** Share of its width the automatic graph gives up (its right lanes are cut) before a column is dropped. */
+const GRAPH_GIVE = 0.25;
 const clamp = (n: number, [lo, hi]: [number, number]) => Math.min(hi, Math.max(lo, n));
 /** Debounce of the reload that follows `repo-changed` events; plain file edits then skip the reload. */
 const REFRESH_DELAY_MS = 800;
@@ -71,28 +80,57 @@ export function LogView(): JSX.Element {
   // ---------------------------------------------------------------- columns state
 
   const saved = loadPersisted<Partial<Cols>>("log.cols", {});
-  const [cols, setCols] = createSignal<Cols>({ ...DEFAULT_COLS, ...saved, hidden: { ...DEFAULT_COLS.hidden, ...(saved.hidden ?? {}) } });
+  const [cols, setCols] = createSignal<Cols>({
+    ...DEFAULT_COLS,
+    ...saved,
+    date: typeof saved.date === "number" && saved.date !== OLD_DATE_WIDTH ? saved.date : null,
+    hidden: { ...DEFAULT_COLS.hidden, ...(saved.hidden ?? {}) },
+  });
   const persistCols = () => savePersisted("log.cols", cols());
   const [visibleLanes, setVisibleLanes] = createSignal(1);
   const [rootWidth, setRootWidth] = createSignal(0);
   const rulerWidth = () => cssPx("--dg-log-ruler-width", 14);
   const baseGraphWidth = () => (settings.showGraph ? cols().graph ?? autoGraphWidth(visibleLanes(), metrics()) : 0);
+  /** 0 before the log is in the page; bumped when a new measure of the text is due. */
+  const [measureRev, setMeasureRev] = createSignal(0);
+  /** Width that fits a date of the user's format at the current font size (measured: the format, the locale and the font decide it). */
+  const autoDateWidth = createMemo(() => {
+    appearanceRev();
+    const sample = dateWidthSample(settings.dateFormat);
+    if (measureRev() === 0 || !root) return clamp(Math.ceil(sample.length * 6.6) + CELL_PAD, LIMITS.date);
+    const probe = document.createElement("span");
+    probe.className = "dg-log-date";
+    probe.style.cssText = "position:absolute;visibility:hidden;white-space:nowrap;";
+    probe.textContent = sample;
+    root.appendChild(probe);
+    const w = probe.getBoundingClientRect().width;
+    probe.remove();
+    return clamp(Math.ceil(w) + CELL_PAD + 2, LIMITS.date);
+  });
+  /** Width of a column as chosen by the user, or its automatic width. */
+  const widthOf = (c: "repo" | "author" | "date" | "hash"): number => (c === "date" ? cols().date ?? autoDateWidth() : cols()[c]);
 
-  /** Columns that are off: chosen by the user, or dropped (hash, author, date, repository) to keep the subject at 200 px. */
+  /**
+   * Columns that are off: chosen by the user, or dropped (hash, author, date, repository) to keep the subject at 200 px.
+   * An automatic graph first gives up a quarter of its width, so a wider date format ("2026-11-10 14:32") does not
+   * drop the date column for a few pixels.
+   */
   const hiddenCols = createMemo(() => {
     const user = cols().hidden;
     const off = { repo: user.repo || !multiRepo(), author: user.author, date: user.date, hash: user.hash };
     const w = rootWidth();
     if (w <= 0) return off;
     const budget = w - rulerWidth() - MIN_SUBJECT;
-    const used = () => baseGraphWidth() + (["repo", "author", "date", "hash"] as const).reduce((n, c) => n + (off[c] ? 0 : cols()[c]), 0);
+    const base = baseGraphWidth();
+    const graph = settings.showGraph && cols().graph === null ? Math.max(Math.min(base, LIMITS.graph[0]), Math.ceil(base * (1 - GRAPH_GIVE))) : base;
+    const used = () => graph + (["repo", "author", "date", "hash"] as const).reduce((n, c) => n + (off[c] ? 0 : widthOf(c)), 0);
     for (const c of ["hash", "author", "date", "repo"] as const) {
       if (used() <= budget) break;
       off[c] = true;
     }
     return off;
   });
-  const colWidth = (c: "repo" | "author" | "date" | "hash") => (hiddenCols()[c] ? 0 : cols()[c]);
+  const colWidth = (c: "repo" | "author" | "date" | "hash") => (hiddenCols()[c] ? 0 : widthOf(c));
   const graphWidth = () => {
     const base = baseGraphWidth();
     const w = rootWidth();
@@ -127,7 +165,10 @@ export function LogView(): JSX.Element {
 
   const map = createMemo(() => {
     const sc = ctl.scan();
-    return new DisplayMap(ctl.total(), wip() !== null, sc.groupStarts, sc.groupLabels);
+    // the group names follow the date format ("October 2026" or "2026-10")
+    const format = settings.dateFormat;
+    const labels = format === "relative" ? sc.groupLabels : sc.groupKeys.map((k) => dateGroupLabel(k, format));
+    return new DisplayMap(ctl.total(), wip() !== null, sc.groupStarts, labels);
   });
 
   // ---------------------------------------------------------------- scrolling
@@ -369,6 +410,9 @@ export function LogView(): JSX.Element {
   onMount(() => {
     if (!root) return;
     setRootWidth(root.clientWidth);
+    setMeasureRev(1);
+    // measured again when the web fonts are in (the first measure may see the fallback font)
+    void document.fonts?.ready.then(() => setMeasureRev((n) => n + 1));
     const ro = new ResizeObserver(() => root && setRootWidth(root.clientWidth));
     ro.observe(root);
     onCleanup(() => ro.disconnect());

@@ -1,24 +1,4 @@
-/** Small pure helpers of the commit details panel: date wording and push state. */
-
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const two = (n: number) => String(n).padStart(2, "0");
-
-const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-
-/**
- * "today at 10:42, Tue 10 Nov 2026", "yesterday at 18:03, Mon 9 Nov 2026" or "on Tue 3 Nov 2026 at 10:42"
- * (local time), to follow "Authored" / "Committed".
- */
-export function whenText(unixSec: number, nowMs: number = Date.now()): string {
-  const d = new Date(unixSec * 1000);
-  const hm = `${two(d.getHours())}:${two(d.getMinutes())}`;
-  const date = `${DAYS[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
-  const days = Math.round((startOfDay(new Date(nowMs)) - startOfDay(d)) / 86400000);
-  if (days === 0) return `today at ${hm}, ${date}`;
-  if (days === 1) return `yesterday at ${hm}, ${date}`;
-  return `on ${date} at ${hm}`;
-}
+/** Small pure helpers of the commit details panel: who committed and the push state. Dates come from `state/dates.ts`. */
 
 export interface PersonLike {
   name: string;

@@ -7,10 +7,11 @@ import { For, type JSX, Show, createEffect, createMemo, createResource, createSi
 import * as api from "../../api/tauri";
 import type { RepoStateKind, WorkingTree } from "../../api/types";
 import {
-  Button, EmptyState, HeaderSlot, Icon, IconButton, SegmentedControl, Spinner, VirtualList, copyText, formatRelative, loadSplitSize, openContextMenu, plural,
+  Button, EmptyState, HeaderSlot, Icon, IconButton, SegmentedControl, Spinner, VirtualList, copyText, loadSplitSize, openContextMenu, plural,
   type MenuItem, type VirtualListApi,
 } from "../../components/ui";
 import * as actions from "../../state/actions";
+import { formatDate, fullDate } from "../../state/dates";
 import { confirmAction } from "../../state/dialogs";
 import { notifyRepoChanged, repoVersion } from "../../state/events";
 import { register } from "../../state/keymap";
@@ -551,7 +552,7 @@ export function ChangesView(): JSX.Element {
                   {(c) => (
                     <>
                       <br />
-                      Last commit {formatRelative(c().time)}{scope().length > 1 ? ` in ${c().repo}` : ""}.
+                      Last commit <span data-tip={fullDate(c().time)}>{formatDate(c().time)}</span>{scope().length > 1 ? ` in ${c().repo}` : ""}.
                     </>
                   )}
                 </Show>

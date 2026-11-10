@@ -32,47 +32,9 @@ export function initials(name: string): string {
   return (words[0][0] + words[words.length - 1][0]).toUpperCase();
 }
 
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const two = (n: number) => String(n).padStart(2, "0");
-
-/** "4 min ago", "3 h ago", "yesterday", "5 d ago", "3 mo ago", "2 y ago" for unix seconds. */
-export function formatRelative(unixSec: number, nowMs: number = Date.now()): string {
-  const s = Math.max(0, Math.floor(nowMs / 1000 - unixSec));
-  if (s < 45) return "now";
-  const min = Math.round(s / 60);
-  if (min < 60) return `${min} min ago`;
-  const h = Math.round(s / 3600);
-  if (h < 24) return `${h} h ago`;
-  const d = Math.round(s / 86400);
-  if (d === 1) return "yesterday";
-  if (d < 30) return `${d} d ago`;
-  const mo = Math.round(d / 30);
-  if (mo < 12) return `${mo} mo ago`;
-  return `${Math.round(d / 365)} y ago`;
-}
-
-/**
- * Log date column (DESIGN.md 5.5 "Date groups"): `HH:mm` today/yesterday, `Ddd HH:mm` within a week,
- * `D Mmm` this year, `D Mmm YYYY` older.
- */
-export function formatLogDate(unixSec: number, nowMs: number = Date.now()): string {
-  const d = new Date(unixSec * 1000);
-  const now = new Date(nowMs);
-  const startOfDay = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
-  const days = Math.round((startOfDay(now) - startOfDay(d)) / 86400000);
-  const hm = `${two(d.getHours())}:${two(d.getMinutes())}`;
-  if (days <= 1) return hm;
-  if (days < 7) return `${DAYS[d.getDay()]} ${hm}`;
-  if (d.getFullYear() === now.getFullYear()) return `${d.getDate()} ${MONTHS[d.getMonth()]}`;
-  return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
-}
-
-/** "Tue 10 Nov 2026 10:42" (local time). */
-export function formatDateTime(unixSec: number): string {
-  const d = new Date(unixSec * 1000);
-  return `${DAYS[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()} ${two(d.getHours())}:${two(d.getMinutes())}`;
-}
+// Dates: `formatDate` / `fullDate` of `state/dates.ts` write a date in the user's format. `formatRelative` is for ages
+// that are relative by nature (last fetch).
+export { formatRelative } from "../../state/dateFormat";
 
 /** Splits "src/refunds/controller.rs" into directory ("src/refunds/") and file name. */
 export function splitPath(path: string): { dir: string; name: string } {

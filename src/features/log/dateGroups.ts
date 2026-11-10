@@ -5,8 +5,7 @@
  * ("Today", "Yesterday", "October 2026"...) before the first commit of each group. `DisplayMap` converts
  * between the virtual list index and the commit index with a binary search, so it works for 100 000 rows.
  */
-
-const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+import { type DateFormat, formatDay, formatMonth } from "../../state/dateFormat";
 
 export interface DateGroup {
   /** Stable key: equal keys mean "same group". */
@@ -21,15 +20,37 @@ export function dateGroup(unixSec: number, nowMs: number = Date.now()): DateGrou
   const dayStart = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
   const today = dayStart(now);
   const day = dayStart(t);
-  if (day >= today) return { key: "today", label: "Today" };
-  if (day >= new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1).getTime()) return { key: "yesterday", label: "Yesterday" };
+  const named = (key: string): DateGroup => ({ key, label: dateGroupLabel(key, "relative", nowMs) });
+  if (day >= today) return named("today");
+  if (day >= new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1).getTime()) return named("yesterday");
   const sinceMonday = (now.getDay() + 6) % 7;
   const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - sinceMonday).getTime();
-  if (day >= weekStart) return { key: "week", label: "This week" };
+  if (day >= weekStart) return named("week");
   const lastWeekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - sinceMonday - 7).getTime();
-  if (day >= lastWeekStart) return { key: "lastweek", label: "Last week" };
-  if (t.getFullYear() === now.getFullYear() && t.getMonth() === now.getMonth()) return { key: "month", label: "Earlier this month" };
-  return { key: `${t.getFullYear()}-${t.getMonth()}`, label: `${MONTHS[t.getMonth()]} ${t.getFullYear()}` };
+  if (day >= lastWeekStart) return named("lastweek");
+  if (t.getFullYear() === now.getFullYear() && t.getMonth() === now.getMonth()) return named("month");
+  return named(`${t.getFullYear()}-${t.getMonth()}`);
+}
+
+/**
+ * Label of a group key in the user's date format (`settings.dateFormat`). The groups are the same in every format;
+ * the text follows it: a month is "October 2026" or "2026-10", and the absolute formats add the date to the two
+ * groups that are one day ("Today, 10 Nov 2026"). "This week", "Last week" and "Earlier this month" are ranges
+ * and stay words.
+ */
+export function dateGroupLabel(key: string, format: DateFormat, nowMs: number = Date.now(), locale?: string): string {
+  const now = new Date(nowMs);
+  const dayAt = (back: number) => new Date(now.getFullYear(), now.getMonth(), now.getDate() - back, 12).getTime() / 1000;
+  const withDay = (word: string, back: number) => (format === "relative" ? word : `${word}, ${formatDay(format, dayAt(back), locale)}`);
+  switch (key) {
+    case "today": return withDay("Today", 0);
+    case "yesterday": return withDay("Yesterday", 1);
+    case "week": return "This week";
+    case "lastweek": return "Last week";
+    case "month": return "Earlier this month";
+  }
+  const m = /^(\d+)-(\d+)$/.exec(key);
+  return m ? formatMonth(format, Number(m[1]), Number(m[2]), locale) : key;
 }
 
 export type DisplayItem =

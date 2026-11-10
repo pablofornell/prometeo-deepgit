@@ -4,7 +4,8 @@
  * components fill the islands; the shell owns sizes, visibility and the splitters.
  */
 import { type JSX, Show, createEffect, createMemo, createSignal, on, onCleanup, onMount } from "solid-js";
-import { HeaderSlotTarget, Icon, IconButton, Splitter, loadSplitSize, openMenu, plural, markNotificationsRead, notifications, unreadCount, formatRelative, type IconName } from "../../components/ui";
+import { HeaderSlotTarget, Icon, IconButton, Splitter, loadSplitSize, openMenu, plural, markNotificationsRead, notifications, unreadCount, type IconName } from "../../components/ui";
+import { formatDate } from "../../state/dates";
 import { tip } from "../../components/ui";
 import { ChangesView } from "../changes/ChangesView";
 import { CommitDetails } from "../details/CommitDetails";
@@ -131,7 +132,7 @@ export function Shell(): JSX.Element {
 
   const notificationsMenu = (e: MouseEvent) => {
     const items = notifications().slice(0, 12).map((n) => ({
-      label: `${n.title} · ${formatRelative(n.time / 1000)}`,
+      label: `${n.title} · ${formatDate(n.time / 1000)}`,
       icon: (n.kind === "error" ? "error" : n.kind === "warning" ? "warning" : n.kind === "success" ? "check" : "info") as IconName,
     }));
     markNotificationsRead();

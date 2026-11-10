@@ -575,7 +575,7 @@ Column header: 26 px, 12 secondary, 1 px top and bottom border `--dg-island-head
 1. Insert a 24 px group row before the first commit of each group: "Today", "Yesterday", "This week", "Last week", "Earlier this month", then "October 2026", "September 2026".
 2. Group row: label 11/600 `--dg-log-date-header-fg`, then a 1 px line `--dg-separator` that fills the row. The graph continues through the group row.
 3. The current group label sticks to the top of the log viewport.
-4. Date column format: inside "Today" and "Yesterday", show `HH:mm`. Inside "This week", show `Ddd HH:mm`. Older, show `D Mmm`. Older than this year, show `D Mmm YYYY`. Tooltip always shows the full date with time zone.
+4. Date column format: the user's **Date format** setting (Settings > Appearance), the same for every date of the UI (`state/dates.ts`): Relative "3 h ago", Absolute "10 Nov 2026, 14:32" (locale order and words), ISO "2026-11-10 14:32". The column is as wide as a date of that format (measured; a width set by the user wins). Group labels follow it too: Absolute and ISO add the day to "Today" / "Yesterday" ("Today, 10 Nov 2026"), and a month group is "October 2026" or "2026-10". Tooltip always shows the full date with time zone.
 5. Use the commit date for ordering and the author date for display. The tooltip shows both if they differ.
 
 #### Uncommitted changes row

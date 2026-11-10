@@ -8,16 +8,17 @@ import * as api from "../../api/tauri";
 import type { CommitDetails as CommitDetailsData, FileChange, RefLabel } from "../../api/types";
 import {
   Avatar, Button, EmptyState, HeaderSlot, Icon, IconButton, RefPill, RepoChip, SegmentedControl, StatusLetter, Tree, copyText, createExpanded, fileIconFor,
-  formatRelative, openContextMenu, openMenu, plural, shortOid, splitPath, statusColorVar, toast, type MenuItem, type TreeRowInfo,
+  openContextMenu, openMenu, plural, shortOid, splitPath, statusColorVar, toast, type MenuItem, type TreeRowInfo,
 } from "../../components/ui";
 import * as actions from "../../state/actions";
+import { formatDate, fullDate, otherDate } from "../../state/dates";
 import { repoVersion } from "../../state/events";
 import { loadPersisted, savePersisted } from "../../state/persist";
 import { refsVersion, repoRefs } from "../../state/refs";
 import { followFile } from "../../state/fileFollow";
 import { mainTab, selectFile, selectedCommit, selectedFile, setDetailsTab, setSelectedCommit } from "../../state/selection";
 import { repoById, summary } from "../../state/workspace";
-import { committerDiffers, pushState, whenText, type PushState } from "./commitText";
+import { committerDiffers, pushState, type PushState } from "./commitText";
 import { buildFileTree, dirIds, fileId, flatFiles, totals, type DirNode, type FileNode, type TreeNode } from "./fileTree";
 import { canOpenLinks, openLink } from "./links";
 import { inline, parseBody, type Block, type Inline } from "./messageText";
@@ -518,14 +519,14 @@ export function CommitDetails(): JSX.Element {
                         <div>
                           <b>{d().author.name}</b> <span class="dg-details-muted">{d().author.email}</span>
                         </div>
-                        <div class="dg-details-muted" title={`Author time zone ${d().author.tz}`}>
-                          Authored {whenText(d().author.time)} <span class="dg-details-faint">· {formatRelative(d().author.time)}</span>
+                        <div class="dg-details-muted" data-tip={`${fullDate(d().author.time)}\nAuthor time zone ${d().author.tz}`}>
+                          Authored {formatDate(d().author.time)} <span class="dg-details-faint">· {otherDate(d().author.time)}</span>
                         </div>
                         <Show when={committerDiffers(d().author, d().committer)}>
-                          <div class="dg-details-muted">
+                          <div class="dg-details-muted" data-tip={`${fullDate(d().committer.time)}\nCommitter time zone ${d().committer.tz}`}>
                             Committed
                             <Show when={d().committer.name !== d().author.name || d().committer.email.toLowerCase() !== d().author.email.toLowerCase()}> by {d().committer.name}</Show>{" "}
-                            {whenText(d().committer.time)}
+                            {formatDate(d().committer.time)}
                           </div>
                         </Show>
                       </div>

@@ -1,12 +1,13 @@
 /** Title bar (DESIGN.md 5.1): logo, project switcher, branch widget, fetch / pull / push, Search Everywhere, tools, window controls. */
 import { type JSX, Show, createMemo } from "solid-js";
 import {
-  Icon, Kbd, Spinner, WindowControls, dragRegion, markNotificationsRead, notifications, openMenu, plural, unreadCount, formatRelative,
+  Icon, Kbd, Spinner, WindowControls, dragRegion, markNotificationsRead, notifications, openMenu, plural, unreadCount,
   type IconName, type MenuItem,
 } from "../../components/ui";
 import * as actions from "../../state/actions";
 import { activities } from "../../state/activity";
 import { autoFetchLine } from "../../state/autoFetch";
+import { formatDate } from "../../state/dates";
 import { fetchAge } from "../../state/fetchAge";
 import { bottomTool, toggleBottomTool } from "../../state/layout";
 import { runBinding, shortcutLabel } from "../../state/keymap";
@@ -86,7 +87,7 @@ export function TitleBar(): JSX.Element {
     const items: MenuItem[] = notifications()
       .slice(0, 12)
       .map((n) => ({
-        label: `${n.title} · ${formatRelative(n.time / 1000)}`,
+        label: `${n.title} · ${formatDate(n.time / 1000)}`,
         icon: (n.kind === "error" ? "error" : n.kind === "warning" ? "warning" : n.kind === "success" ? "check" : "info") as IconName,
       }));
     markNotificationsRead();

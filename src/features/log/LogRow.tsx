@@ -4,7 +4,8 @@
  */
 import { For, type JSX, Show, createMemo } from "solid-js";
 import type { CommitRow, GraphRow, RepoInfo } from "../../api/types";
-import { Avatar, RefPills, RepoChip, formatDateTime, formatLogDate, plural, shortOid } from "../../components/ui";
+import { Avatar, RefPills, RepoChip, plural, shortOid } from "../../components/ui";
+import { formatDate, fullDate } from "../../state/dates";
 import { type GraphMetrics, type NodeKind, passThroughShape, rowGraphShape } from "./graph";
 import type { DisplayMap } from "./dateGroups";
 import { splitMatches } from "./query";
@@ -85,7 +86,7 @@ function GraphSvg(props: { ctx: RowCtx; graph: GraphRow; kind: NodeKind; dashedT
 
 function accessibleName(r: CommitRow, repo: string): string {
   const refs = r.refs.map((x) => x.name).join(", ");
-  return `${r.subject}, ${repo}, ${r.authorName}, ${formatLogDate(r.authorTime)}${refs ? ", " + refs : ""}`;
+  return `${r.subject}, ${repo}, ${r.authorName}, ${formatDate(r.authorTime)}${refs ? ", " + refs : ""}`;
 }
 
 function CommitRowBody(props: { ctx: RowCtx; ci: number; row: CommitRow }): JSX.Element {
@@ -100,8 +101,8 @@ function CommitRowBody(props: { ctx: RowCtx; ci: number; row: CommitRow }): JSX.
     return { x: (wip.lane + 1) * ctx.metrics().lane };
   };
   const dateTip = () => {
-    const a = formatDateTime(r.authorTime);
-    return r.committerTime !== r.authorTime ? `Authored ${a}\nCommitted ${formatDateTime(r.committerTime)}` : a;
+    const a = fullDate(r.authorTime);
+    return r.committerTime !== r.authorTime ? `Authored ${a}\nCommitted ${fullDate(r.committerTime)}` : a;
   };
   const pillSpace = () => pillBudget(ctx.subjectWidth(), ctx.minSubject());
   const pillMax = () => visiblePills(pillWidths(r.refs), pillSpace());
@@ -142,7 +143,7 @@ function CommitRowBody(props: { ctx: RowCtx; ci: number; row: CommitRow }): JSX.
         <Avatar name={r.authorName} email={r.authorEmail} />
         <span class="dg-log-aname">{r.authorName}</span>
       </span>
-      <span class="dg-log-date" role="gridcell" data-tip={dateTip()}>{formatLogDate(r.authorTime)}</span>
+      <span class="dg-log-date" role="gridcell" data-tip={dateTip()}>{formatDate(r.authorTime)}</span>
       <span class="dg-log-hash" role="gridcell">{shortOid(r.oid)}</span>
       <span />
     </div>

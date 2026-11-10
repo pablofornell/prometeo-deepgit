@@ -1,10 +1,11 @@
 /** Sidebar island (DESIGN.md 5.3): project header and card, sync strip, repository tree with branches, tags, stashes and submodules. */
 import { type JSX, Show, createEffect, createMemo, createSignal, on } from "solid-js";
 import {
-  AheadBehind, EmptyState, Icon, IconButton, RepoIcon, Tree, createExpanded, formatRelative, initials, openContextMenu, openMenu, plural,
+  AheadBehind, EmptyState, Icon, IconButton, RepoIcon, Tree, createExpanded, initials, openContextMenu, openMenu, plural,
   type IconName, type MenuItem,
 } from "../../components/ui";
 import * as actions from "../../state/actions";
+import { formatDate, fullDate } from "../../state/dates";
 import { setSidebarVisible } from "../../state/layout";
 import { repoRefs } from "../../state/refs";
 import {
@@ -280,7 +281,7 @@ export function Sidebar(): JSX.Element {
           <>
             <Icon name="stash" class="dg-sidebar-icon" />
             <span class="dg-sidebar-bname"><Hl text={n.label} query={q()} /></span>
-            <span class="dg-sidebar-count">{formatRelative(n.stash.time)}</span>
+            <span class="dg-sidebar-count" data-tip={fullDate(n.stash.time)}>{formatDate(n.stash.time)}</span>
           </>
         );
       case "submodule":
