@@ -67,7 +67,7 @@ The backend is written in Rust and runs the `git` command-line program. The inte
 
 - Every destructive write asks first: discard, hard reset, branch and tag delete, stash drop, abort of a merge or rebase.
 - Other writes can be undone with Git, for example with the reflog.
-- DeepGit never asks for a password. Use an SSH agent or a Git credential helper.
+- When `git` or `ssh` needs a password, a token, a key passphrase or a host-key decision, DeepGit shows a dialog. It can save the secret in the system key store (Secret Service, Keychain or Credential Manager). An SSH agent or a Git credential helper still works and is tried first.
 - DeepGit makes no network calls of its own. Only `git` talks to the network, when you fetch, pull or push.
 
 ## Requirements

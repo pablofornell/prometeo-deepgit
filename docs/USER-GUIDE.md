@@ -533,6 +533,33 @@ DeepGit always runs a rebase with `--autostash`. There is no option for it: loca
 - A branch whose upstream has another name (for example `myfix` tracking `origin/main`) is never pushed to that upstream. DeepGit pushes it to `origin/myfix` with `-u`, so it tracks that branch from then on. The dialog explains this and the notification says, for example, "Pushed myfix to new origin/myfix (it tracked origin/main)".
 - Remote names may contain a slash, for example `team/fork`. DeepGit finds the remote by its configured name, not by the first slash.
 - At most four repositories run at the same time. A progress widget in the status bar shows the count.
+- When a remote needs a login, DeepGit asks. See [Sign in to a remote](#sign-in-to-a-remote).
+
+### Sign in to a remote
+
+When `git` or `ssh` needs a secret during a fetch, pull, push or clone that you started, DeepGit opens a dialog.
+Git first tries your SSH agent and your Git credential helper. The dialog appears only when they cannot answer.
+
+| Dialog | What it asks | Remember |
+|---|---|---|
+| **Log in to github.com** | HTTPS user name and password or token, in one dialog | The password is saved with the user name |
+| **Log in to github.com** (user name in the URL) | The password or token only. The user name is shown | Yes |
+| **Unlock SSH key ~/.ssh/id_ed25519** | The passphrase of the key | Yes, for this key file |
+| **Log in to host** (SSH password) | The password of `user@host` | Yes |
+| **Unknown host** | The fingerprint of an SSH host that is not in `known_hosts`. **Accept** adds it. **Reject** stops the command | No |
+
+- The field is masked. Click the eye to show the text.
+- Many hosts need a personal access token instead of a password. Paste the token in the password field.
+- **Remember** is on by default. DeepGit saves the secret in the system key store: Secret Service on Linux (GNOME Keyring, KWallet), Keychain on macOS, Credential Manager on Windows. It saves only after the command succeeded.
+- Next time DeepGit uses the saved login without a dialog. When the remote rejects it, DeepGit deletes the saved login and asks again.
+- Without a key store (for example a server without Secret Service) the checkbox is hidden, DeepGit shows one notice, and you type the secret each time.
+- Several repositories can ask at the same time (a fetch of all repositories). DeepGit shows the dialogs one by one.
+- The 120 second timeout does not run while a dialog is open. If you do not answer for 5 minutes, DeepGit cancels the command.
+- **Cancel** stops the command with the message "No credentials were given."
+- Background fetches never open a dialog. They use only saved HTTPS logins and SSH agent keys.
+- DeepGit never writes the secret in the Git console. It goes straight from the dialog to `git`.
+- The setting `useCredentialStore` (default on) turns reading and saving off. The Settings page does not show this switch yet.
+- DeepGit can forget every login that it saved. The Settings page does not have this button yet.
 
 ---
 
@@ -851,26 +878,27 @@ The diff shortcuts act on the diff viewer that you used last.
 
 ### Authentication fails
 
-DeepGit never asks for a password or a passphrase.
-It starts `git` with prompts turned off.
-It also starts `ssh` in batch mode, unless you set `GIT_SSH_COMMAND`, `GIT_SSH` or `core.sshCommand` yourself.
+DeepGit asks for the login when `git` or `ssh` needs it (see [Sign in to a remote](#sign-in-to-a-remote)).
+You can see one of these messages:
 
-When a fetch, pull or push needs a login, you see one of these messages:
+- "Authentication failed. Check your user name and password or token, then try again." The remote refused the login. DeepGit deleted the saved login. Run the command again and type the right one.
+- "No credentials were given. Run the command again and enter them, or set up a credential helper or an SSH agent." You cancelled the dialog, or a background fetch had no saved login.
+- "SSH authentication failed (permission denied). Check the passphrase of your key, or load the key in an SSH agent." The server does not accept your key. Check that the public key is on the server.
 
-- "Authentication failed. DeepGit cannot ask for passwords; use an SSH agent or a credential helper."
-- "SSH authentication failed (permission denied). Load your key in an SSH agent."
-
-To fix this:
+To check outside DeepGit:
 
 1. Open a terminal.
-2. For an SSH remote, start an SSH agent and load your key with `ssh-add`. Start DeepGit from a session that has the `SSH_AUTH_SOCK` variable.
-3. For an HTTPS remote, set a credential helper, for example `git config --global credential.helper store` or the helper of your system.
-4. Run `git fetch` in the repository in the terminal. When it works there, it works in DeepGit.
+2. Run `git fetch` in the repository. When it works there, it works in DeepGit.
+3. For an HTTPS remote that rejects your password, create a personal access token on the host and use it as the password.
+4. For an SSH remote, `ssh -T git@host` shows whether the key works.
+
+DeepGit starts `ssh` with its own `SSH_ASKPASS` program, so it does not read from a terminal. If you set `GIT_SSH_COMMAND`, `GIT_SSH` or `core.sshCommand`, DeepGit keeps your command.
 
 ### A network command times out
 
-DeepGit stops `fetch`, `pull` and `push` after 300 seconds.
-The error reads "git fetch timed out after 300 s".
+DeepGit stops `fetch`, `pull` and `push` after 120 seconds without output, or after 60 minutes in total.
+The error reads "git fetch timed out after 120 s".
+A login dialog that is open does not count as silence.
 DeepGit also stops the programs that `git` started, such as `ssh`.
 Check your network, your VPN and the remote address. Then try again.
 

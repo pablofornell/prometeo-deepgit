@@ -47,10 +47,12 @@ export function notifyRepoChanged(repoId: string): void {
 
 let started = false;
 
-/** Subscribes to `git-console` and `repo-changed` once. Safe to call repeatedly. */
+/** Subscribes to `git-console`, `repo-changed` and the credential prompts (`state/auth.ts`) once. Safe to call repeatedly. */
 export function startEvents(): void {
   if (started) return;
   started = true;
   void onGitConsole(pushConsoleEntry);
   void onRepoChanged((e) => notifyRepoChanged(e.repoId));
+  // loaded on demand: the dialog code pulls in the UI components, which tests of the state modules cannot import
+  void import("./auth").then((m) => m.startAuth());
 }

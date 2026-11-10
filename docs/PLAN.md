@@ -15,7 +15,7 @@ All JSON is **camelCase** (`#[serde(rename_all = "camelCase")]`). Enums with dat
 ## 2. Repository layout
 
 ```
-Cargo.toml                 workspace: members = ["src-tauri", "crates/gitcore"]
+Cargo.toml                 workspace: members = ["src-tauri", "crates/gitcore", "crates/askpass"]
 crates/gitcore/            pure Rust library, no Tauri dependency
   src/lib.rs               re-exports
   src/error.rs             GitError
@@ -29,12 +29,23 @@ crates/gitcore/            pure Rust library, no Tauri dependency
   src/diff.rs              unified diff parser, commit file list
   src/ops.rs               write operations
   src/state.rs             in-progress operation detection
+  src/auth.rs              AuthMode, AuthBroker trait, apply_auth_env (section 5.6)
+crates/askpass/            helper mode of the app binary, local IPC, credential broker (no Tauri dependency)
+  src/helper.rs            what the binary does when git or ssh runs it as askpass
+  src/protocol.rs          length-prefixed JSON frames; env names
+  src/endpoint.rs          unix socket / loopback TCP endpoint
+  src/server.rs            tokio listener (private directory, mode 0700 / 0600)
+  src/prompt.rs            classifies the prompts of git and ssh
+  src/broker.rs            tokens, answers, save after success, forget after failure
+  src/store.rs             key store trait, index of saved keys, in-memory backend
+  src/bin/askpass-helper.rs  the helper as its own program (integration tests)
 src-tauri/                 Tauri app
   src/main.rs, src/lib.rs  setup, plugins, command registration
   src/commands.rs          #[tauri::command] wrappers (section 5)
   src/workspace.rs         projects persistence (JSON in app config dir)
   src/logsession.rs        cached log sessions (section 5.2)
   src/watcher.rs           file watcher -> "repo-changed" events
+  src/auth.rs              auth-prompt events, auth_reply, keyring backend (section 5.6)
 src/                       SolidJS UI
   api/types.ts             TS mirror of section 4
   api/tauri.ts             typed invoke wrappers + browser mock fallback
@@ -53,6 +64,7 @@ src/                       SolidJS UI
 
 - Every call: `git -C <repo> -c core.quotepath=false -c color.ui=never -c log.showSignature=false --no-pager <args>`.
 - Env: `GIT_TERMINAL_PROMPT=0`, `LC_ALL=C`, `GIT_OPTIONAL_LOCKS=0` for read commands, `GIT_EDITOR=true` (no editor for merge/rebase --continue).
+- Network commands (`fetch`, `pull`, `push` and `clone`) run in a new session (no controlling terminal) and get their authentication environment from one function, `gitcore::auth::apply_auth_env` (section 5.6).
 - Never use a shell. Pass args as a Vec.
 - Each call reports a `ConsoleEntry` to an optional sink (`Arc<dyn Fn(ConsoleEntry) + Send + Sync>`). stdout/stderr in the entry are truncated to 8 KiB.
 - Non-zero exit → `GitError::Command { args, code, stderr }`.
@@ -246,7 +258,7 @@ The browser mock (`src/api/mock.ts`, `mockColors.ts`) applies the same rules and
 | `revert` | `repoId, oid` | `OpResult` |
 | `reset` | `repoId, target, mode: ResetMode` | `OpResult` |
 | `op_continue` / `op_abort` / `op_skip` | `repoId` | `OpResult` (acts on the detected RepoStateKind) |
-| `fetch` | `repoId, remote: Option<String> /* None = --all */, prune: bool` | `OpResult` |
+| `fetch` | `repoId, remote: Option<String> /* None = --all */, prune: bool, background: Option<bool> /* auto-fetch: Silent auth, no dialog */` | `OpResult` |
 | `pull` | `repoId, rebase: bool` | `OpResult` |
 | `push` | `repoId, remote: Option<String>, branch: Option<String> /* pushed as `refs/heads/<b>:refs/heads/<b>`; a leading `+` or any `:`, `^`, `~` is rejected */, force: bool /* --force-with-lease */, setUpstream: bool, tags: bool` | `OpResult` |
 | `stash_save` | `repoId, message: Option<String>, includeUntracked: bool, keepIndex: bool` | `OpResult` |
@@ -277,7 +289,90 @@ any output on stdout or stderr, or after 60 min in total; the error is `Timeout`
 `pull` leaves `.git/index.lock`, the message says "A git lock file may remain: .git/index.lock"
 (the file is not removed).
 
-### 5.6 Clone
+### 5.5 Events (backend → frontend)
+- `git-console` : `ConsoleEntry` (every git call).
+- `clone-progress` : `{ operationId, phase, percent: number | null }` while `clone_repo` runs.
+- `repo-changed` : `RepoChanged` (watcher, debounced 400 ms; also after each write command).
+  The watcher watches the worktree recursively and ignores paths inside `.git` except
+  `HEAD`, `index`, `refs/**`, `packed-refs`, `MERGE_HEAD`, `rebase-merge`, `rebase-apply`, `CHERRY_PICK_HEAD`.
+- `auth-prompt`, `auth-prompt-close`, `auth-notice`: see 5.6.
+
+### 5.6 Authentication (password, token, passphrase, host key)
+
+git and ssh can ask the user. They run the app's own executable as their askpass program; the app shows the
+question as a dialog and prints the answer back. Port of IntelliJ's `GitHandlerAuthenticationManager`.
+
+**Modes** (`gitcore::AuthMode`, chosen per `Git` handle with `with_auth_mode`, default `Interactive`):
+
+| mode | for | git | ssh |
+|---|---|---|---|
+| `None` | no broker, tests | `GIT_TERMINAL_PROMPT=0` | `SSH_ASKPASS_REQUIRE=never`, `GIT_SSH_COMMAND="ssh -o BatchMode=yes"` unless the user set `GIT_SSH_COMMAND`, `GIT_SSH` or `core.sshCommand` |
+| `Silent` | background commands (auto-fetch): `git.clone().with_auth_mode(AuthMode::Silent)` | + `GIT_ASKPASS=<this exe>`; the helper answers from saved credentials only and fails fast | like `None` (BatchMode blocks passphrase questions) |
+| `Interactive` | commands the user started | + `GIT_ASKPASS=<this exe>` | `SSH_ASKPASS=<this exe>`, `SSH_ASKPASS_REQUIRE=force`, `DISPLAY=:0.0` when unset (Unix), no `BatchMode`; a user `core.sshCommand` / `GIT_SSH_COMMAND` stays |
+
+All modes with a broker also set `DEEPGIT_ASKPASS=1`, `DEEPGIT_ASKPASS_ENDPOINT`, `DEEPGIT_ASKPASS_TOKEN`.
+User credential helpers (`credential.helper`) still run first; the helper is only called for what they cannot answer.
+`Git::run*` and `Git::run_streaming` (so `clone`) do this themselves for every network command: `begin_auth(repo_id, "git <sub>")`
+before the spawn, `apply_auth` on the command, `ticket.finish(&AuthOutcome { success, stderr })` after it ends (also after a cancel or
+a timeout). Finishing the ticket revokes the token and withdraws an open prompt, so cancelling a clone closes its login dialog
+(`auth-prompt-close`) and the helper stops waiting. A command that bypasses the runner calls the three functions by hand.
+`clone_repo` runs in `Interactive` mode (a private HTTPS repository asks for a login). The `fetch` command has a `background: bool`
+argument: the auto-fetch sets it and the command runs with `AuthMode::Silent`; a fetch the user starts leaves it out.
+
+**Helper mode.** At the start of `main` (before Tauri), `askpass::run_from_env()` checks `DEEPGIT_ASKPASS=1` plus the endpoint and
+token variables. If they are set, the process is a helper: it reads the prompt from argv[1], sends one request, prints the
+answer and `\n` on stdout and exits 0. On cancel, timeout (6 min), unknown token or any error it prints nothing and exits 1.
+No window, GTK or Tauri code runs. `SSH_ASKPASS_PROMPT=none` (an ssh info message) exits 0 without a request.
+
+**IPC.** One request and one reply per connection. Frame = 4-byte big-endian length + JSON (max 64 KiB).
+```
+helper -> app   {"v":1,"token":"<64 hex>","prompt":"Username for 'https://github.com': ","hint":null|"confirm"|"none"}
+app -> helper   {"answer":"alice"}     or     {"answer":null}
+```
+Transport: Unix = domain socket `askpass.sock` (mode 0600) in a fresh directory `deepgit-askpass-<pid>-<random>` (mode 0700) under
+`$XDG_RUNTIME_DIR` (else the temp dir); a peer with another uid is dropped; directories of dead processes are swept at start.
+Windows = TCP on `127.0.0.1`, port chosen by the system (a named pipe would be better; untested). `DEEPGIT_ASKPASS_ENDPOINT` is
+`unix:<path>` or `tcp:127.0.0.1:<port>`.
+Each network command gets a fresh 32-byte random token (64 hex chars), passed only in the child's environment, never in argv. The
+server answers only a live token; the token dies when the command ends (also when it is killed). The frame never carries a
+secret except the answer.
+
+**Prompts** (`PromptKind`): `username`, `password`, `passphrase`, `pin`, `hostkey`, `unknown`. Parsed from git's
+`Username for 'https://host'` / `Password for 'https://user@host'`, ssh's `Enter passphrase for [key ]'<path>'`, `Bad passphrase, try again for <path>`,
+`<user>@<host>'s password`, `Enter PIN for '<label>'` and the host-key question (`continue connecting`, or `SSH_ASKPASS_PROMPT=confirm`).
+The answer to a host-key question is `yes`; Reject is a cancel.
+
+**Events and commands.**
+
+| name | direction | payload |
+|---|---|---|
+| `auth-prompt` | event | `{ id, kind, prompt, host?, user?, keyPath?, repoId?, command, withPassword, canRemember, retry }` |
+| `auth-prompt-close` | event | `{ id }`: the question is gone (5 min without answer, or the command ended) |
+| `auth-notice` | event | `{ kind: "storeUnavailable", message }`, once per run |
+| `auth_reply` | command | `id: u64, answer: Option<String>, remember: bool, secondary: Option<String>` -> `bool` (false: nobody waits for `id`). `answer: null` = Cancel / Reject. `secondary` = password of a `withPassword` dialog |
+| `set_auth_prefs` | command | `useCredentialStore: bool` (setting of the same name, default true) |
+| `credentials_clear` | command | -> `u32` entries removed (all credentials DeepGit saved) |
+
+`command` is `git <subcommand>` only (a URL can carry a secret). HTTPS: git asks the user name, then the password. The
+`username` prompt has `withPassword: true`: the dialog shows both fields; `answer` = user name, `secondary` = password. The password
+prompt that follows (same host and user) is answered from it without a second dialog. If `secondary` is missing, a second `password` prompt is shown.
+Prompts are shown one at a time (`state/authQueue.ts`).
+
+**Timeouts.** An unanswered prompt is cancelled after 5 min. While a prompt is open (counter `AuthContext.prompting`), the 120 s
+inactivity timeout does not count; the 60 min cap still does.
+
+**Saved credentials** (system key store through the `keyring` crate: Secret Service, Keychain, Credential Manager; service
+`DeepGit`). Keys: HTTPS password `https://user@host[/path]` (as git prints it), HTTPS user name `login:https://host`, ssh key passphrase = the key path as ssh
+prints it, ssh password `ssh://user@host`, PIN `pin:<label>`. A host-key answer and an `unknown` prompt are never saved.
+- Nothing is saved while the command runs. After exit 0 the credentials the user asked to remember are saved.
+- After a failure whose stderr says `Authentication failed`, `Permission denied`, `HTTP Basic: Access denied`, `Invalid username or password` or HTTP 401 / 403, the saved entries the command used are deleted.
+- A second question for the same key in one command means the answer was wrong: the saved entry is deleted and the dialog is shown with `retry: true`.
+- The key store does not work (no Secret Service...): `canRemember` is false, `auth-notice` is sent once, login still works.
+- `useCredentialStore` off: nothing is read, saved or offered.
+- The names of saved keys (no secrets) are listed in `<app config dir>/credentials.json`, so `credentials_clear` removes exactly those.
+- A secret is never logged, never put in an error, never in the `git-console` entry (the answer goes helper -> git on a pipe).
+
+### 5.7 Clone
 
 | command | args | returns |
 |---|---|---|
@@ -298,13 +393,6 @@ clone created it, else only the files in it (it was empty). On success `target` 
 before the clone starts) and `{ kind: "newProject" }` adds a project whose folder is the clone.
 `gitcore::clone::default_dir_name(url)` is the folder name git would pick (`https://h/o/r.git/` -> `r`,
 `git@h:o/r.git` -> `r`, `file:///x/r` -> `r`, `/x/r/.git` -> `r`).
-
-### 5.5 Events (backend → frontend)
-- `git-console` : `ConsoleEntry` (every git call).
-- `clone-progress` : `{ operationId, phase, percent: number | null }` while `clone_repo` runs.
-- `repo-changed` : `RepoChanged` (watcher, debounced 400 ms; also after each write command).
-  The watcher watches the worktree recursively and ignores paths inside `.git` except
-  `HEAD`, `index`, `refs/**`, `packed-refs`, `MERGE_HEAD`, `rebase-merge`, `rebase-apply`, `CHERRY_PICK_HEAD`.
 
 ## 6. Graph layout algorithm (gitcore/graph.rs)
 
@@ -351,7 +439,7 @@ Colour index is unbounded; the UI takes `color % paletteSize`.
 
 ## 9. Verification
 
-- `cargo test -p gitcore` (tests create temporary repos with `git init` in `tempfile` dirs).
+- `cargo test --workspace` (tests create temporary repos with `git init` in `tempfile` dirs). `crates/askpass/tests/e2e.rs` runs the real helper against the broker with real `git credential fill` and `ssh-add`; `src-tauri/tests/helper_mode.rs` runs the real app binary as a helper with no display.
 - `cargo clippy --workspace -- -D warnings`.
 - `npm run build` (tsc + vite).
 - Browser: `npm run dev` + Playwright screenshots of the main views on the mock backend.

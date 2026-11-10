@@ -4,13 +4,13 @@
 
 use std::sync::Arc;
 
-use gitcore::GitError;
 use gitcore::{
     clone as gitclone, diff, log, ops, refs as gitrefs, status, ApiError, CloneOpts, CloneProgress,
     CloneResult, CloneTarget, CommitDetails, CommitRow, DiffSpec, FileDiff, Git, HunkRef, LogQuery,
     LogSessionInfo, MergeOpts, OpResult, Project, Refs, RepoChanged, RepoInfo, RepoSummary,
     ResetMode, WorkingTree, Workspace,
 };
+use gitcore::{AuthMode, GitError};
 use tauri::{AppHandle, Emitter, State};
 
 use crate::state::{api_error, lock, AppState};
@@ -495,6 +495,8 @@ pub async fn op_skip(app: AppHandle, state: St<'_>, repo_id: String) -> Res<OpRe
 
 // ------------------------------------------------------------------ write: remotes
 
+/// `background` marks the auto-fetch: it never opens a login dialog (saved credentials only, it
+/// fails fast otherwise). A fetch the user starts leaves it out.
 #[tauri::command]
 pub async fn fetch(
     app: AppHandle,
@@ -502,9 +504,16 @@ pub async fn fetch(
     repo_id: String,
     remote: Option<String>,
     prune: bool,
+    background: Option<bool>,
 ) -> Res<OpResult> {
+    let background = background.unwrap_or(false);
     write(&app, &state, &repo_id, move |g, r| {
-        ops::fetch(g, r, remote.as_deref(), prune)
+        if background {
+            let silent = g.clone().with_auth_mode(AuthMode::Silent);
+            ops::fetch(&silent, r, remote.as_deref(), prune)
+        } else {
+            ops::fetch(g, r, remote.as_deref(), prune)
+        }
     })
     .await
 }

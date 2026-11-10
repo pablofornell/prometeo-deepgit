@@ -1,4 +1,4 @@
-//! `git clone` (PLAN.md section 5.6): the rules for the URL and the target folder, the folder name
+//! `git clone` (PLAN.md section 5.7): the rules for the URL and the target folder, the folder name
 //! git would pick, the parsing of git's progress output and the run itself.
 //!
 //! `plan_clone` validates and touches nothing; `run_clone` clones and, when the clone fails or is

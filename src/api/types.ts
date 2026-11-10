@@ -376,6 +376,40 @@ export interface CloneResult {
   createdProject: boolean;
 }
 
+// ---------------------------------------------------------------- authentication (PLAN.md section 5.6)
+
+/** What git or ssh is asking for. */
+export type AuthPromptKind = "username" | "password" | "passphrase" | "pin" | "hostkey" | "unknown";
+
+/** Payload of the `auth-prompt` event: one question of a running git command. */
+export interface AuthPrompt {
+  /** Pass it back to `authReply`. */
+  id: number;
+  kind: AuthPromptKind;
+  /** The text git or ssh sent; for a host key it holds the fingerprint. */
+  prompt: string;
+  /** `https://github.com` (HTTPS), `alice@host` (ssh password) or the host of a host-key question. */
+  host?: string;
+  user?: string;
+  /** Path of the ssh key a passphrase is for. */
+  keyPath?: string;
+  repoId?: string;
+  /** The command that asks, e.g. `git push` (never holds arguments). */
+  command: string;
+  /** A `username` dialog that also asks the password: git asks it right after. Send it as `secondary`. */
+  withPassword: boolean;
+  /** Show the "Remember" checkbox (the key store works and the setting is on). */
+  canRemember: boolean;
+  /** The previous answer to this same question was rejected. */
+  retry: boolean;
+}
+
+/** Payload of `auth-notice`, sent once per run. */
+export interface AuthNotice {
+  kind: "storeUnavailable";
+  message: string;
+}
+
 /** Shape of every rejection of an API call (see `ApiError` in `./tauri`). */
 export interface ApiErrorShape {
   message: string;

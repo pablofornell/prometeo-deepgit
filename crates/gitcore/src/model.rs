@@ -498,7 +498,7 @@ pub struct MergeOpts {
     pub allow_unrelated_histories: bool,
 }
 
-/// Options of `clone` (PLAN.md section 5.6).
+/// Options of `clone` (PLAN.md section 5.7).
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default)]
 #[serde(rename_all = "camelCase", default)]
 pub struct CloneOpts {

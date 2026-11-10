@@ -1,5 +1,5 @@
 [workspace]
-members = ["src-tauri", "crates/gitcore"]
+members = ["src-tauri", "crates/gitcore", "crates/askpass"]
 resolver = "2"
 
 [workspace.package]

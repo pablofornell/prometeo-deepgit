@@ -542,6 +542,8 @@ export interface FetchOptions {
   quiet?: boolean;
   /** Background auto-fetch: no activity and no toast of any kind; read the returned `BatchResult` (`state/autoFetch.ts`). */
   silent?: boolean;
+  /** Run as a background command: never opens a login dialog (saved credentials only). Set with `silent` by the auto-fetch. */
+  background?: boolean;
 }
 
 /** Fetches the given repos (all remotes unless `opts.remote`). */
@@ -554,7 +556,7 @@ export function fetch(repoIds: RepoIds, opts: FetchOptions = {}): Promise<BatchR
     quiet: opts.quiet,
     silent: opts.silent,
     progress: `Fetching ${plural(ids.length, "repository", "repositories")}`,
-    run: (id) => api.fetch(id, opts.remote ?? null, opts.prune ?? false),
+    run: (id) => api.fetch(id, opts.remote ?? null, opts.prune ?? false, opts.background ?? false),
     body: (r) => (r.ok.length > 1 ? `${plural(r.ok.length, "repository", "repositories")} up to date.${r.failed.length ? ` ${r.failed.length} failed.` : ""}` : undefined),
   });
 }

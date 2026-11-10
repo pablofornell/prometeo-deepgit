@@ -1,3 +1,4 @@
+mod auth;
 mod commands;
 mod logsession;
 mod state;
@@ -47,8 +48,17 @@ pub fn run() {
         .setup(|app| {
             let config_dir = app.path().app_config_dir()?;
 
+            // Credential prompts for fetch, pull and push (see auth.rs). Without the local IPC the
+            // commands still run, they just cannot ask.
+            let auth = auth::init(app.handle(), config_dir.clone());
+            let mut git = Git::new(None);
+            if let Some(broker) = &auth.broker {
+                git = git.with_auth(broker.clone());
+            }
+            app.manage(auth);
+
             let console = app.handle().clone();
-            let git = Git::new(None).with_sink(Arc::new(move |entry| {
+            let git = git.with_sink(Arc::new(move |entry| {
                 let _ = console.emit("git-console", entry);
             }));
 
@@ -123,7 +133,18 @@ pub fn run() {
             commands::tag_delete,
             commands::clone_repo,
             commands::clone_cancel,
+            auth::auth_reply,
+            auth::set_auth_prefs,
+            auth::credentials_clear,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running DeepGit");
+        .build(tauri::generate_context!())
+        .expect("error while building DeepGit")
+        .run(|app, event| {
+            // Managed state is not dropped at exit: remove the askpass socket by hand.
+            if let tauri::RunEvent::Exit = event {
+                if let Some(broker) = app.state::<auth::AuthState>().broker.as_ref() {
+                    broker.shutdown();
+                }
+            }
+        });
 }

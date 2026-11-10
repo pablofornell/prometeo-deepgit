@@ -72,14 +72,16 @@ fn friendly_message(sub: &str, text: &str) -> Option<&'static str> {
         Some("Push rejected: the remote has new commits. Pull first.")
     } else if push && has("[remote rejected]") {
         Some("The remote rejected the push. See the details for its reason.")
-    } else if has("authentication failed")
-        || has("could not read username")
+    } else if has("authentication failed") {
+        Some("Authentication failed. Check your user name and password or token, then try again.")
+    } else if has("could not read username")
         || has("could not read password")
         || has("terminal prompts disabled")
     {
-        Some("Authentication failed. DeepGit cannot ask for passwords; use an SSH agent or a credential helper.")
+        // The dialog was cancelled, or the command ran in the background (auto-fetch).
+        Some("No credentials were given. Run the command again and enter them, or set up a credential helper or an SSH agent.")
     } else if has("permission denied (publickey") {
-        Some("SSH authentication failed (permission denied). Load your key in an SSH agent.")
+        Some("SSH authentication failed (permission denied). Check the passphrase of your key, or load the key in an SSH agent.")
     } else if has("not possible to fast-forward") {
         Some("Cannot fast-forward: the branches have diverged. Choose another merge mode.")
     } else if has("refusing to merge unrelated histories") {

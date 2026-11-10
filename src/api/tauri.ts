@@ -13,7 +13,7 @@
  * toasts, conflict handling and multi-repo fan-out.
  */
 import type {
-  ApiErrorShape, CloneOpts, CloneProgress, CloneResult, CloneTarget, CommitDetails, ConsoleEntry, DiffSpec, FileDiff, LogQuery,
+  ApiErrorShape, AuthNotice, AuthPrompt, CloneOpts, CloneProgress, CloneResult, CloneTarget, CommitDetails, ConsoleEntry, DiffSpec, FileDiff, LogQuery,
   LogSessionInfo, MergeOpts, OpResult, Project, CommitRow, HunkOpts, RepoChanged, RepoInfo, RepoSummary, Refs, ResetMode, Workspace, WorkingTree,
 } from "./types";
 
@@ -144,8 +144,12 @@ export const reset = (repoId: string, target: string, mode: ResetMode) => invoke
 export const opContinue = (repoId: string) => invoke<OpResult>("op_continue", { repoId });
 export const opAbort = (repoId: string) => invoke<OpResult>("op_abort", { repoId });
 export const opSkip = (repoId: string) => invoke<OpResult>("op_skip", { repoId });
-/** `remote = null` fetches all remotes. */
-export const fetch = (repoId: string, remote: string | null = null, prune = false) => invoke<OpResult>("fetch", { repoId, remote, prune });
+/**
+ * `remote = null` fetches all remotes. `background` (the auto-fetch) never opens a login dialog: it uses saved
+ * credentials or fails fast. A fetch the user starts leaves it false.
+ */
+export const fetch = (repoId: string, remote: string | null = null, prune = false, background = false) =>
+  invoke<OpResult>("fetch", { repoId, remote, prune, background });
 export const pull = (repoId: string, rebase = false) => invoke<OpResult>("pull", { repoId, rebase });
 /** `force` means `--force-with-lease`. */
 export const push = (repoId: string, opts: { remote?: string | null; branch?: string | null; force?: boolean; setUpstream?: boolean; tags?: boolean } = {}) =>
@@ -166,7 +170,7 @@ export const tagCreate = (repoId: string, name: string, target: string, message:
   invoke<OpResult>("tag_create", { repoId, name, target, message });
 export const tagDelete = (repoId: string, name: string) => invoke<OpResult>("tag_delete", { repoId, name });
 
-// ---------------------------------------------------------------- 5.6 clone
+// ---------------------------------------------------------------- 5.7 clone
 
 /**
  * Clones `url` into `parentDir/dirName`, then adds the repository to `target`. `operationId` ties the
@@ -176,6 +180,19 @@ export const cloneRepo = (operationId: string, url: string, parentDir: string, d
   invoke<CloneResult>("clone_repo", { operationId, url, parentDir, dirName, opts, target });
 /** Stops the clone with this id (no-op when it has finished). `cloneRepo` then rejects with "The operation was cancelled.". */
 export const cloneCancel = (operationId: string) => invoke<void>("clone_cancel", { operationId });
+
+// ---------------------------------------------------------------- 5.6 authentication
+
+/**
+ * Answers an `auth-prompt`. `answer = null` cancels it (Reject for a host key). `secondary` is the password of a
+ * `withPassword` dialog. Resolves false when the prompt is gone (timed out, or its command ended).
+ */
+export const authReply = (id: number, answer: string | null, remember: boolean, secondary: string | null = null) =>
+  invoke<boolean>("auth_reply", { id, answer, remember, secondary });
+/** Tells the backend whether saved credentials may be read and offered (`settings.useCredentialStore`). */
+export const setAuthPrefs = (useCredentialStore: boolean) => invoke<void>("set_auth_prefs", { useCredentialStore });
+/** Forgets every credential DeepGit saved in the system key store. Resolves to how many entries were removed. */
+export const credentialsClear = () => invoke<number>("credentials_clear");
 
 // ---------------------------------------------------------------- 5.5 events
 
@@ -190,6 +207,11 @@ async function listen<T>(event: string, cb: (payload: T) => void): Promise<() =>
 
 /** Every git call (user actions and background reads). Prefer `state/console.ts`, which subscribes once. */
 export const onGitConsole = (cb: (entry: ConsoleEntry) => void) => listen<ConsoleEntry>("git-console", cb);
+/** git or ssh asks for a credential. Prefer `state/auth.ts`, which subscribes once and shows the dialog. */
+export const onAuthPrompt = (cb: (p: AuthPrompt) => void) => listen<AuthPrompt>("auth-prompt", cb);
+/** A question is gone (timeout, command ended): close its dialog. */
+export const onAuthPromptClose = (cb: (e: { id: number }) => void) => listen<{ id: number }>("auth-prompt-close", cb);
+export const onAuthNotice = (cb: (n: AuthNotice) => void) => listen<AuthNotice>("auth-notice", cb);
 /** A repository changed on disk or through a write command (debounced by the backend). */
 export const onRepoChanged = (cb: (e: RepoChanged) => void) => listen<RepoChanged>("repo-changed", cb);
 /** Progress of a running `cloneRepo` (filter on `operationId`). */

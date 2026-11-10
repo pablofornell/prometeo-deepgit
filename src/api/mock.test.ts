@@ -115,7 +115,7 @@ describe("mock backend", () => {
 
   it("requires '<remote>/<branch>' to delete a remote branch", async () => {
     const { ids } = await setup();
-    const repoId = ids[5];
+    const repoId = ids[3]; // not ids[5]: docs-site has an https remote and asks for credentials (mockAuth.test.ts)
     await call("branch_create", { repoId, name: "topic/del", startPoint: "main", checkout: false });
     await call("push", { repoId, branch: "topic/del", remote: "origin", setUpstream: true });
     await expect(call("branch_delete", { repoId, name: "topic/del", force: false, remote: true })).rejects.toMatchObject({

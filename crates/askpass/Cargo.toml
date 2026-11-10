@@ -1,0 +1,20 @@
+[package]
+name = "askpass"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "DeepGit askpass: the helper mode of the app binary, the local IPC and the credential broker (no Tauri dependency)"
+
+[dependencies]
+gitcore = { path = "../gitcore" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+getrandom = "0.3"
+tokio = { workspace = true, features = ["net", "rt", "sync", "time", "io-util"] }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[dev-dependencies]
+tempfile = "3"
+tokio = { workspace = true, features = ["net", "rt", "rt-multi-thread", "sync", "time", "io-util", "macros"] }

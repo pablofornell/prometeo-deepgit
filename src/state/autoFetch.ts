@@ -11,6 +11,7 @@
  *  - a repo with a write operation running (a fetch included) is skipped and tried again soon;
  *  - nothing runs while the window is hidden; on return, overdue repos are fetched at once;
  *  - no toast, no progress activity; the console marks these fetches as background commands;
+ *  - no login dialog: the backend runs them with `AuthMode::Silent` (`background`), saved credentials only;
  *  - a repo that fails backs off on its own: its interval doubles up to 60 min and resets on its first success.
  */
 import { createEffect, createRoot, createSignal, on, untrack } from "solid-js";
@@ -57,7 +58,7 @@ export function startAutoFetch(): void {
     fetch: async (ids, prune) => {
       const release = markBackgroundFetch(ids);
       try {
-        const r = await actions.fetch(ids, { prune, silent: true });
+        const r = await actions.fetch(ids, { prune, silent: true, background: true });
         return { ok: r.ok, failed: r.failed.map((f) => ({ repoId: f.repoId, message: f.error.message })) };
       } finally {
         release();

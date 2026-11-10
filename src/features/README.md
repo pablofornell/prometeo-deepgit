@@ -54,12 +54,13 @@ feature. Cross-feature communication goes through `state/` (selection, layout, a
 | `workspace.ts` | `workspace` (store), `activeProject()`, `projectRepos()`, `repoById(id)`, `repoColor(repo)`, `selectedRepoIds()` / `selectedRepos()` (the repo filter), `setSelectedRepoIds`, `toggleRepo`, `selectOnlyRepo`, `selectAllRepos`, `isRepoFilterActive()`, `focusedRepo()` / `setFocusedRepoId` (target of single-repo commands), `summary(repoId)` (reactive `RepoSummary`), `projectTotals()` (ahead/behind/changes/operations), `refreshSummaries(ids?)`, `addProject`, `setActiveProject`, `removeProject`, `rescanProject`. Summaries refresh themselves on `repo-changed` (throttled). |
 | `refs.ts` | `repoRefs(repoId)` -> accessor of `Refs` (first read loads it), `refreshRefs`, `ensureRefs(ids)`, `cachedRefs`, `hasLocalBranch`, `hasRemoteBranch`. Auto-refresh on `repo-changed`. |
 | `selection.ts` | `selectedCommit()` / `setSelectedCommit({repoId, oid})`, `selectedFile()` / `selectFile({repoId, spec, path, oldPath?}, { reveal? })`, `detailsTab()` / `setDetailsTab("files" \| "diff")`, `mainTab()` / `setMainTab("log" \| "changes")`, `changesRepoId()` / `setChangesRepoId`, `clearSelection()`. |
-| `settings.ts` | `settings` store (`theme`, `dateFormat`, `diffMode`, `showGraph`, `laneColors`, `comfortableRows`, `showBackgroundCommands`, `fontSize`, `editorFontSize`, `uiScale`, `autoFetchMinutes` (0 = off, 5, 15, 30, 60; default 15), `autoFetchPrune` (default true), `commitSignOff` (default false, remembered by the commit box)), `setSetting(key, value)` (validated, persisted as `deepgit.ui.<key>`), `resetSettings(keys?)`, `SETTING_DEFAULTS`, `zoomUi(+1 \| -1)`, `toggleTheme()`, `resolvedTheme()`. Add a key: extend `Settings`, `SETTING_DEFAULTS` and `SANITIZERS`. |
+| `settings.ts` | `settings` store (`theme`, `dateFormat`, `diffMode`, `showGraph`, `laneColors`, `comfortableRows`, `showBackgroundCommands`, `useCredentialStore` (default true, synced to the backend with `setAuthPrefs`), `fontSize`, `editorFontSize`, `uiScale`, `autoFetchMinutes` (0 = off, 5, 15, 30, 60; default 15), `autoFetchPrune` (default true), `commitSignOff` (default false, remembered by the commit box)), `setSetting(key, value)` (validated, persisted as `deepgit.ui.<key>`), `resetSettings(keys?)`, `SETTING_DEFAULTS`, `zoomUi(+1 \| -1)`, `toggleTheme()`, `resolvedTheme()`. Add a key: extend `Settings`, `SETTING_DEFAULTS` and `SANITIZERS`. |
 | `appearance.ts` | Pure maths of font size / editor size / UI scale: limits, `sanitize*`, `appearanceVars()` (the CSS variables). `index.html` repeats it before first paint; `prepaint.test.ts` checks both agree. |
 | `metrics.ts` | `cssPx(token, fallback)` (resolved px of a CSS token, reactive to font-size changes), `appearanceRev()`. |
 | `layout.ts` | `sidebarVisible()`, `bottomTool()` ("console" \| "matrix" \| null), `toggleSidebar`, `openBottomTool(tool)`, `toggleBottomTool(tool)`. (The diff island and `diffVisible` / `toggleDiff` are gone.) |
 | `console.ts` | `consoleEntries()` (ring of 500 `ConsoleEntry`), `lastUserEntry()` (ticker), `lastConsoleEntry()`, `isBackgroundEntry(e)`, `clearConsole()`, `formatCommand(e)`. |
 | `events.ts` | `repoVersion(repoId)` / `anyRepoVersion()` (reactive counters bumped on every change), `subscribeRepoChanged(cb)`, `notifyRepoChanged(id)`. Never call `onRepoChanged` / `onGitConsole` yourself. |
+| `auth.ts` | Credential prompts of fetch, pull and push (PLAN.md section 5.6). Started by `startEvents()`; shows the `auth` dialog one prompt at a time (`authQueue.ts`). `clearSavedCredentials()` forgets all saved logins (for the Settings page). Features never call it otherwise. |
 | `activity.ts` | `activities()` (running operations for the progress widget), `beginActivity(label, total)`. |
 | `keymap.ts` | See below. |
 | `actions.ts` | See below. |
@@ -105,7 +106,7 @@ summary refresh are done for you. To add a new action, add it to `actions.ts` wi
 
 `registerDialog(name, Component)` and `showDialog(name, props) -> Promise<result | undefined>` (undefined = cancelled).
 Names and their `props` / `result` types are in `DialogRegistry`: `newBranch`, `renameBranch`, `merge`, `rebase`, `reset`,
-`confirm` (done), `push`, `stash`, `tag`, `checkoutRemote`, `settings` (`features/settings`, props `{ section? }`), `clone`. Until a name is registered `showDialog` falls back to
+`confirm` (done), `push`, `stash`, `tag`, `checkoutRemote`, `settings` (`features/settings`, props `{ section? }`), `clone`, `auth` (opened by `state/auth.ts`, not by features). Until a name is registered `showDialog` falls back to
 `window.prompt` / `confirm`. A dialog component receives its props plus `close(result?)`:
 
 ```tsx

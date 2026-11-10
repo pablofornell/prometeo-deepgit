@@ -13,6 +13,7 @@
  * back to the default or are clamped). `resetSettings()` removes the stored values.
  */
 import { createStore } from "solid-js/store";
+import { setAuthPrefs } from "../api/tauri";
 import { UI_SCALE_DEFAULT, appearanceVars, sanitizeEditorFontSize, sanitizeFontSize, sanitizeUiScale, stepUiScale, FONT_SIZE_DEFAULT } from "./appearance";
 import { bumpAppearance } from "./metrics";
 import { loadPersisted, removePersisted, savePersisted } from "./persist";
@@ -52,6 +53,13 @@ export interface Settings {
   editorFontSize: number | null;
   /** Page zoom in percent, 80..200 in steps of 10. */
   uiScale: number;
+
+  // ---- Authentication (docs/PLAN.md section 5.6) ---------------------------------------------------------------
+  /**
+   * Read saved passwords, tokens and key passphrases from the system key store and offer "Remember" in the login
+   * dialog. Off: DeepGit still asks, but never reads or writes the key store. Sent to the backend (`setAuthPrefs`).
+   */
+  useCredentialStore: boolean;
 }
 
 export const SETTING_DEFAULTS: Readonly<Settings> = {
@@ -70,6 +78,7 @@ export const SETTING_DEFAULTS: Readonly<Settings> = {
   fontSize: FONT_SIZE_DEFAULT,
   editorFontSize: null,
   uiScale: UI_SCALE_DEFAULT,
+  useCredentialStore: true,
 };
 
 const oneOf =
@@ -93,6 +102,7 @@ export const SANITIZERS: { [K in keyof Settings]: (v: unknown) => Settings[K] } 
   fontSize: sanitizeFontSize,
   editorFontSize: sanitizeEditorFontSize,
   uiScale: sanitizeUiScale,
+  useCredentialStore: (v) => (typeof v === "boolean" ? v : SETTING_DEFAULTS.useCredentialStore),
 };
 
 const KEYS = Object.keys(SETTING_DEFAULTS) as (keyof Settings)[];
@@ -114,6 +124,7 @@ export function setSetting<K extends keyof Settings>(key: K, value: Settings[K])
   savePersisted(key, v);
   if (key === "theme") applyTheme();
   if (APPEARANCE_KEYS.includes(key)) applyAppearance();
+  if (key === "useCredentialStore") pushAuthPrefs();
 }
 
 /** Puts the given settings (all when omitted) back to their defaults and removes the stored values. */
@@ -124,6 +135,12 @@ export function resetSettings(keys: readonly (keyof Settings)[] = KEYS): void {
   }
   if (keys.includes("theme")) applyTheme();
   if (keys.some((k) => APPEARANCE_KEYS.includes(k))) applyAppearance();
+  if (keys.includes("useCredentialStore")) pushAuthPrefs();
+}
+
+/** Tells the backend the authentication settings. Called at startup and whenever `useCredentialStore` changes. */
+function pushAuthPrefs(): void {
+  setAuthPrefs(settings.useCredentialStore).catch(() => undefined);
 }
 
 /** "dark" or "light" after resolving "system". */
@@ -180,6 +197,7 @@ export function toggleTheme(): void {
 export function initSettings(): void {
   applyTheme();
   applyAppearance();
+  pushAuthPrefs();
   if (typeof matchMedia === "function") {
     matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
       if (settings.theme === "system") applyTheme();

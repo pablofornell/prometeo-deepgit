@@ -85,3 +85,9 @@
 .dg-dialogs-clone-progress { display: flex; flex-direction: column; gap: var(--dg-space-3); padding: var(--dg-space-4); border-radius: var(--dg-banner-radius); background: var(--dg-layer-1-bg); }
 .dg-dialogs-clone-phase { display: flex; align-items: center; gap: var(--dg-space-3); color: var(--dg-text-muted); font-variant-numeric: tabular-nums; }
 .dg-dialogs-clone-progress .dg-progress { width: 100% !important; }
+
+/* login: the host-key text ssh prints (host, key type, fingerprint) */
+.dg-dialogs-fingerprint {
+  margin: 0; padding: var(--dg-space-3) var(--dg-space-4); border-radius: var(--dg-input-radius); background: var(--dg-layer-1-bg);
+  font-family: var(--dg-font-mono); font-size: var(--dg-font-size-mono); line-height: 18px; white-space: pre-wrap; overflow-wrap: anywhere;
+}

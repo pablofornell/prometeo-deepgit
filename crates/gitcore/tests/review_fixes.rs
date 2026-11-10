@@ -656,15 +656,15 @@ fn f10_known_failures_get_clear_messages() {
         ),
         (
             "remote: Invalid username or password.\nfatal: Authentication failed for 'https://x/y.git/'",
-            "Authentication failed. DeepGit cannot ask for passwords; use an SSH agent or a credential helper.",
+            "Authentication failed. Check your user name and password or token, then try again.",
         ),
         (
             "fatal: could not read Username for 'https://x': terminal prompts disabled",
-            "Authentication failed. DeepGit cannot ask for passwords; use an SSH agent or a credential helper.",
+            "No credentials were given. Run the command again and enter them, or set up a credential helper or an SSH agent.",
         ),
         (
             "git@x: Permission denied (publickey).\nfatal: Could not read from remote repository.",
-            "SSH authentication failed (permission denied). Load your key in an SSH agent.",
+            "SSH authentication failed (permission denied). Check the passphrase of your key, or load the key in an SSH agent.",
         ),
         (
             "fatal: unable to access 'https://nope/': Could not resolve host: nope",

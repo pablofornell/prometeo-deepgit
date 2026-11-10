@@ -4,11 +4,12 @@
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::mpsc::{self, RecvTimeoutError};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
+use crate::auth::{apply_auth_env, AuthBroker, AuthMode, AuthOp, AuthOutcome, AuthTicket};
 use crate::error::GitError;
 use crate::model::ConsoleEntry;
 
@@ -41,6 +42,13 @@ impl CancelToken {
 struct Stream<'a> {
     cancel: &'a CancelToken,
     on_stderr: StderrSink,
+}
+
+/// What a network call adds to a spawn: live stderr and cancellation (`run_streaming` only) and the
+/// authentication session of the command.
+struct Network<'a> {
+    stream: Option<&'a Stream<'a>>,
+    ticket: Option<&'a AuthTicket>,
 }
 
 static NEXT_ENTRY_ID: AtomicU64 = AtomicU64::new(1);
@@ -104,6 +112,10 @@ pub struct Git {
     network_timeout: Duration,
     /// Absolute limit of fetch, pull and push.
     network_cap: Duration,
+    /// Asks the user for credentials of network commands; `None` = never ask.
+    auth: Option<Arc<dyn AuthBroker>>,
+    /// How network commands may ask when `auth` is set. Interactive unless changed.
+    auth_mode: AuthMode,
 }
 
 /// Parses "git version 2.43.0" (or "... 2.39.3 (Apple Git-145)") into (major, minor).
@@ -133,6 +145,8 @@ impl Git {
             end_of_options,
             network_timeout: NETWORK_INACTIVITY,
             network_cap: NETWORK_CAP,
+            auth: None,
+            auth_mode: AuthMode::Interactive,
         }
     }
 
@@ -147,6 +161,44 @@ impl Git {
     pub fn with_network_cap(mut self, d: Duration) -> Self {
         self.network_cap = d;
         self
+    }
+
+    /// Lets network commands (fetch, pull, push) ask the user for credentials through `broker`.
+    /// Without a broker they never ask (`AuthMode::None`).
+    pub fn with_auth(mut self, broker: Arc<dyn AuthBroker>) -> Self {
+        self.auth = Some(broker);
+        self
+    }
+
+    /// How network commands run through this handle may ask. The default is `Interactive` (the
+    /// user started the command). A background caller such as auto-fetch uses a clone of the
+    /// handle with `AuthMode::Silent`: saved credentials only, no dialog, fail fast.
+    pub fn with_auth_mode(mut self, mode: AuthMode) -> Self {
+        self.auth_mode = mode;
+        self
+    }
+
+    /// Starts the authentication session of one network command. Call it before spawning, pass
+    /// the ticket to `apply_auth`, and give it the outcome with `AuthTicket::finish` afterwards.
+    /// `command` is a short label such as `"git clone"` (no arguments, they can hold secrets).
+    pub fn begin_auth(&self, repo_id: Option<&str>, command: &str) -> Option<AuthTicket> {
+        let broker = self.auth.as_ref()?;
+        broker.begin(self.auth_mode, &AuthOp { repo_id, command })
+    }
+
+    /// Sets the authentication environment of a network command. The `run*` methods call this
+    /// themselves; call it by hand only for a command that does not go through them. `repo` is where `core.sshCommand` is read from (`None`: only the
+    /// global config and the environment count).
+    pub fn apply_auth(&self, cmd: &mut Command, repo: Option<&Path>, ticket: Option<&AuthTicket>) {
+        let mode = if ticket.is_some() {
+            self.auth_mode
+        } else {
+            AuthMode::None
+        };
+        let user_ssh = std::env::var_os("GIT_SSH_COMMAND").is_some()
+            || std::env::var_os("GIT_SSH").is_some()
+            || self.ssh_command_configured(repo);
+        apply_auth_env(cmd, mode, ticket.map(|t| &t.ctx), user_ssh);
     }
 
     /// `["--end-of-options"]` when git supports it, to put right before user-supplied revisions
@@ -286,8 +338,22 @@ impl Git {
             inactivity: self.network_timeout,
             cap: self.network_cap,
         });
+        let ticket = limits.and_then(|_| {
+            let command = format!("git {}", subcommand(args));
+            self.begin_auth(repo_id, &command)
+        });
         let result = self
-            .spawn(repo, args, write, stdin, limits, stream)
+            .spawn(
+                repo,
+                args,
+                write,
+                stdin,
+                limits,
+                Network {
+                    stream,
+                    ticket: ticket.as_ref(),
+                },
+            )
             .map_err(|e| match e {
                 SpawnError::Io(e) => GitError::Io(e),
                 SpawnError::Cancelled => GitError::Cancelled,
@@ -301,6 +367,17 @@ impl Git {
                 }
             });
         let duration_ms = timer.elapsed().as_millis() as u64;
+        if let Some(ticket) = ticket {
+            // The token stops working here; the broker saves or forgets credentials.
+            let outcome = match &result {
+                Ok(o) => (o.code == 0, String::from_utf8_lossy(&o.stderr).into_owned()),
+                Err(_) => (false, String::new()),
+            };
+            ticket.finish(&AuthOutcome {
+                success: outcome.0,
+                stderr: &outcome.1,
+            });
+        }
         if let Some(sink) = &self.sink {
             let (exit_code, stdout, stderr) = match &result {
                 Ok(o) => (
@@ -341,11 +418,12 @@ impl Git {
     }
 
     /// True when `core.sshCommand` is configured for the repo (it would lose against the env var).
-    fn ssh_command_configured(&self, repo: &Path) -> bool {
-        Command::new(&self.bin)
-            .arg("-C")
-            .arg(repo)
-            .args(["config", "--get", "core.sshCommand"])
+    fn ssh_command_configured(&self, repo: Option<&Path>) -> bool {
+        let mut cmd = Command::new(&self.bin);
+        if let Some(repo) = repo {
+            cmd.arg("-C").arg(repo);
+        }
+        cmd.args(["config", "--get", "core.sshCommand"])
             .stdin(Stdio::null())
             .stderr(Stdio::null())
             .output()
@@ -360,8 +438,9 @@ impl Git {
         write: bool,
         stdin: Option<&[u8]>,
         limits: Option<Limits>,
-        stream: Option<&Stream>,
+        net: Network,
     ) -> Result<RawOutput, SpawnError> {
+        let Network { stream, ticket } = net;
         let mut cmd = Command::new(&self.bin);
         cmd.arg("-C")
             .arg(repo)
@@ -405,13 +484,9 @@ impl Git {
         if !write {
             cmd.env("GIT_OPTIONAL_LOCKS", "0");
         }
-        // ssh must never wait for a password or a host-key question nobody can answer.
-        if limits.is_some()
-            && std::env::var_os("GIT_SSH_COMMAND").is_none()
-            && std::env::var_os("GIT_SSH").is_none()
-            && !self.ssh_command_configured(repo)
-        {
-            cmd.env("GIT_SSH_COMMAND", "ssh -o BatchMode=yes");
+        if limits.is_some() {
+            // Who may ask for a password, and how ssh behaves (see `apply_auth_env`).
+            self.apply_auth(&mut cmd, Some(repo), ticket);
         }
         #[cfg(windows)]
         {
@@ -420,9 +495,18 @@ impl Git {
         }
         #[cfg(unix)]
         if limits.is_some() {
-            // Own process group, so a timeout can kill git together with ssh / the helpers.
+            // A new session: its own process group, so a timeout can kill git together with ssh and
+            // the helpers, and no controlling terminal, so ssh cannot open /dev/tty to ask.
             use std::os::unix::process::CommandExt;
-            cmd.process_group(0);
+            // SAFETY: setsid(2) is async-signal-safe and touches no memory of the parent.
+            unsafe {
+                cmd.pre_exec(|| {
+                    if libc::setsid() == -1 {
+                        return Err(std::io::Error::last_os_error());
+                    }
+                    Ok(())
+                });
+            }
         }
         let mut child = cmd.spawn()?;
         let start = Instant::now();
@@ -446,12 +530,14 @@ impl Git {
                 stream.map(|s| s.on_stderr.clone()),
             )
         });
+        let prompting = ticket.map(|t| t.ctx.prompting.clone());
         let waited = wait(
             &mut child,
             limits,
             stream.map(|s| s.cancel),
             start,
             &activity,
+            prompting.as_deref(),
         );
         // After a kill the readers are not waited for forever: a grandchild that survived (no
         // process group on Windows) would hold the pipes open and block this call.
@@ -550,13 +636,15 @@ impl Reader {
 
 /// Waits for the child. With `limits` it is killed (with its process group) after `inactivity`
 /// without output or after `cap` in total, and the result is `SpawnError::Killed`. A set `cancel`
-/// token kills it too, with `SpawnError::Cancelled`.
+/// token kills it too, with `SpawnError::Cancelled`. While `prompting` is above zero a dialog is
+/// open: that time does not count as inactivity.
 fn wait(
     child: &mut std::process::Child,
     limits: Option<Limits>,
     cancel: Option<&CancelToken>,
     start: Instant,
     activity: &AtomicU64,
+    prompting: Option<&AtomicUsize>,
 ) -> Result<std::process::ExitStatus, SpawnError> {
     if limits.is_none() && cancel.is_none() {
         return Ok(child.wait()?);
@@ -572,6 +660,9 @@ fn wait(
         }
         if let Some(limits) = limits {
             let now = start.elapsed();
+            if prompting.is_some_and(|p| p.load(Ordering::Relaxed) > 0) {
+                activity.store(now.as_millis() as u64, Ordering::Relaxed);
+            }
             let last = Duration::from_millis(activity.load(Ordering::Relaxed));
             let exceeded = if now >= limits.cap {
                 Some(limits.cap)

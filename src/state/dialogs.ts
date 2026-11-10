@@ -10,10 +10,12 @@
  * `DialogRegistry`, then register a component for it.
  */
 import type { Component } from "solid-js";
-import type { MergeOpts, ResetMode } from "../api/types";
+import type { AuthPrompt, MergeOpts, ResetMode } from "../api/types";
+import type { AuthDialogResult } from "./authQueue";
 import { ConfirmDialog, type ConfirmProps, type ConfirmResult, type DialogComponentProps, openDialog } from "../components/ui";
 
 export type { ConfirmProps, ConfirmResult } from "../components/ui";
+export type { AuthDialogResult } from "./authQueue";
 
 export interface NewBranchProps {
   /** Repos the branch can be created in (the dialog shows a checklist when more than one). */
@@ -141,6 +143,10 @@ export interface CloneDialogResult {
   path: string;
   projectId: string;
 }
+export interface AuthProps {
+  /** The question of a running fetch, pull or push (docs/PLAN.md section 5.6). `state/auth.ts` opens this dialog. */
+  prompt: AuthPrompt;
+}
 
 /** Props and result of every dialog name. */
 export interface DialogRegistry {
@@ -156,6 +162,7 @@ export interface DialogRegistry {
   checkoutRemote: { props: CheckoutRemoteProps; result: CheckoutRemoteResult };
   settings: { props: SettingsProps; result: void };
   clone: { props: CloneProps; result: CloneDialogResult };
+  auth: { props: AuthProps; result: AuthDialogResult };
 }
 
 export type DialogName = keyof DialogRegistry;
@@ -236,6 +243,11 @@ function fallback<K extends DialogName>(name: K, props: DialogProps<K>): DialogR
         const def = q.remoteBranch.slice(q.remoteBranch.indexOf("/") + 1);
         const n = window.prompt(`Local branch name for ${q.remoteBranch}`, def);
         return n?.trim() ? ({ localName: n.trim() } satisfies CheckoutRemoteResult) : undefined;
+      }
+      case "auth": {
+        const q = p as AuthProps;
+        const a = window.prompt(q.prompt.prompt);
+        return a === null ? undefined : ({ answer: a, remember: false } satisfies AuthDialogResult);
       }
     }
     return undefined;

@@ -7,6 +7,7 @@
 import { checkCloneInput, joinPath } from "./cloneRules";
 import { layoutGraph } from "./graphLayout";
 import { checkMergeOpts, effectiveMessage, mergeArgs } from "./mergeRules";
+import { authReply, beginAuth, credentialsClear, setAuthPrefs, type AuthSession } from "./mockAuth";
 import {
   DEEPGIT_ROOT, PAYMENTS_ROOT, PEOPLE, SCENARIOS, genericScenario, generateRepo, hashStr, hex40, repoId,
   type MockCommit, type MockRepo, type Scenario,
@@ -82,7 +83,9 @@ const metas = new Map<string, { info: RepoInfo; url: string; scenario: Scenario 
 const repos = new Map<string, MockRepo>();
 
 function registerRepo(info: RepoInfo, scenario: Scenario): void {
-  metas.set(info.id, { info, url: `git@github.com:acme/${scenario.name}.git`, scenario });
+  // docs-site has an https remote: its fetch, pull and push ask for credentials (mockAuth.ts)
+  const url = scenario.name === "docs-site" ? `https://github.com/acme/${scenario.name}.git` : `git@github.com:acme/${scenario.name}.git`;
+  metas.set(info.id, { info, url, scenario });
 }
 
 /** Colours come from the same assignment as the Rust backend (`mockColors.ts`). */
@@ -534,7 +537,7 @@ function customArg(a: Args, cmd: string): string | null {
   fail(`invalid args \`custom\` for command \`${cmd}\`: invalid type`);
 }
 
-const READ_FAST = new Set(["log_rows", "log_find", "log_close", "workspace_load", "workspace_save_ui", "project_set_active", "project_remove", "repo_set_color", "project_set_color"]);
+const READ_FAST = new Set(["log_rows", "log_find", "log_close", "workspace_load", "workspace_save_ui", "project_set_active", "project_remove", "repo_set_color", "project_set_color", "auth_reply", "set_auth_prefs", "credentials_clear"]);
 
 const handlers: Record<string, Handler> = {
   // ---- workspace
@@ -801,7 +804,7 @@ const handlers: Record<string, Handler> = {
     emitChanged(repo);
     return ok(`Created branch '${name}' at ${short(oid)}`);
   },
-  branch_delete: (a, c) => {
+  branch_delete: async (a, c) => {
     const repo = repoOf(a.repoId);
     const name = str(a.name);
     if (bool(a.remote)) {
@@ -809,10 +812,12 @@ const handlers: Record<string, Handler> = {
       const split = splitRemoteRef(repo, name);
       if (!split) fail(`${name} does not belong to a configured remote`, `error: '${name}' does not belong to a configured remote`);
       const { remote, branch } = split;
+      const auth = await beginAuth(emit, repo.info.id, repo.url, "git push");
       if (!repo.remotes.has(name)) fail(`remote ref does not exist: ${name}`, `error: unable to delete '${branch}': remote ref does not exist`);
       repo.remotes.delete(name);
       c.git(repo, ["push", remote, "--delete", branch], { stderr: `To ${repo.url}\n - [deleted]         ${branch}\n` });
       emitChanged(repo);
+      auth.commit();
       return ok(`Deleted remote branch ${name}`);
     }
     const oid = repo.branches.get(name);
@@ -999,8 +1004,9 @@ const handlers: Record<string, Handler> = {
   },
 
   // ---- remotes
-  fetch: (a, c) => {
+  fetch: async (a, c) => {
     const repo = repoOf(a.repoId);
+    const auth = await beginAuth(emit, repo.info.id, repo.url, "git fetch", { silent: bool(a.background) });
     repo.fetches++;
     const remote = optStr(a.remote);
     const args = ["fetch", ...(remote ? [remote] : ["--all"]), ...(bool(a.prune) ? ["--prune"] : [])];
@@ -1015,17 +1021,20 @@ const handlers: Record<string, Handler> = {
     }
     c.git(repo, args, { stderr: message });
     emitChanged(repo);
+    auth.commit();
     return ok(message || "Already up to date.");
   },
-  pull: (a, c) => {
+  pull: async (a, c) => {
     const repo = repoOf(a.repoId);
     const up = repo.head.branch ? repo.upstreams.get(repo.head.branch) : undefined;
     const upOid = up ? repo.remotes.get(up) : undefined;
     if (!repo.head.branch || !up || !upOid) return notOk("There is no tracking information for the current branch.");
+    const auth = await beginAuth(emit, repo.info.id, repo.url, "git pull");
     const ab = aheadBehind(repo, repo.head.oid, upOid);
     const rebase = bool(a.rebase);
     if (ab.behind === 0) {
       c.git(repo, ["pull", ...(rebase ? ["--rebase"] : [])], { stdout: "Already up to date.\n" });
+      auth.commit();
       return ok("Already up to date.");
     }
     if (ab.ahead === 0) advanceHead(repo, upOid);
@@ -1033,9 +1042,10 @@ const handlers: Record<string, Handler> = {
     else advanceHead(repo, makeCommit(repo, [repo.head.oid, upOid], `Merge branch '${repo.head.branch}' of ${repo.url}`).oid);
     c.git(repo, ["pull", ...(rebase ? ["--rebase"] : [])], { stdout: `Updating...\nFast-forward\n ${ab.behind} commits\n` });
     emitChanged(repo);
+    auth.commit();
     return ok(`Pulled ${ab.behind} commit${ab.behind === 1 ? "" : "s"}`);
   },
-  push: (a, c) => {
+  push: async (a, c) => {
     const repo = repoOf(a.repoId);
     const branch = optStr(a.branch) ?? repo.head.branch;
     if (!branch) fail("You are not on a branch", "fatal: You are not currently on a branch.");
@@ -1053,6 +1063,7 @@ const handlers: Record<string, Handler> = {
     const remote = optStr(a.remote) ?? upSplit?.remote ?? "origin";
     if (!remoteNamesOf(repo).includes(remote)) fail(`'${remote}' does not appear to be a git repository`, `fatal: '${remote}' does not appear to be a git repository`);
     const oid = repo.branches.get(branch) ?? fail(`Branch '${branch}' not found`, `error: src refspec ${branch} does not match any`);
+    const auth = await beginAuth(emit, repo.info.id, repo.url, "git push");
     // like `git push <remote> <branch>`: the remote branch has the local name, whatever the upstream is
     const key = `${remote}/${branch}`;
     const remoteOid = repo.remotes.get(key);
@@ -1070,8 +1081,14 @@ const handlers: Record<string, Handler> = {
       stdout: `To ${repo.url}\n${remoteOid ? " " : "*"}\trefs/heads/${branch}:refs/heads/${branch}\t${remoteOid ? `${short(remoteOid)}..${short(oid)}` : "[new branch]"}\nDone\n`,
     });
     emitChanged(repo);
+    auth.commit();
     return ok(`Pushed ${branch} (${n} commit${n === 1 ? "" : "s"})`);
   },
+
+  // ---- authentication (mockAuth.ts)
+  auth_reply: (a) => authReply(a),
+  set_auth_prefs: (a) => setAuthPrefs(a),
+  credentials_clear: () => credentialsClear(),
 
   // ---- stash and tags
   stash_save: (a, c) => {
@@ -1127,13 +1144,16 @@ const handlers: Record<string, Handler> = {
   clone_repo: (a, c) => cloneRepo(a, c),
   clone_cancel: (a) => {
     const running = runningClones.get(str(a.operationId));
-    if (running) running.cancelled = true;
+    if (running) {
+      running.cancelled = true;
+      running.abort.abort(); // closes a login dialog that is open
+    }
   },
 };
 
 // ---------------------------------------------------------------- clone
 
-const runningClones = new Map<string, { cancelled: boolean }>();
+const runningClones = new Map<string, { cancelled: boolean; abort: AbortController }>();
 const CLONE_PHASES = ["Counting objects", "Compressing objects", "Receiving objects", "Resolving deltas", "Updating files"];
 
 /** The mock disk: every absolute folder exists, except one that has a segment named `missing`. */
@@ -1166,10 +1186,19 @@ async function cloneRepo(a: Args, c: Ctx): Promise<CloneResult> {
     }
   }
   if (runningClones.has(operationId)) fail("This clone is already running.");
-  const state = { cancelled: false };
+  const state = { cancelled: false, abort: new AbortController() };
   runningClones.set(operationId, state);
   const gitArgs = ["clone", "--progress", ...(branch ? ["--branch", branch] : []), ...(depth ? ["--depth", String(depth)] : []), ...(opts.recurseSubmodules ? ["--recurse-submodules"] : []), "--", url, path];
   try {
+    // Like Rust: the clone runs as an interactive network command, so a private https URL asks for a login.
+    let auth: AuthSession;
+    try {
+      auth = await beginAuth(emit, null, url, "git clone", { signal: state.abort.signal });
+    } catch (e) {
+      const err = e as { message?: string; detail?: string };
+      c.git(null, gitArgs, { stderr: err.detail ?? err.message ?? "", exit: state.cancelled ? -1 : 128 });
+      throw e;
+    }
     if (/does-not-exist|nonexistent/i.test(url)) {
       await sleep(400);
       const detail = `Cloning into '${path}'...\nfatal: repository '${url}' does not exist\n`;
@@ -1203,6 +1232,7 @@ async function cloneRepo(a: Args, c: Ctx): Promise<CloneResult> {
       addColoredProject(workspace, project);
     }
     c.git(null, gitArgs, { stderr: `Cloning into '${path}'...\nReceiving objects: 100% (350/350), done.\n` });
+    auth.commit();
     return { path, project: structuredClone(project), createdProject: created } satisfies CloneResult;
   } finally {
     runningClones.delete(operationId);
@@ -1241,7 +1271,7 @@ export async function mockInvoke(cmd: string, args: Args = {}): Promise<unknown>
     },
   };
   try {
-    return handler(args, ctx);
+    return await handler(args, ctx);
   } catch (e) {
     // a failed git command shows up in the console too
     const repo = typeof args.repoId === "string" ? repos.get(args.repoId) ?? null : null;
