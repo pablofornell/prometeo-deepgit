@@ -3,11 +3,14 @@
 
 mod common;
 
+#[cfg(unix)]
 use std::time::{Duration, Instant};
 
 use common::*;
 use gitcore::ops::HunkOpts;
-use gitcore::{diff, ops, refs, state, ApiError, DiffSpec, GitError, RepoStateKind};
+#[cfg(unix)]
+use gitcore::ApiError;
+use gitcore::{diff, ops, refs, state, DiffSpec, GitError, RepoStateKind};
 
 fn lines(n: usize, f: impl Fn(usize) -> String) -> String {
     (0..n).map(|i| f(i) + "\n").collect()

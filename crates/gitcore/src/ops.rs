@@ -61,8 +61,12 @@ fn run_op(
     let text = format!("{}\n{}", out.stdout, out.stderr);
     if out.code == 0 {
         if conflictable {
+            // git <= 2.4x: "Applying autostash resulted in conflicts. Your changes are safe in
+            // the stash." Newer git: "Your local changes are stashed, however applying them
+            // resulted in conflicts."
             let autostash = text.contains("Applying autostash resulted in conflicts")
-                || text.contains("Your changes are safe in the stash");
+                || text.contains("Your changes are safe in the stash")
+                || text.contains("Your local changes are stashed, however applying them");
             if autostash || has_unmerged(git, repo) {
                 return Ok(OpResult {
                     ok: false,
