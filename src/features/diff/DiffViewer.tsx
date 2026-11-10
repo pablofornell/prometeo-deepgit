@@ -67,10 +67,15 @@ export function DiffViewer(props: DiffViewerProps): JSX.Element {
   const [width, setWidth] = createSignal(0);
   const narrow = () => width() > 0 && width() < NARROW_DIFF_PX;
   // The layout shown feeds back into the choice (hysteresis band) and is held while a splitter drag is in progress.
+  // Only a unified layout that came from the narrow fallback is held in the band; a changed saved setting applies at once.
+  let fellBack = false;
   const mode = createMemo<DiffMode>((shown) => {
     const explicit = explicitDiffMode();
     if (!explicit && shown && splitDragging()) return shown;
-    return effectiveDiffMode(explicit, settings.diffMode, width(), shown ?? null);
+    const saved = settings.diffMode;
+    const m = effectiveDiffMode(explicit, saved, width(), shown ? (fellBack ? "unified" : saved) : null);
+    fellBack = !explicit && m === "unified" && saved !== "unified";
+    return m;
   });
 
   let loadedKey = "";

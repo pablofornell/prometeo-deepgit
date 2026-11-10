@@ -1,4 +1,4 @@
-import { type JSX, createSignal } from "solid-js";
+import { type JSX, createSignal, onCleanup } from "solid-js";
 import { loadPersisted, savePersisted } from "../../state/persist";
 import { setSplitDragging } from "./dragState";
 import { dragSize } from "./splitterMath";
@@ -40,6 +40,10 @@ export function Splitter(props: SplitterProps): JSX.Element {
   const [dragging, setDragging] = createSignal(false);
   const vertical = () => props.orientation === "vertical";
   const maxSize = () => (typeof props.max === "function" ? props.max() : props.max);
+  // Ends the drag in progress. Also run when the splitter is removed mid-drag (sidebar or tool hidden by a shortcut): the
+  // browser then sends lostpointercapture to the document, not to the element, and the drag state would stay on.
+  let endDrag: (() => void) | undefined;
+  onCleanup(() => endDrag?.());
 
   const onDown = (e: PointerEvent) => {
     if (e.button !== 0) return;
@@ -48,7 +52,8 @@ export function Splitter(props: SplitterProps): JSX.Element {
     el.setPointerCapture(e.pointerId);
     const start = vertical() ? e.clientX : e.clientY;
     const startSize = props.size;
-    let last = dragSize(startSize, 0, false, props.min, maxSize());
+    const from = dragSize(startSize, 0, false, props.min, maxSize());
+    let last = from;
     // A click without movement changes nothing: it must not save the clamped size of a column that was beyond its limit.
     let moved = false;
     let done = false;
@@ -58,13 +63,14 @@ export function Splitter(props: SplitterProps): JSX.Element {
     const move = (ev: PointerEvent) => {
       const d = (vertical() ? ev.clientX : ev.clientY) - start;
       last = dragSize(startSize, d, !!props.reverse, props.min, maxSize());
-      if (last !== startSize) moved = true;
+      if (last !== from) moved = true;
       props.onSize(last);
     };
     // Also runs for a cancelled drag and a lost pointer capture, so the drag state never stays on.
     const up = () => {
       if (done) return;
       done = true;
+      endDrag = undefined;
       el.removeEventListener("pointermove", move);
       el.removeEventListener("pointerup", up);
       el.removeEventListener("pointercancel", up);
@@ -74,6 +80,7 @@ export function Splitter(props: SplitterProps): JSX.Element {
       document.body.classList.remove("dg-resizing-col", "dg-resizing-row");
       if (moved && props.persistKey) savePersisted("split." + props.persistKey, last);
     };
+    endDrag = up;
     el.addEventListener("pointermove", move);
     el.addEventListener("pointerup", up);
     el.addEventListener("pointercancel", up);
