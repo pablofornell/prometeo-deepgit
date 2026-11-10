@@ -1,0 +1,31 @@
+[workspace]
+members = ["src-tauri", "crates/gitcore"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+rust-version = "1.99"
+
+[workspace.dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "fs", "io-util"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+anyhow = "1"
+tracing = "0.1"
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+strip = true
+panic = "abort"
+
+# Local `make run` builds: release-like speed, much faster rebuilds than the full LTO release profile.
+[profile.fast-release]
+inherits = "release"
+lto = "thin"
+codegen-units = 16
+incremental = true

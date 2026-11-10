@@ -1,0 +1,5 @@
+# The Rust version pin lives in `rust-version` (workspace Cargo.toml). No channel is set on
+# purpose: this keeps the host toolchain the developer already uses. The file only makes sure
+# the local toolchain has the components the lint/format targets need.
+[toolchain]
+components = ["rustfmt", "clippy"]
