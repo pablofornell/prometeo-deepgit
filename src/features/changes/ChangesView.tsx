@@ -1,7 +1,7 @@
 /**
  * "Local changes" tab (DESIGN.md 5.12, 5.13): every selected repo that has changes, grouped by repo, with
  * Conflicts / Staged / Unstaged sections, tree or flat file rows, multi-selection, keyboard, a commit box and
- * the banner of a merge / rebase / cherry-pick in progress. The diff of the selected file is the diff island's job.
+ * the banner of a merge / rebase / cherry-pick in progress. The diff of the selected file is the "File changes" tab's job.
  */
 import { For, type JSX, Show, createEffect, createMemo, createResource, createSignal, mapArray, on, onCleanup, onMount } from "solid-js";
 import * as api from "../../api/tauri";
@@ -236,7 +236,7 @@ export function ChangesView(): JSX.Element {
     }),
   );
 
-  // the diff island must not keep showing a file that is no longer changed
+  // the File changes tab must not keep showing a file that is no longer changed
   createEffect(() => {
     const f = selectedFile();
     if (!f || f.spec.kind === "commit") return;

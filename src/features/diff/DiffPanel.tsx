@@ -1,13 +1,17 @@
-/** The diff island content: the diff of the file selected in the selection store, or an empty state. */
+/** The "File changes" tab of the right column: the diff of the file selected in the selection store, or a hint. */
 import { type JSX, Show } from "solid-js";
 import { EmptyState } from "../../components/ui";
 import * as actions from "../../state/actions";
-import { selectedFile } from "../../state/selection";
+import { mainTab, selectedFile } from "../../state/selection";
 import { DiffViewer } from "./DiffViewer";
 
 export function DiffPanel(): JSX.Element {
   return (
-    <Show when={selectedFile()} fallback={<EmptyState icon="file" title="Select a file">Pick a file in the list to see its changes.</EmptyState>}>
+    <Show when={selectedFile()} fallback={
+        <EmptyState icon="file" title="No file selected">
+          {mainTab() === "changes" ? "Select a file in Local changes." : "Select a file in Changed files."}
+        </EmptyState>
+      }>
       {(f) => (
         <DiffViewer
           repoId={f().repoId}

@@ -1,15 +1,16 @@
 /**
- * Diff shortcuts (DESIGN.md section 8). Several viewers can be mounted at once (diff island, Local changes);
+ * Diff shortcuts (DESIGN.md section 8). Several viewers can be mounted at once;
  * the shortcuts act on the one the user touched last.
  */
 import { register } from "../../state/keymap";
-import { setSetting, settings } from "../../state/settings";
 
 export interface DiffController {
   /** Moves to the next change; false when there is none (the key then passes through). */
   next(): boolean;
   prev(): boolean;
   toggleIgnoreWhitespace(): void;
+  /** Flips the layout this viewer shows (side by side / unified) and remembers the choice. */
+  toggleMode(): void;
 }
 
 const stack: DiffController[] = [];
@@ -23,12 +24,7 @@ function ensureBindings(): void {
   offs = [
     register("diff.nextChange", "F7", () => top()?.next() ?? false, { title: "Next change", group: "Diff", when }),
     register("diff.prevChange", "Shift+F7", () => top()?.prev() ?? false, { title: "Previous change", group: "Diff", when }),
-    register(
-      "diff.toggleMode",
-      "Ctrl+Alt+D",
-      () => setSetting("diffMode", settings.diffMode === "sideBySide" ? "unified" : "sideBySide"),
-      { title: "Diff: side by side / unified", group: "Diff", when },
-    ),
+    register("diff.toggleMode", "Ctrl+Alt+D", () => top()?.toggleMode(), { title: "Diff: side by side / unified", group: "Diff", when }),
     register("diff.toggleWhitespace", "Ctrl+Alt+W", () => top()?.toggleIgnoreWhitespace(), { title: "Diff: toggle ignore whitespace", group: "Diff", when }),
   ];
 }

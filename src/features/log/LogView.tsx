@@ -378,7 +378,11 @@ export function LogView(): JSX.Element {
   const inList = () => !!listEl()?.contains(document.activeElement);
   const onLogTab = () => mainTab() === "log";
   // DESIGN.md 8 "Esc - Return focus to the log": from the details or diff islands back to the commit list
-  const inDetailsOrDiff = () => !!(document.activeElement as HTMLElement | null)?.closest?.('[aria-label="Commit details"], [aria-label="Diff"]');
+  // (Esc in the "File changes" tab goes back to "Changed files" first: `diff.back` in state/shortcuts.ts.)
+  const inDetailsOrDiff = () => {
+    const el = document.activeElement as HTMLElement | null;
+    return !!el?.closest?.('[aria-label="Details"]') && !el.closest('[data-details-view="diff"]');
+  };
 
   onMount(() => {
     const offs = [

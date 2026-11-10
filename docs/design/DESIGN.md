@@ -49,16 +49,19 @@ Where DeepGit spends its boldness: the **repo spine**, the **branch matrix** and
 ```
 ┌──────────────────────────────────────────────────────────────────────────────────────────┐
 │ TITLE BAR 40px: logo · project ▾ · branch ▾ │ fetch pull push │  search  │ tools │ win  │
-├────┬───────────────┬──────────────────────────────────────────────┬──────────────────────┤
-│ S  │ SIDEBAR       │ LOG island                                   │ DETAILS island       │
-│ T  │ island        │  header 36 (tabs + actions)                  │  header 36           │
-│ R  │ 280 default   │  filter bar 32                               │  commit block        │
-│ I  │ 200..480      │  banner 34 (only when a repo is mid-op)      │  changed files       │
-│ P  │               │  column header 26                            │ 400 default          │
-│ E  │               │  rows 24 each (virtualized)                  │ 300..720             │
-│    │               ├──────────────────────────────────────────────┴──────────────────────┤
-│ 40 │               │ DIFF island (spans log + details) 330 default, min 160              │
-├────┴───────────────┴─────────────────────────────────────────────────────────────────────┤
+├────┬───────────────┬──────────────────────────────────────┬───────────────────────────┤
+│ S  │ SIDEBAR       │ LOG island                           │ RIGHT column island       │
+│ T  │ island        │  header 36 (tabs + actions)          │  header 36: tabs          │
+│ R  │ 280 default   │  filter bar 32                       │  [Changed files]          │
+│ I  │ 200..480      │  banner 34 (only when a repo is      │  [File changes]           │
+│ P  │               │   mid-op)                            │ Changed files: commit     │
+│ E  │               │  column header 26                    │  block + file tree        │
+│    │               │  rows 24 each (virtualized)          │ File changes: diff of     │
+│ 40 │               │                                      │  the selected file        │
+│    │               │                                      │ 42 % of the row, min 320  │
+│    │               ├──────────────────────────────────────┴───────────────────────────┤
+│    │               │ BOTTOM tool window (optional): Git console / Branch matrix        │
+├────┴───────────────┴──────────────────────────────────────────────────────────────────┤
 │ STATUS BAR 28px: console ticker · progress ·                ·  repo · branch · fetch age  │
 └──────────────────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -77,9 +80,9 @@ Where DeepGit spends its boldness: the **repo spine**, the **branch matrix** and
 | Gap between last island and right window edge | 6 px | — |
 | Gap between islands and title bar / status bar | 0 px (the bars have the window colour, so they read as the gap) | — |
 | Sidebar width | default 280, min 200, max 480 px | `--dg-sidebar-*` |
-| Details width | default 400, min 300, max 720 px | `--dg-details-*` |
-| Log minimum width | 480 px | `--dg-log-min-width` |
-| Diff island height | default 330 px, min 160 px | `--dg-diff-min-height` |
+| Right column width | default 42 % of the log + column row, min 320 px, max = row width − 480 px (maximized: row width − max(200 px, 15 %)) | `--dg-details-*` |
+| Log minimum width | 480 px (200 px while the right column is maximized) | `--dg-log-min-width` |
+| Bottom tool window height | default 20 % of the centre column, min 120 px | — |
 | Island header height | 36 px, padding 0 8 0 12 | `--dg-panel-header-*` |
 | Splitter drag zone | 6 px (the island gap) | `--dg-splitter-hit` |
 
@@ -89,10 +92,13 @@ Where DeepGit spends its boldness: the **repo spine**, the **branch matrix** and
 2. Splitters are invisible. The 6 px gap is the drag zone. Show `col-resize` or `row-resize` cursor on hover.
 3. Double-click a splitter to reset the two panels to their default sizes.
 4. Persist all panel sizes per project in the app config.
-5. When the window is narrower than 1320 px, collapse the details island under the log as a tab ("Commit") of the diff island.
-6. The diff island can be hidden with `Ctrl+D`. Then the log takes its height.
-7. A file opened from the details panel always shows in the diff island. Double-click opens the diff in a separate window.
-8. The sidebar can be hidden with `Alt+1`. The stripe button stays visible.
+5. The right column is one island with two tabs, drawn like the tabs of the log island: **Changed files** (the commit block and the file tree of the selected commit) and **File changes** (the diff of the selected file). Both tabs stay mounted; the inactive one is only hidden, so the diff keeps its scroll position and the tree keeps its expanded folders and selection. The commit actions (copy hash, cherry-pick, more) sit at the right of the tabs and show only on **Changed files**.
+6. There is no diff island under the log: the log and the Local changes list use the full height of the centre column (minus the optional bottom tool window).
+7. A click (or `Enter`) on a file in **Changed files** opens it in **File changes**; arrow keys in the tree only move the selection. A file chosen in the Local changes list opens in **File changes** too. When the selected commit changes, the open file stays (shown at the new commit) if the new commit changes the same path in the same repository; otherwise the column returns to **Changed files**. `Ctrl+D` shows **File changes**; `Esc` inside the diff goes back to **Changed files** (focus on the tree); a second `Esc` returns the focus to the log.
+8. **File changes** has a maximize button (and a double-click on its tab) that widens the column to most of the row; a second toggle restores it. Dragging the splitter, or leaving the tab, also restores it. The persisted width is `split.details`; an old or too large value is clamped.
+9. In a diff pane narrower than 720 px the diff uses the unified layout, unless the user chose a layout in this session (header switch or `Ctrl+Alt+D`). The header then shows icon-only layout buttons and a short "2/9" change counter.
+10. Opening a diff in a separate window is not built.
+11. The sidebar can be hidden with `Alt+1`. The stripe button stays visible.
 
 ### 2.4 Window shell (Tauri)
 
@@ -824,7 +830,7 @@ Destructive actions (hard reset, force delete, discard, drop stash) use `--dg-bu
 
 ### 5.12 Local changes view
 
-Location: tab "Local changes" in the log island. The diff island shows the selected file.
+Location: tab "Local changes" in the log island. The **File changes** tab of the right column shows the selected file.
 
 Layout of the tab (top to bottom):
 
@@ -837,7 +843,7 @@ Layout of the tab (top to bottom):
 
 Row actions on hover (right side, 22 px icon buttons): Stage / Unstage, Discard (with confirm dialog), Open file.
 
-Hunk staging: in the diff island, each hunk gets a 20 px action strip at its top right: "Stage hunk", "Discard hunk". Line selection with `Shift+click` on line numbers enables "Stage selected lines".
+Hunk staging: in the **File changes** tab, each hunk gets a 20 px action strip at its top right: "Stage hunk", "Discard hunk". Line selection with `Shift+click` on line numbers enables "Stage selected lines".
 
 Multi-repo commit: when the scope has more than one repo, the button text is "Commit in 3 repos". One message goes to all repos. The console shows one command per repo.
 
@@ -906,7 +912,7 @@ Message rules:
 
 ### 5.18 Git console tool window (`Alt+9`)
 
-1. Opens as a bottom island under the diff (default 220 px high) or replaces the diff island if the user drags it there.
+1. Opens as a bottom island under the log and the right column (default 20 % of the centre column, min 120 px).
 2. Background `--dg-console-bg`, mono 12/20, padding 8 12.
 3. Each command is one block:
 
@@ -1032,7 +1038,8 @@ Windows/Linux keys. On macOS, `Ctrl` becomes `Cmd` and `Alt` becomes `Option`.
 | Tool windows | `Alt+3` | Stashes |
 | Tool windows | `Alt+9` | Git console |
 | Tool windows | `Esc` | Return focus to the log |
-| Tool windows | `Ctrl+D` | Show or hide the diff island |
+| Tool windows | `Ctrl+D` | Show the **File changes** tab (the diff) |
+| Tool windows | `Esc` (in the diff) | Back to the **Changed files** tab |
 | Log | `↑` `↓` | Previous / next commit |
 | Log | `PgUp` `PgDn` `Home` `End` | Scroll by page / to start / to end |
 | Log | `Ctrl+F` | Focus the text filter |

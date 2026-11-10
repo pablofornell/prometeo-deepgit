@@ -1,5 +1,6 @@
 /* Diff viewer (DESIGN.md 5.10). Prefix dg-diff-. Colours and sizes come from tokens only. */
 .dg-diff { display: flex; flex-direction: column; height: 100%; min-height: 0; min-width: 0; --dgd-gutter: var(--dg-diff-gutter-width); }
+.dg-diff:focus { outline: 0; }
 .dg-diff.has-no-ln { --dgd-gutter: calc(var(--dg-diff-gutter-width) / 6); }
 
 /* ---- toolbar ---- */

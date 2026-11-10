@@ -60,10 +60,8 @@
   --dg-sidebar-width: 280px;       /* default */
   --dg-sidebar-min-width: 200px;
   --dg-sidebar-max-width: 480px;
-  --dg-details-width: 400px;       /* commit details island, default */
-  --dg-details-min-width: 300px;
-  --dg-details-max-width: 720px;
-  --dg-diff-min-height: 160px;
+  --dg-details-width: 42%;         /* right column (Changed files / File changes), default share of the row */
+  --dg-details-min-width: 320px;
   --dg-log-min-width: 480px;
   --dg-splitter-hit: 6px;          /* invisible drag zone = island gap */
   --dg-panel-header-height: round(calc(36 * var(--dg-u)), 1px);  /* island header (title + actions) */

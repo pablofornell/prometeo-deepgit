@@ -8,8 +8,8 @@ Each folder in `src/features/` is one feature with **one root component** (names
 | `sidebar/` | `Sidebar()` | Island content (header + tree). |
 | `log/` | `LogView()` | Log tab content: filter bar, banners, rows. Put header buttons in `<HeaderSlot name="main">`. |
 | `changes/` | `ChangesView()` | "Local changes" tab content. |
-| `details/` | `CommitDetails()` | Reads `selectedCommit()`. |
-| `diff/` | `DiffViewer(props)`, `DiffPanel()` | `DiffPanel` is done; `DiffViewer` props are the contract (see file). |
+| `details/` | `CommitDetails()` | "Changed files" tab of the right column. Reads `selectedCommit()`. Puts its header buttons in `<HeaderSlot name="details">`. |
+| `diff/` | `DiffViewer(props)`, `DiffPanel()` | `DiffPanel` is the "File changes" tab of the right column; `DiffViewer` props are the contract (see file). |
 | `palette/` | `SearchEverywhere()` | Mounted once by `App`; registers its own keys (`Shift Shift`, `Ctrl+K`). |
 | `console/` | `GitConsole()` | Bottom tool window. |
 | `matrix/` | `BranchMatrix()` | Bottom tool window. |
@@ -17,7 +17,7 @@ Each folder in `src/features/` is one feature with **one root component** (names
 | `welcome/` | `Welcome()` | Shown when the workspace has no project. Keep the drag bar + `WindowControls`. |
 | `settings/` | `SettingsDialog`, `registerSettings()`, `SettingsHost` | Settings window and zoom keys. Sections are plain files, see "Settings sections" below. |
 | `dialogs/` | `registerAllDialogs()` | Add `registerDialog(name, Component)` lines. |
-| `shell/` | `Shell()` | Window layout. Owned by the foundation, not by feature agents. |
+| `shell/` | `Shell()` | Window layout (the right column tabs live here). Owned by the foundation, not by feature agents. |
 
 Files in `titlebar/ ... welcome/` currently hold **stubs**. Replace the stub, keep the export name and props.
 `Sidebar` and `LogView` stubs already show the wiring (`Tree`, `VirtualList`, log sessions); throw them away freely.
@@ -50,11 +50,11 @@ feature. Cross-feature communication goes through `state/` (selection, layout, a
 |---|---|
 | `workspace.ts` | `workspace` (store), `activeProject()`, `projectRepos()`, `repoById(id)`, `repoColor(repo)`, `selectedRepoIds()` / `selectedRepos()` (the repo filter), `setSelectedRepoIds`, `toggleRepo`, `selectOnlyRepo`, `selectAllRepos`, `isRepoFilterActive()`, `focusedRepo()` / `setFocusedRepoId` (target of single-repo commands), `summary(repoId)` (reactive `RepoSummary`), `projectTotals()` (ahead/behind/changes/operations), `refreshSummaries(ids?)`, `addProject`, `setActiveProject`, `removeProject`, `rescanProject`. Summaries refresh themselves on `repo-changed` (throttled). |
 | `refs.ts` | `repoRefs(repoId)` -> accessor of `Refs` (first read loads it), `refreshRefs`, `ensureRefs(ids)`, `cachedRefs`, `hasLocalBranch`, `hasRemoteBranch`. Auto-refresh on `repo-changed`. |
-| `selection.ts` | `selectedCommit()` / `setSelectedCommit({repoId, oid})`, `selectedFile()` / `selectFile({repoId, spec, path, oldPath?})`, `mainTab()` / `setMainTab("log" \| "changes")`, `changesRepoId()` / `setChangesRepoId`, `clearSelection()`. |
+| `selection.ts` | `selectedCommit()` / `setSelectedCommit({repoId, oid})`, `selectedFile()` / `selectFile({repoId, spec, path, oldPath?}, { reveal? })`, `detailsTab()` / `setDetailsTab("files" \| "diff")`, `mainTab()` / `setMainTab("log" \| "changes")`, `changesRepoId()` / `setChangesRepoId`, `clearSelection()`. |
 | `settings.ts` | `settings` store (`theme`, `dateFormat`, `diffMode`, `showGraph`, `laneColors`, `comfortableRows`, `showBackgroundCommands`, `fontSize`, `editorFontSize`, `uiScale`), `setSetting(key, value)` (validated, persisted as `deepgit.ui.<key>`), `resetSettings(keys?)`, `SETTING_DEFAULTS`, `zoomUi(+1 \| -1)`, `toggleTheme()`, `resolvedTheme()`. Add a key: extend `Settings`, `SETTING_DEFAULTS` and `SANITIZERS`. |
 | `appearance.ts` | Pure maths of font size / editor size / UI scale: limits, `sanitize*`, `appearanceVars()` (the CSS variables). `index.html` repeats it before first paint; `prepaint.test.ts` checks both agree. |
 | `metrics.ts` | `cssPx(token, fallback)` (resolved px of a CSS token, reactive to font-size changes), `appearanceRev()`. |
-| `layout.ts` | `sidebarVisible()`, `diffVisible()`, `bottomTool()` ("console" \| "matrix" \| null), `toggleSidebar`, `toggleDiff`, `openBottomTool(tool)`, `toggleBottomTool(tool)`. |
+| `layout.ts` | `sidebarVisible()`, `bottomTool()` ("console" \| "matrix" \| null), `toggleSidebar`, `openBottomTool(tool)`, `toggleBottomTool(tool)`. (The diff island and `diffVisible` / `toggleDiff` are gone.) |
 | `console.ts` | `consoleEntries()` (ring of 500 `ConsoleEntry`), `lastUserEntry()` (ticker), `lastConsoleEntry()`, `isBackgroundEntry(e)`, `clearConsole()`, `formatCommand(e)`. |
 | `events.ts` | `repoVersion(repoId)` / `anyRepoVersion()` (reactive counters bumped on every change), `subscribeRepoChanged(cb)`, `notifyRepoChanged(id)`. Never call `onRepoChanged` / `onGitConsole` yourself. |
 | `activity.ts` | `activities()` (running operations for the progress widget), `beginActivity(label, total)`. |
@@ -129,6 +129,27 @@ through. Plain keys do not fire inside inputs (set `allowInInput`). `bindings()`
 `runBinding(id)` executes one, `shortcutLabel(id)` / `formatKeys` give display text for tooltips. Global shortcuts (tool windows,
 fetch/pull/push, refresh) are already registered in `state/shortcuts.ts`; do not register them again.
 
+## Right column: Changed files / File changes
+
+The right column of the centre row is one island with two tabs, owned by `shell/Shell.tsx`. `detailsTab()` in `state/selection.ts` holds the active one.
+
+| Tab | Content | Mounted |
+|---|---|---|
+| `"files"` Changed files | `CommitDetails` (commit block + file tree / list) | always, hidden with `hidden` when inactive |
+| `"diff"` File changes | `DiffPanel` (the `DiffViewer` of `selectedFile()`, or the hint "Select a file in Changed files") | always, hidden with `hidden` when inactive |
+
+Both stay mounted so the diff keeps its scroll position and the tree keeps its folders and selection. `DiffViewer` ignores the 0 px size of a hidden tab and puts the scroll offset back when it is shown again.
+
+Rules (keep them simple; change them here and in `DESIGN.md` 2.3 together):
+
+1. `selectFile(file)` selects the file **and** shows File changes. `selectFile(file, { reveal: false })` only selects (used for arrow keys in the tree and for re-pointing). `selectFile(null)` does not change the tab.
+2. In Changed files a click or `Enter` / double-click on a file opens File changes; arrow keys only move the selection. In the Local changes list every file selection opens File changes (the list stays focused).
+3. When the selected commit changes (Log tab only), `CommitDetails` asks `followFile()` (`state/fileFollow.ts`): if the new commit changes the same path in the same repo, the open file is re-pointed to the new commit and the tab does not change; otherwise the file is dropped (commit files only; a Local changes file stays selected) and the column returns to Changed files. Selecting no commit, or a commit that fails to load, does the same.
+4. Keys (`state/shortcuts.ts`): `Ctrl+D` = File changes; `Esc` while the focus is inside File changes = back to Changed files, focus on the tree (id `diff.back`; the log's own `Esc` ignores the File changes tab); the palette actions "Show file changes (the diff)", "Show changed files (Esc in the diff)" and "Maximize or restore the file changes" do the same without keys.
+5. Width: persisted `deepgit.ui.split.details` (px, set by dragging the splitter). Without a value the column takes 42 % of the row. It is clamped on every use (min 320 px, the log keeps 480 px). **Maximize** (button next to the tabs, double-click on the File changes tab) shows the column at row width minus a strip of at least 200 px for the log; it is not persisted and ends when the user leaves File changes or drags the splitter. See `shell/widths.ts`.
+6. Diff layout: the user's choice of this session (`explicitDiffMode` in `diff/diffPrefs.ts`, set by the header switch and `Ctrl+Alt+D`) wins; otherwise a diff pane narrower than 720 px (`NARROW_DIFF_PX`) uses unified; otherwise the saved `diffMode` setting. Hunk buttons and `F7` work in both layouts.
+7. Old localStorage values are ignored: `diffVisible` is never read, `shell.ratios` keeps only `bottom` (`sanitizeRatios`).
+
 ## UI components (`src/components/ui`, `import { ... } from "../../components/ui"`)
 
 Open `http://localhost:1420/#gallery` for a live catalogue of everything below.
@@ -141,7 +162,7 @@ Open `http://localhost:1420/#gallery` for a live catalogue of everything below.
 `tip("text", "Ctrl+T")` / `use:tooltip` / native `title="Text  Shortcut"`, `Splitter` + `loadSplitSize(key, default)`,
 `VirtualList` (`count`, `rowHeight`, `renderRow(i)`, `onRangeChange(start, end)`, `selectedIndex`, `onSelect(i)` for keyboard, `apiRef` -> `scrollToIndex`),
 `Tree<T>` (`roots`, `getId`, `getChildren`, `renderNode`, `expanded` + `onExpandedChange` via `createExpanded()`, `selectedId`, `onSelect`, `onActivate`, `onContextMenu`),
-`Badge`, `Pill`, `Kbd`, `Spinner`, `ProgressBar`, `EmptyState`, `Avatar` (`name`, `email`, `size`), `HeaderSlot name="main"`.
+`Badge`, `Pill`, `Kbd`, `Spinner`, `ProgressBar`, `EmptyState`, `Avatar` (`name`, `email`, `size`), `HeaderSlot name="main" | "details"`.
 Git-specific: `RepoChip`, `RepoSquare`, `RefPill` / `RefPills` (split HEAD pill, synced pill, +N), `AheadBehind`, `StatusLetter`.
 Helpers: `formatLogDate`, `formatRelative`, `formatDateTime`, `shortOid`, `initials`, `fnv1a`, `splitPath`, `statusLetter`,
 `statusColorVar`, `fileIconFor(path)`, `copyText`, `plural`, `joinNames`.

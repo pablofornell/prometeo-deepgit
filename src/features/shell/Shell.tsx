@@ -1,9 +1,9 @@
 /**
- * The window layout of DESIGN.md section 2: title bar, tool stripe, islands (sidebar, main with tabs, details,
- * diff, optional bottom tool window) and status bar. Feature components fill the islands; the shell owns sizes,
- * visibility and the splitters.
+ * The window layout of DESIGN.md section 2: title bar, tool stripe, islands (sidebar, main with tabs, the right
+ * column with the "Changed files" / "File changes" tabs, optional bottom tool window) and status bar. Feature
+ * components fill the islands; the shell owns sizes, visibility and the splitters.
  */
-import { type JSX, Show, createMemo, createSignal, onCleanup, onMount } from "solid-js";
+import { type JSX, Show, createEffect, createMemo, createSignal, on, onCleanup, onMount } from "solid-js";
 import { HeaderSlotTarget, Icon, IconButton, Splitter, loadSplitSize, openMenu, plural, markNotificationsRead, notifications, unreadCount, formatRelative, type IconName } from "../../components/ui";
 import { tip } from "../../components/ui";
 import { ChangesView } from "../changes/ChangesView";
@@ -15,17 +15,16 @@ import { LogView } from "../log/LogView";
 import { Sidebar } from "../sidebar/Sidebar";
 import { StatusBar } from "../statusbar/StatusBar";
 import { TitleBar } from "../titlebar/TitleBar";
-import { bottomTool, diffVisible, openBottomTool, setSidebarVisible, sidebarVisible, toggleBottomTool, toggleSidebar, type BottomTool } from "../../state/layout";
-import { mainTab, setMainTab } from "../../state/selection";
+import { bottomTool, openBottomTool, setSidebarVisible, sidebarVisible, toggleBottomTool, toggleSidebar, type BottomTool } from "../../state/layout";
+import { detailsTab, mainTab, setDetailsTab, setMainTab } from "../../state/selection";
 import { activeProject, projectTotals, selectedRepos } from "../../state/workspace";
-import { keysFor, formatKeys } from "../../state/keymap";
+import { keysFor, formatKeys, register } from "../../state/keymap";
 import { loadPersisted, savePersisted } from "../../state/persist";
-import { DEFAULT_RATIOS, allocate, maxFor, ratioFor, sanitizeRatios, type Mins, type Ratios } from "./heights";
+import { DEFAULT_RATIOS, allocate, maxBottom, ratioFor, sanitizeRatios, type Mins, type Ratios } from "./heights";
+import { clampDetails, defaultDetails, maxDetails, maximizedDetails } from "./widths";
 import "./shell.css";
 
-const MIN_LOG_WIDTH = 480;
 const SPLIT = 6;
-const MIN_DIFF = 160;
 const MIN_BOTTOM = 120;
 const RATIOS_KEY = "shell.ratios";
 
@@ -60,30 +59,69 @@ const keyOf = (id: string) => {
 
 export function Shell(): JSX.Element {
   const [sidebarW, setSidebarW] = createSignal(loadSplitSize("sidebar", 280));
-  const [detailsW, setDetailsW] = createSignal(loadSplitSize("details", 400));
-  // The diff island and the bottom tool window keep a persisted share of the centre column; the main row takes the rest.
+  // Width of the right column: the persisted px (NaN = never dragged: 42 % of the row), clamped on every use.
+  const [detailsPref, setDetailsPref] = createSignal(loadSplitSize("details", Number.NaN));
+  const [rowW, setRowW] = createSignal(0);
+  const [maximized, setMaximized] = createSignal(false);
+  // The bottom tool window keeps a persisted share of the centre column; the main row takes the rest.
   const [ratios, setRatios] = createSignal<Ratios>(sanitizeRatios(loadPersisted<Partial<Ratios> | null>(RATIOS_KEY, null)));
   const [centerH, setCenterH] = createSignal(0);
   let topRow: HTMLDivElement | undefined;
   let center: HTMLDivElement | undefined;
 
   const toastWidth = () => (sidebarVisible() ? Math.min(384, Math.max(260, sidebarW() - 12)) : 320);
-  const maxDetails = () => Math.max(300, Math.min(720, (topRow?.clientWidth ?? 1600) - MIN_LOG_WIDTH - SPLIT));
-  const mins = (): Mins => ({ top: tokenPx("--dg-shell-main-min-height", 260), diff: MIN_DIFF, bottom: MIN_BOTTOM });
-  const heights = createMemo(() => allocate(centerH() || 900, SPLIT, diffVisible(), bottomTool() !== null, ratios(), mins()));
-  const setRatio = (part: "diff" | "bottom", px: number) => {
-    const next = sanitizeRatios({ ...ratios(), [part]: ratioFor(px, heights().available) });
+  const rowWidth = () => rowW() || 1300;
+  const detailsW = createMemo(() => (maximized() ? maximizedDetails(rowWidth(), SPLIT) : clampDetails(detailsPref(), rowWidth(), SPLIT)));
+  const resizeDetails = (px: number) => {
+    setMaximized(false);
+    setDetailsPref(px);
+  };
+  const mins = (): Mins => ({ top: tokenPx("--dg-shell-main-min-height", 260), bottom: MIN_BOTTOM });
+  const heights = createMemo(() => allocate(centerH() || 900, SPLIT, bottomTool() !== null, ratios(), mins()));
+  const setBottomRatio = (px: number) => {
+    const next = sanitizeRatios({ bottom: ratioFor(px, heights().available) });
     setRatios(next);
     savePersisted(RATIOS_KEY, next);
   };
-  const maxPart = (part: "diff" | "bottom") => () => maxFor(part, heights(), mins(), diffVisible(), bottomTool() !== null);
 
   onMount(() => {
     if (!center) return;
     setCenterH(center.clientHeight);
-    const ro = new ResizeObserver(() => center && setCenterH(center.clientHeight));
+    const ro = new ResizeObserver(() => {
+      if (center) setCenterH(center.clientHeight);
+      if (topRow) setRowW(topRow.clientWidth);
+    });
     ro.observe(center);
+    if (topRow) {
+      setRowW(topRow.clientWidth);
+      ro.observe(topRow);
+    }
     onCleanup(() => ro.disconnect());
+  });
+
+  // The maximized column only makes sense on "File changes": leaving that tab restores the width.
+  createEffect(on(detailsTab, (t) => t !== "diff" && setMaximized(false), { defer: true }));
+  // A click or Enter in the file tree hides the tree under the focus: move the focus into the diff so Esc works at once.
+  // (A file chosen in the Local changes list keeps the focus there.)
+  createEffect(
+    on(
+      detailsTab,
+      (t) => {
+        if (t !== "diff") return;
+        const active = document.activeElement;
+        if (active && active !== document.body && !active.closest('[data-details-view="files"]')) return;
+        queueMicrotask(() => document.querySelector<HTMLElement>('[data-details-view="diff"] .dg-diff')?.focus());
+      },
+      { defer: true },
+    ),
+  );
+  const toggleMaximized = () => {
+    setDetailsTab("diff");
+    setMaximized(!maximized());
+  };
+  onMount(() => {
+    const off = register("view.maximizeDiff", [], toggleMaximized, { title: "Maximize or restore the file changes", group: "Tool windows" });
+    onCleanup(off);
   });
 
   const logSubtitle = createMemo(() => {
@@ -157,23 +195,45 @@ export function Shell(): JSX.Element {
                   <ChangesView />
                 </div>
               </section>
-              <Splitter orientation="vertical" reverse size={detailsW()} onSize={setDetailsW} min={300} max={maxDetails} defaultSize={400} persistKey="details" />
-              <aside class="dg-shell-island dg-shell-details" style={{ width: detailsW() + "px" }} aria-label="Commit details">
-                <CommitDetails />
+              <Splitter orientation="vertical" reverse size={detailsW()} onSize={resizeDetails} min={320} max={() => maxDetails(rowWidth(), SPLIT)} defaultSize={defaultDetails(rowWidth(), SPLIT)} persistKey="details" />
+              <aside class="dg-shell-island dg-shell-details" style={{ width: detailsW() + "px" }} aria-label="Details">
+                <div class="dg-shell-head" role="tablist" aria-label="Details tabs">
+                  <button type="button" role="tab" aria-selected={detailsTab() === "files"} class="dg-shell-tab" classList={{ "is-on": detailsTab() === "files" }} onClick={() => setDetailsTab("files")}>
+                    Changed files
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={detailsTab() === "diff"}
+                    class="dg-shell-tab"
+                    classList={{ "is-on": detailsTab() === "diff" }}
+                    {...tip("File changes\nDouble-click to maximize", keyOf("tool.diff"))}
+                    onClick={() => setDetailsTab("diff")}
+                    onDblClick={toggleMaximized}
+                  >
+                    File changes
+                  </button>
+                  <span class="dg-grow" />
+                  <span class="dg-shell-slot" hidden={detailsTab() !== "files"}>
+                    <HeaderSlotTarget name="details" />
+                  </span>
+                  <Show when={detailsTab() === "diff"}>
+                    <IconButton icon={maximized() ? "restore" : "maximize"} label={maximized() ? "Restore the column width" : "Maximize the file changes"} active={maximized()} onClick={toggleMaximized} />
+                  </Show>
+                </div>
+                <div class="dg-shell-view" data-details-view="files" hidden={detailsTab() !== "files"}>
+                  <CommitDetails />
+                </div>
+                <div class="dg-shell-view" data-details-view="diff" hidden={detailsTab() !== "diff"}>
+                  <DiffPanel />
+                </div>
               </aside>
             </div>
-
-            <Show when={diffVisible()}>
-              <Splitter orientation="horizontal" reverse size={heights().diff} onSize={(px) => setRatio("diff", px)} min={MIN_DIFF} max={maxPart("diff")} defaultSize={Math.round(heights().available * DEFAULT_RATIOS.diff)} />
-              <section class="dg-shell-island dg-shell-diff" style={{ height: heights().diff + "px" }} aria-label="Diff">
-                <DiffPanel />
-              </section>
-            </Show>
 
             <Show when={bottomTool()}>
               {(tool) => (
                 <>
-                  <Splitter orientation="horizontal" reverse size={heights().bottom} onSize={(px) => setRatio("bottom", px)} min={MIN_BOTTOM} max={maxPart("bottom")} defaultSize={Math.round(heights().available * DEFAULT_RATIOS.bottom)} />
+                  <Splitter orientation="horizontal" reverse size={heights().bottom} onSize={setBottomRatio} min={MIN_BOTTOM} max={() => maxBottom(heights(), mins())} defaultSize={Math.round(heights().available * DEFAULT_RATIOS.bottom)} />
                   <section class="dg-shell-island dg-shell-bottom" style={{ height: heights().bottom + "px" }} aria-label={bottomLabel[tool()]}>
                     <div class="dg-shell-head">
                       <button type="button" class="dg-shell-tab" classList={{ "is-on": tool() === "console" }} onClick={() => openBottomTool("console")}>

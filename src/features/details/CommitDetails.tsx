@@ -1,19 +1,21 @@
 /**
- * Commit details island (DESIGN.md 5.8, 5.9): identity, subject, body, people, parents / branches / push state
- * and the changed files (tree or list). Reads `selectedCommit()`; selecting a file fills the diff island.
+ * "Changed files" tab of the right column (DESIGN.md 5.8, 5.9): identity, subject, body, people, parents / branches /
+ * push state and the changed files (tree or list). Reads `selectedCommit()`; clicking a file or pressing Enter on it
+ * opens it in the "File changes" tab. The commit actions go to the column header (`HeaderSlot name="details"`).
  */
 import { type JSX, For, Match, Show, Switch, batch, createEffect, createMemo, createSignal, on, untrack } from "solid-js";
 import * as api from "../../api/tauri";
 import type { CommitDetails as CommitDetailsData, FileChange, RefLabel } from "../../api/types";
 import {
-  Avatar, Button, EmptyState, Icon, IconButton, RefPill, RepoChip, SegmentedControl, StatusLetter, Tree, copyText, createExpanded, fileIconFor,
+  Avatar, Button, EmptyState, HeaderSlot, Icon, IconButton, RefPill, RepoChip, SegmentedControl, StatusLetter, Tree, copyText, createExpanded, fileIconFor,
   formatRelative, openContextMenu, openMenu, plural, shortOid, splitPath, statusColorVar, toast, type MenuItem, type TreeRowInfo,
 } from "../../components/ui";
 import * as actions from "../../state/actions";
 import { repoVersion } from "../../state/events";
 import { loadPersisted, savePersisted } from "../../state/persist";
 import { refsVersion, repoRefs } from "../../state/refs";
-import { selectFile, selectedCommit, selectedFile, setSelectedCommit } from "../../state/selection";
+import { followFile } from "../../state/fileFollow";
+import { mainTab, selectFile, selectedCommit, selectedFile, setDetailsTab, setSelectedCommit } from "../../state/selection";
 import { repoById, summary } from "../../state/workspace";
 import { committerDiffers, pushState, whenText, type PushState } from "./commitText";
 import { buildFileTree, dirIds, fileId, flatFiles, totals, type DirNode, type FileNode, type TreeNode } from "./fileTree";
@@ -257,19 +259,52 @@ export function CommitDetails(): JSX.Element {
 
   const specFor = (d: CommitDetailsData) => ({ kind: "commit" as const, oid: d.oid, parent: parentIdx() === 0 ? null : d.parents[parentIdx()] ?? null });
 
-  const openFile = (f: FileChange) => {
+  /** Selects a file; `reveal` also opens the "File changes" tab (click, Enter, menu), a keyboard move in the tree does not. */
+  const openFile = (f: FileChange, reveal = true) => {
     const d = details();
     if (!d) return;
-    selectFile({ repoId: d.repoId, spec: specFor(d), path: f.path, oldPath: f.oldPath ?? undefined });
+    selectFile({ repoId: d.repoId, spec: specFor(d), path: f.path, oldPath: f.oldPath ?? undefined }, { reveal });
   };
 
-  // The selected row follows the file in the selection store (e.g. chosen from the palette).
+  // The commit changed while a file was open: keep it (pointed at the new commit) when the new commit changes the same
+  // path, otherwise drop it and return to "Changed files". Only in the Log: Local changes files do not depend on the commit.
+  createEffect(
+    on(
+      () => details()?.oid,
+      (oid) => {
+        const d = untrack(details);
+        const f = untrack(selectedFile);
+        if (!oid || !d || !f || untrack(mainTab) !== "log") return;
+        const next = followFile(f, d, untrack(parentIdx));
+        if (next === f) return;
+        if (next) selectFile(next, { reveal: false });
+        else {
+          if (f.spec.kind === "commit") selectFile(null);
+          setDetailsTab("files");
+        }
+      },
+      { defer: true },
+    ),
+  );
+  // The new commit could not be loaded: the old file means nothing any more.
+  createEffect(
+    on(status, (st) => {
+      if (st !== "error" || untrack(mainTab) !== "log") return;
+      if (untrack(selectedFile)?.spec.kind === "commit") selectFile(null);
+      setDetailsTab("files");
+    }, { defer: true }),
+  );
+
+  // The selected row follows the file in the selection store (e.g. chosen from the palette). A folder picked with the
+  // arrow keys wins until another file is selected, so the keys can walk over folders.
   const selectedId = createMemo(() => {
+    const dir = dirSel();
+    if (dir) return dir;
     const f = selectedFile();
     const d = details();
-    if (f && d && f.repoId === d.repoId && f.spec.kind === "commit" && f.spec.oid === d.oid) return fileId(f.path);
-    return dirSel();
+    return f && d && f.repoId === d.repoId && f.spec.kind === "commit" && f.spec.oid === d.oid ? fileId(f.path) : null;
   });
+  createEffect(on(selectedFile, () => setDirSel(null), { defer: true }));
 
   // Switching the parent re-opens the shown file against the new parent.
   createEffect(
@@ -278,13 +313,13 @@ export function CommitDetails(): JSX.Element {
       const f = selectedFile();
       if (d && f && f.repoId === d.repoId && f.spec.kind === "commit" && f.spec.oid === d.oid) {
         const change = d.files.find((x) => x.path === f.path);
-        if (change) openFile(change);
+        if (change) openFile(change, false);
       }
     }, { defer: true }),
   );
 
   const fileMenu = (f: FileChange): MenuItem[] => [
-    { label: "Show diff", icon: "sideBySide", onSelect: () => openFile(f) },
+    { label: "Show file changes", icon: "sideBySide", onSelect: () => openFile(f) },
     { separator: true },
     { label: "Copy path", icon: "copy", onSelect: () => void copy(f.path, "path") },
     { label: "Copy file name", onSelect: () => void copy(splitPath(f.path).name, "file name") },
@@ -401,20 +436,33 @@ export function CommitDetails(): JSX.Element {
     );
   };
 
+  /** Click or arrow keys: the row is selected, the diff follows quietly (the click handler below opens the tab). */
   const onSelectNode = (n: TreeNode) => {
     if (n.kind === "file") {
       setDirSel(null);
-      openFile(n.change);
+      openFile(n.change, false);
     } else setDirSel(n.id);
+  };
+  /** Enter or double-click on a file: show its changes. */
+  const onActivateNode = (n: TreeNode) => {
+    if (n.kind === "file") {
+      setDirSel(null);
+      openFile(n.change);
+    }
+  };
+  // A click on a file row opens "File changes"; the Tree reports clicks and arrow keys with the same callback, so the
+  // click is told apart here (the row's own handler has already selected the file when this runs).
+  const onFilesClick = (e: MouseEvent) => {
+    const row = (e.target as Element | null)?.closest?.(".dg-tree-row");
+    if (!row || (e.target as Element).closest(".dg-tree-chev") || !row.querySelector(".dg-details-fname")) return;
+    if (selectedFile()?.spec.kind === "commit") setDetailsTab("diff");
   };
 
   // ---------------------------------------------------------------- view
 
   return (
     <div class="dg-details">
-      <div class="dg-details-head">
-        <span class="dg-details-title">Commit</span>
-        <span class="dg-details-grow" />
+      <HeaderSlot name="details">
         <Show when={details()}>
           {(d) => (
             <>
@@ -424,7 +472,7 @@ export function CommitDetails(): JSX.Element {
             </>
           )}
         </Show>
-      </div>
+      </HeaderSlot>
 
       <Switch>
         <Match when={!selectedCommit()}>
@@ -553,7 +601,7 @@ export function CommitDetails(): JSX.Element {
                   </div>
                 </Show>
 
-                <div class="dg-details-files">
+                <div class="dg-details-files" onClick={onFilesClick}>
                   <Show when={files().length > 0} fallback={<div class="dg-details-nofiles">No files changed{d().parents.length > 1 ? " against the first parent" : ""}.</div>}>
                     <Show
                       when={fileView() === "tree"}
@@ -566,7 +614,7 @@ export function CommitDetails(): JSX.Element {
                           onExpandedChange={ex.set}
                           selectedId={selectedId()}
                           onSelect={onSelectNode}
-                          onActivate={onSelectNode}
+                          onActivate={onActivateNode}
                           onContextMenu={(n, e) => openContextMenu(e, fileMenu(n.change))}
                           guides={false}
                           ariaLabel="Changed files"
@@ -582,7 +630,7 @@ export function CommitDetails(): JSX.Element {
                         onExpandedChange={ex.set}
                         selectedId={selectedId()}
                         onSelect={onSelectNode}
-                        onActivate={(n) => (n.kind === "file" ? openFile(n.change) : ex.toggle(n.id))}
+                        onActivate={(n) => (n.kind === "file" ? onActivateNode(n) : ex.toggle(n.id))}
                         onContextMenu={(n, e) => n.kind === "file" && openContextMenu(e, fileMenu(n.change))}
                         ariaLabel="Changed files"
                         renderNode={(n, info) => renderFileRow(n, info)}

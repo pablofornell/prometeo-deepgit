@@ -12,9 +12,10 @@ import { Button, EmptyState, Icon, IconButton, SegmentedControl, Spinner, Status
 import { confirmAction } from "../../state/dialogs";
 import { repoVersion } from "../../state/events";
 import { cssPx } from "../../state/metrics";
-import { setSetting, settings } from "../../state/settings";
-import { collapseOn, ignoreWs, lineNumbersOn, setCollapseOn, setIgnoreWs, setLineNumbersOn, setSyntaxOn, setWordDiffOn, syntaxOn, wordDiffOn } from "./diffPrefs";
+import { settings } from "../../state/settings";
+import { chooseDiffMode, collapseOn, explicitDiffMode, ignoreWs, lineNumbersOn, setCollapseOn, setIgnoreWs, setLineNumbersOn, setSyntaxOn, setWordDiffOn, syntaxOn, wordDiffOn } from "./diffPrefs";
 import { activateDiff, releaseDiff, type DiffController } from "./diffKeys";
+import { NARROW_DIFF_PX, effectiveDiffMode } from "./diffMode";
 import {
   BIG_DIFF_LINES, CONTEXT, FULL_CONTEXT, buildItems, countLines, isWhitespaceOnly, statusOf, toSideBySide, toUnified, usableFull,
   type ChangeMark, type Model, type SbsRow, type UniRow,
@@ -62,8 +63,16 @@ export function DiffViewer(props: DiffViewerProps): JSX.Element {
   const [retry, setRetry] = createSignal(0);
   const [scrollTop, setScrollTop] = createSignal(0);
   const [viewH, setViewH] = createSignal(0);
+  // Width of the whole viewer (last measured while visible). A narrow pane shows unified unless the user chose a layout this session.
+  const [width, setWidth] = createSignal(0);
+  const narrow = () => width() > 0 && width() < NARROW_DIFF_PX;
+  const mode = createMemo(() => effectiveDiffMode(explicitDiffMode(), settings.diffMode, width()));
 
   let loadedKey = "";
+  let root: HTMLDivElement | undefined;
+  // Scroll offsets seen while the viewer was visible, put back when a hidden tab is shown again (a hidden element may lose them).
+  let seenTop = 0;
+  let seenLeft = 0;
   let seq = 0;
   let fullSeq = 0;
   let primary: HTMLDivElement | undefined;
@@ -164,7 +173,7 @@ export function DiffViewer(props: DiffViewerProps): JSX.Element {
     return buildItems(d, full(), { expanded: expanded(), expandAll: !collapseOn() });
   });
   const view = createMemo<View>(() =>
-    settings.diffMode === "unified" ? { kind: "uni", m: toUnified(items(), ignoreWs()) } : { kind: "sbs", m: toSideBySide(items(), ignoreWs()) },
+    mode() === "unified" ? { kind: "uni", m: toUnified(items(), ignoreWs()) } : { kind: "sbs", m: toSideBySide(items(), ignoreWs()) },
   );
   const sbsRows = createMemo(() => {
     const v = view();
@@ -203,15 +212,46 @@ export function DiffViewer(props: DiffViewerProps): JSX.Element {
     observer?.observe(el);
     setViewH(el.clientHeight);
     setScrollTop(el.scrollTop);
+    seenTop = el.scrollTop;
+    seenLeft = el.scrollLeft;
   };
+  const onResize = () => {
+    if (!primary || primary.clientHeight === 0) return;
+    // Visible again after a hidden tab: restore the scroll position, then measure.
+    if (primary.scrollTop !== seenTop || primary.scrollLeft !== seenLeft) {
+      primary.scrollTop = seenTop;
+      primary.scrollLeft = seenLeft;
+      if (left) {
+        left.scrollTop = seenTop;
+        left.scrollLeft = seenLeft;
+      }
+    }
+    setViewH(primary.clientHeight);
+    setScrollTop(primary.scrollTop);
+  };
+  let rootObserver: ResizeObserver | undefined;
   onMount(() => {
-    observer = new ResizeObserver(() => primary && setViewH(primary.clientHeight));
+    observer = new ResizeObserver(onResize);
     if (primary) observer.observe(primary);
+    // A hidden tab measures 0: keep the last real width so the layout does not flip while the tab is hidden.
+    const measureWidth = () => root && root.clientWidth > 0 && setWidth(root.clientWidth);
+    rootObserver = new ResizeObserver(measureWidth);
+    if (root) {
+      rootObserver.observe(root);
+      measureWidth();
+    }
   });
-  onCleanup(() => observer?.disconnect());
+  onCleanup(() => {
+    observer?.disconnect();
+    rootObserver?.disconnect();
+  });
 
   const onPrimaryScroll = () => {
     if (!primary) return;
+    if (primary.clientHeight > 0) {
+      seenTop = primary.scrollTop;
+      seenLeft = primary.scrollLeft;
+    }
     setScrollTop(primary.scrollTop);
     if (left) {
       if (left.scrollTop !== primary.scrollTop) left.scrollTop = primary.scrollTop;
@@ -249,6 +289,7 @@ export function DiffViewer(props: DiffViewerProps): JSX.Element {
     next: () => goTo(active() + 1),
     prev: () => goTo(active() - 1),
     toggleIgnoreWhitespace: () => setIgnoreWs(ignoreWs() === "off" ? "all" : "off"),
+    toggleMode: () => chooseDiffMode(mode() === "sideBySide" ? "unified" : "sideBySide"),
   };
   onMount(() => activateDiff(controller));
   onCleanup(() => releaseDiff(controller));
@@ -256,7 +297,7 @@ export function DiffViewer(props: DiffViewerProps): JSX.Element {
   // Keep the focused change in view when the layout switches.
   createEffect(
     on(
-      () => settings.diffMode,
+      mode,
       () => queueMicrotask(() => goTo(Math.min(active(), changes().length - 1))),
       { defer: true },
     ),
@@ -376,8 +417,10 @@ export function DiffViewer(props: DiffViewerProps): JSX.Element {
 
   return (
     <div
+      ref={root}
       class="dg-diff"
-      classList={{ "has-no-ln": !lineNumbersOn() }}
+      tabindex={-1}
+      classList={{ "has-no-ln": !lineNumbersOn(), "is-narrow": narrow() }}
       onPointerDown={() => activateDiff(controller)}
       onFocusIn={() => activateDiff(controller)}
     >
@@ -416,7 +459,7 @@ export function DiffViewer(props: DiffViewerProps): JSX.Element {
           <span class="dg-diff-nav">
             <IconButton icon="arrowUp" label="Previous change" shortcut="Shift+F7" iconSize={14} disabled={active() <= 0} onClick={() => goTo(active() - 1)} />
             <span class="dg-diff-nav-text">
-              Change {active() + 1} of {changes().length}
+              {narrow() ? `${active() + 1}/${changes().length}` : `Change ${active() + 1} of ${changes().length}`}
             </span>
             <IconButton icon="arrowDown" label="Next change" shortcut="F7" iconSize={14} disabled={active() >= changes().length - 1} onClick={() => goTo(active() + 1)} />
           </span>
@@ -424,11 +467,11 @@ export function DiffViewer(props: DiffViewerProps): JSX.Element {
         </Show>
         <SegmentedControl
           label="Diff layout"
-          value={settings.diffMode}
-          onChange={(m) => setSetting("diffMode", m)}
+          value={mode()}
+          onChange={chooseDiffMode}
           options={[
-            { value: "sideBySide", label: "Side by side", icon: "sideBySide", title: "Side by side  Ctrl+Alt+D" },
-            { value: "unified", label: "Unified", icon: "unified", title: "Unified  Ctrl+Alt+D" },
+            { value: "sideBySide", label: narrow() ? undefined : "Side by side", icon: "sideBySide", title: "Side by side  Ctrl+Alt+D" },
+            { value: "unified", label: narrow() ? undefined : "Unified", icon: "unified", title: "Unified  Ctrl+Alt+D" },
           ]}
         />
         <IconButton icon="more" label="Diff options" onClick={optionsMenu} />
@@ -484,7 +527,7 @@ export function DiffViewer(props: DiffViewerProps): JSX.Element {
         </Match>
         <Match when={hasBody()}>
           <Show
-            when={settings.diffMode === "sideBySide"}
+            when={mode() === "sideBySide"}
             fallback={
               <div class="dg-diff-body dg-diff-body-uni" classList={{ "is-busy": status() === "loading" }}>
                 <div class="dg-diff-cap">

@@ -5,13 +5,15 @@
  */
 import * as actions from "./actions";
 import { notifyRepoChanged } from "./events";
-import { openBottomTool, setSidebarVisible, toggleBottomTool, toggleDiff, toggleSidebar } from "./layout";
+import { openBottomTool, setSidebarVisible, toggleBottomTool, toggleSidebar } from "./layout";
 import { register } from "./keymap";
-import { mainTab, setMainTab } from "./selection";
+import { detailsTab, mainTab, setDetailsTab, setMainTab } from "./selection";
 import { toggleTheme } from "./settings";
 import { activeProject, focusedRepo, projectRepos, refreshSummaries } from "./workspace";
 
 const hasProject = () => !!activeProject();
+/** Focus is inside the "File changes" tab of the right column. */
+const inFileChanges = () => !!(document.activeElement as HTMLElement | null)?.closest?.('[data-details-view="diff"]');
 
 export function registerGlobalShortcuts(): void {
   // Ctrl chords do not fire in text fields unless `allowInInput`: none of these clash with text editing, so they all opt in.
@@ -21,7 +23,19 @@ export function registerGlobalShortcuts(): void {
   register("tool.stashes", "Alt+3", () => setSidebarVisible(true), { title: "Show the sidebar (stashes)", group: "Tool windows", when: hasProject });
   register("tool.matrix", "Alt+2", () => toggleBottomTool("matrix"), { title: "Toggle branch matrix", group: "Tool windows", when: hasProject });
   register("tool.console", "Alt+9", () => toggleBottomTool("console"), { title: "Toggle git console", group: "Tool windows" });
-  register("tool.diff", "Ctrl+D", toggleDiff, { title: "Show or hide the diff island", group: "Tool windows", allowInInput: true });
+  register("tool.diff", "Ctrl+D", () => setDetailsTab("diff"), { title: "Show file changes (the diff)", group: "Tool windows", allowInInput: true });
+  register("tool.changedFiles", [], () => setDetailsTab("files"), { title: "Show changed files (Esc in the diff)", group: "Tool windows" });
+  // Esc inside the diff goes back to the file tree. The log's own Esc ("return focus to the log") ignores the diff tab.
+  register(
+    "diff.back",
+    "Esc",
+    () => {
+      if (!inFileChanges()) return false;
+      setDetailsTab("files");
+      queueMicrotask(() => document.querySelector<HTMLElement>('[data-details-view="files"] [role="tree"]')?.focus());
+    },
+    { when: () => detailsTab() === "diff" },
+  );
   register("tool.closeBottom", "Shift+Esc", () => openBottomTool(null), { title: "Hide the bottom tool window", group: "Tool windows" });
 
   register("git.fetchAll", "Ctrl+T", () => void actions.fetchAll(), g("Fetch all repositories"));

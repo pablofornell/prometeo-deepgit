@@ -29,7 +29,9 @@
 .dg-shell-top { flex: 1; min-height: var(--dg-shell-main-min-height); display: flex; min-width: 0; }
 .dg-shell-main-island { flex: 1; min-width: 0; }
 .dg-shell-details { flex: none; }
-.dg-shell-diff, .dg-shell-bottom { flex: none; }
+.dg-shell-bottom { flex: none; }
+.dg-shell-slot { display: inline-flex; align-items: center; gap: 2px; }
+.dg-shell-slot[hidden] { display: none; }
 
 /* ---- island header with tabs */
 .dg-shell-head { height: var(--dg-panel-header-height); flex: none; display: flex; align-items: center; gap: 2px; padding: var(--dg-panel-header-padding); padding-left: 6px; }

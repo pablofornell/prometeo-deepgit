@@ -80,9 +80,8 @@ The window has these parts:
 | Tool stripe | Left edge | Buttons for the Project sidebar (`Alt+1`), Local changes (`Alt+0`), Branch matrix (`Alt+2`), Stashes (`Alt+3`, shows the sidebar) and Git console (`Alt+9`). Also the notifications button. |
 | Sidebar | Left | The project card, the sync strip and the tree of repositories, branches, tags and stashes. |
 | Main island | Centre | Two tabs: **Log** and **Local changes**. |
-| Details island | Right | The selected commit and its changed files. |
-| Diff island | Below the main island and details | The diff of the selected file. |
-| Bottom tool window | Below the diff island | **Git console** or **Branch matrix**. It shows only when you open it. |
+| Right column | Right of the main island | Two tabs. **Changed files** shows the selected commit and its changed files. **File changes** shows the diff of the selected file. |
+| Bottom tool window | Below the main island and the right column | **Git console** or **Branch matrix**. It shows only when you open it. |
 | Status bar | Bottom | Command ticker, focused repository, current branch, fetch age and theme switch. |
 
 ### Resize and hide panels
@@ -90,7 +89,9 @@ The window has these parts:
 - Drag the gap between two panels to resize them.
 - Double-click a gap to reset the panels to their default size.
 - Press `Alt+1` to hide or show the sidebar.
-- Press `Ctrl+D` to hide or show the diff island.
+- Press `Ctrl+D` to show the **File changes** tab. Press `Esc` in the diff to go back to **Changed files**.
+- Click the maximize button next to the tabs, or double-click the **File changes** tab, to make the right column wide. Do it again to restore the width.
+- Search Everywhere (**Actions** tab) lists **Show file changes**, **Show changed files** and **Maximize or restore the file changes**.
 - Press `Shift+Esc` to hide the bottom tool window.
 
 DeepGit remembers panel sizes and which panels are visible.
@@ -200,7 +201,7 @@ Hover a mark to see its name. Click a mark to jump to that commit and select it.
 
 ### Select commits
 
-- Click a row to select a commit. The details and the diff island follow.
+- Click a row to select a commit. The **Changed files** tab follows.
 - `Ctrl`+click adds or removes a commit.
 - `Shift`+click selects a range (up to 2000 rows).
 - Use `↑`, `↓`, `PgUp`, `PgDn`, `Home` and `End` to move.
@@ -210,7 +211,7 @@ Hover a mark to see its name. Click a mark to jump to that commit and select it.
 - Press `Enter` or double-click a row to move the focus to the file list in the details island.
 - Press `Ctrl+Shift+C` to copy the full hash.
 - Press `Ctrl+G` to go to a commit by hash. It opens Search Everywhere on the **Commits** tab.
-- Press `Esc` in the details or diff island to move the focus back to the commit list.
+- Press `Esc` in the **Changed files** tab to move the focus back to the commit list. In the **File changes** tab, `Esc` goes back to **Changed files** first.
 
 ### Context menu of a commit
 
@@ -255,14 +256,16 @@ For a merge commit, choose which parent to compare against with **Changes agains
 
 The header buttons copy the hash, cherry-pick the commit onto the current branch, and open a **More** menu.
 
-Click a file to show its diff in the diff island. Right-click a file to copy its path.
+Click a file, or press `Enter` on it, to show its diff in the **File changes** tab. The arrow keys only move the selection. Right-click a file to copy its path.
+
+If you select another commit while a file is open, the file stays open when the new commit changes the same path (you see its change in the new commit). If it does not, DeepGit goes back to **Changed files**.
 
 ### Diff viewer
 
-The diff island shows the diff of the selected file.
+The **File changes** tab shows the diff of the selected file. Both tabs stay alive, so the diff keeps its scroll position when you switch.
 The header shows the file path, the status letter, the number of added and removed lines, and the layout switch.
 
-- **Side by side** and **Unified** are the two layouts. Press `Ctrl+Alt+D` to switch.
+- **Side by side** and **Unified** are the two layouts. Press `Ctrl+Alt+D` to switch. When the diff is narrower than 720 px, DeepGit shows **Unified** by itself, unless you chose a layout in this session. Maximize the column to get more room.
 - Press `F7` for the next change and `Shift+F7` for the previous change. The header shows "Change 3 of 9".
 - Unchanged lines far from a change are folded. Click **Show N hidden lines** to unfold them.
 - Changed words are highlighted inside changed lines. DeepGit does not highlight words when more than 60 % of the line changed.
@@ -287,7 +290,7 @@ Large and binary files:
 
 ### Stage, unstage and discard hunks
 
-When the diff island shows a file from **Local changes**, each hunk has buttons at its top right.
+When the **File changes** tab shows a file from **Local changes**, each hunk has buttons at its top right.
 
 - For an unstaged file: **Stage** and **Discard**.
 - For a staged file: **Unstage**.
@@ -322,11 +325,11 @@ Status letters: `A` added, `M` modified, `D` deleted, `R` renamed, `C` copied, `
 - Select files and press `Space` to stage or unstage them.
 - Click the **+** button of a section, or press `Ctrl+Alt+A`, to stage all changes.
 - Click the **−** button of the **Staged** section to unstage all.
-- Select a file to see its diff in the diff island. Press `Enter` or double-click a file to show the diff.
+- Select a file to see its diff in the **File changes** tab of the right column. Press `Enter` or double-click a file to show the diff.
 - Use `Ctrl`+click, `Shift`+click, `Ctrl+A` and `Shift+↑` / `Shift+↓` to select several files.
 - Use `←` and `→` to collapse and expand folders.
 
-To stage only a part of a file, use the **Stage** button on a hunk in the diff island. See [section 4](#stage-unstage-and-discard-hunks).
+To stage only a part of a file, use the **Stage** button on a hunk in the **File changes** tab. See [section 4](#stage-unstage-and-discard-hunks).
 
 ### Discard
 
@@ -760,9 +763,9 @@ While a menu, popup or dialog is open, most shortcuts do not work.
 | `Alt+2` | Show or hide the branch matrix |
 | `Alt+3` | Show the sidebar (stashes) |
 | `Alt+9` | Show or hide the Git console |
-| `Ctrl+D` | Show or hide the diff island |
+| `Ctrl+D` | Show the **File changes** tab (the diff) |
 | `Shift+Esc` | Hide the bottom tool window |
-| `Esc` | In the details or diff island: return the focus to the log |
+| `Esc` | In the **File changes** tab: back to **Changed files**. In **Changed files**: return the focus to the log |
 
 ### Log
 
