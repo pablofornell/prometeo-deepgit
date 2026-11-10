@@ -42,7 +42,7 @@ export function Note(props: { kind: "info" | "warning" | "error"; children: JSX.
 }
 
 /** Multi-line text input in the look of `TextField`. */
-export function TextArea(props: { value: string; onInput: (v: string) => void; placeholder?: string; rows?: number; ariaLabel?: string }): JSX.Element {
+export function TextArea(props: { value: string; onInput: (v: string) => void; placeholder?: string; rows?: number; ariaLabel?: string; disabled?: boolean }): JSX.Element {
   return (
     <textarea
       class="dg-dialogs-textarea"
@@ -50,6 +50,7 @@ export function TextArea(props: { value: string; onInput: (v: string) => void; p
       value={props.value}
       placeholder={props.placeholder}
       aria-label={props.ariaLabel}
+      disabled={props.disabled}
       spellcheck={false}
       onInput={(e) => props.onInput(e.currentTarget.value)}
     />

@@ -19,6 +19,9 @@ pub enum GitError {
         secs: u64,
         lock_may_remain: bool,
     },
+    /// The caller stopped the operation (`CancelToken`).
+    #[error("The operation was cancelled.")]
+    Cancelled,
     #[error("io error: {0}")]
     Io(#[from] std::io::Error),
     #[error("could not parse git output: {0}")]
@@ -77,6 +80,10 @@ fn friendly_message(sub: &str, text: &str) -> Option<&'static str> {
         Some("Authentication failed. DeepGit cannot ask for passwords; use an SSH agent or a credential helper.")
     } else if has("permission denied (publickey") {
         Some("SSH authentication failed (permission denied). Load your key in an SSH agent.")
+    } else if has("not possible to fast-forward") {
+        Some("Cannot fast-forward: the branches have diverged. Choose another merge mode.")
+    } else if has("refusing to merge unrelated histories") {
+        Some("The branches have no common history. Tick \"Allow unrelated histories\" to merge them anyway.")
     } else if has("could not resolve host") {
         Some("Could not resolve the host. Check your network connection and the remote URL.")
     } else {

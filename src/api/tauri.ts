@@ -13,8 +13,8 @@
  * toasts, conflict handling and multi-repo fan-out.
  */
 import type {
-  ApiErrorShape, CommitDetails, ConsoleEntry, DiffSpec, FileDiff, LogQuery, LogSessionInfo, OpResult, Project,
-  CommitRow, HunkOpts, RepoChanged, RepoInfo, RepoSummary, Refs, ResetMode, Workspace, WorkingTree,
+  ApiErrorShape, CloneOpts, CloneProgress, CloneResult, CloneTarget, CommitDetails, ConsoleEntry, DiffSpec, FileDiff, LogQuery,
+  LogSessionInfo, MergeOpts, OpResult, Project, CommitRow, HunkOpts, RepoChanged, RepoInfo, RepoSummary, Refs, ResetMode, Workspace, WorkingTree,
 } from "./types";
 
 /** True when running inside the Tauri webview (false in a plain browser). */
@@ -122,7 +122,9 @@ export const stageHunk = (repoId: string, path: string, hunkIndex: number, rever
   invoke<void>("stage_hunk", { repoId, path, hunkIndex, reverse, ...hunkArgs(opts) });
 export const discardHunk = (repoId: string, path: string, hunkIndex: number, opts: HunkOpts = {}) =>
   invoke<void>("discard_hunk", { repoId, path, hunkIndex, ...hunkArgs(opts) });
-export const commit = (repoId: string, message: string, amend = false) => invoke<OpResult>("commit", { repoId, message, amend });
+/** `signOff` adds a `Signed-off-by` trailer (`--signoff`); the backend does not add it twice. */
+export const commit = (repoId: string, message: string, amend = false, signOff = false) =>
+  invoke<OpResult>("commit", { repoId, message, amend, signOff });
 /** A remote branch target + `newBranch` creates a tracking branch. */
 export const checkout = (repoId: string, target: string, newBranch: string | null = null) => invoke<OpResult>("checkout", { repoId, target, newBranch });
 export const branchCreate = (repoId: string, name: string, startPoint: string, checkout: boolean) =>
@@ -131,7 +133,9 @@ export const branchCreate = (repoId: string, name: string, startPoint: string, c
 export const branchDelete = (repoId: string, name: string, force = false, remote = false) =>
   invoke<OpResult>("branch_delete", { repoId, name, force, remote });
 export const branchRename = (repoId: string, oldName: string, newName: string) => invoke<OpResult>("branch_rename", { repoId, oldName, newName });
-export const merge = (repoId: string, target: string, noFf = false, squash = false) => invoke<OpResult>("merge", { repoId, target, noFf, squash });
+export const DEFAULT_MERGE_OPTS: MergeOpts = { mode: "ff", message: null, noCommit: false, allowUnrelatedHistories: false };
+export const merge = (repoId: string, target: string, opts: Partial<MergeOpts> = {}) =>
+  invoke<OpResult>("merge", { repoId, target, opts: { ...DEFAULT_MERGE_OPTS, ...opts } });
 export const rebase = (repoId: string, onto: string) => invoke<OpResult>("rebase", { repoId, onto });
 export const cherryPick = (repoId: string, oids: string[]) => invoke<OpResult>("cherry_pick", { repoId, oids });
 export const revert = (repoId: string, oid: string) => invoke<OpResult>("revert", { repoId, oid });
@@ -162,6 +166,17 @@ export const tagCreate = (repoId: string, name: string, target: string, message:
   invoke<OpResult>("tag_create", { repoId, name, target, message });
 export const tagDelete = (repoId: string, name: string) => invoke<OpResult>("tag_delete", { repoId, name });
 
+// ---------------------------------------------------------------- 5.6 clone
+
+/**
+ * Clones `url` into `parentDir/dirName`, then adds the repository to `target`. `operationId` ties the
+ * `clone-progress` events and `cloneCancel` to this call. A failed or cancelled clone leaves nothing on disk.
+ */
+export const cloneRepo = (operationId: string, url: string, parentDir: string, dirName: string, opts: CloneOpts, target: CloneTarget) =>
+  invoke<CloneResult>("clone_repo", { operationId, url, parentDir, dirName, opts, target });
+/** Stops the clone with this id (no-op when it has finished). `cloneRepo` then rejects with "The operation was cancelled.". */
+export const cloneCancel = (operationId: string) => invoke<void>("clone_cancel", { operationId });
+
 // ---------------------------------------------------------------- 5.5 events
 
 async function listen<T>(event: string, cb: (payload: T) => void): Promise<() => void> {
@@ -177,3 +192,5 @@ async function listen<T>(event: string, cb: (payload: T) => void): Promise<() =>
 export const onGitConsole = (cb: (entry: ConsoleEntry) => void) => listen<ConsoleEntry>("git-console", cb);
 /** A repository changed on disk or through a write command (debounced by the backend). */
 export const onRepoChanged = (cb: (e: RepoChanged) => void) => listen<RepoChanged>("repo-changed", cb);
+/** Progress of a running `cloneRepo` (filter on `operationId`). */
+export const onCloneProgress = (cb: (e: CloneProgress) => void) => listen<CloneProgress>("clone-progress", cb);

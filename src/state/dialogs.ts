@@ -10,7 +10,7 @@
  * `DialogRegistry`, then register a component for it.
  */
 import type { Component } from "solid-js";
-import type { ResetMode } from "../api/types";
+import type { MergeOpts, ResetMode } from "../api/types";
 import { ConfirmDialog, type ConfirmProps, type ConfirmResult, type DialogComponentProps, openDialog } from "../components/ui";
 
 export type { ConfirmProps, ConfirmResult } from "../components/ui";
@@ -50,13 +50,14 @@ export interface MergeProps {
   source: string;
   /** Current branch; read-only in the dialog. */
   target: string;
+  /** What `source` is, for git's default message ("Merge remote-tracking branch 'origin/x' into main"). Default "branch". */
+  sourceKind?: "branch" | "remote" | "tag" | "commit";
 }
-export interface MergeResult {
-  noFf: boolean;
-  squash: boolean;
-  /** Commit message when a merge commit is created. */
-  message?: string;
-}
+/**
+ * The options to merge with (see `api/mergeRules.ts` for the rules). `message` is null unless the user changed git's
+ * default message, so repos on different branches keep their own default.
+ */
+export type MergeResult = MergeOpts;
 
 export interface RebaseProps {
   repoIds: string[];
@@ -130,6 +131,16 @@ export interface SettingsProps {
   /** Id of the section to show (`appearance`, `log`, ...); default the first one. */
   section?: string;
 }
+export interface CloneProps {
+  /** URL to start with (for example from the clipboard). */
+  url?: string;
+}
+/** What a finished clone leaves: the dialog does the work (`actions.startClone`) and closes with this. */
+export interface CloneDialogResult {
+  /** Absolute path of the new repository. */
+  path: string;
+  projectId: string;
+}
 
 /** Props and result of every dialog name. */
 export interface DialogRegistry {
@@ -144,6 +155,7 @@ export interface DialogRegistry {
   tag: { props: TagProps; result: TagResult };
   checkoutRemote: { props: CheckoutRemoteProps; result: CheckoutRemoteResult };
   settings: { props: SettingsProps; result: void };
+  clone: { props: CloneProps; result: CloneDialogResult };
 }
 
 export type DialogName = keyof DialogRegistry;
@@ -192,7 +204,7 @@ function fallback<K extends DialogName>(name: K, props: DialogProps<K>): DialogR
       }
       case "merge": {
         const q = p as MergeProps;
-        return window.confirm(`Merge ${q.source} into ${q.target}?`) ? ({ noFf: false, squash: false } satisfies MergeResult) : undefined;
+        return window.confirm(`Merge ${q.source} into ${q.target}?`) ? ({ mode: "ff", message: null, noCommit: false, allowUnrelatedHistories: false } satisfies MergeResult) : undefined;
       }
       case "rebase": {
         const q = p as RebaseProps;

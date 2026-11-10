@@ -17,6 +17,9 @@
 
 .dg-welcome-action { display: flex; flex-direction: column; align-items: center; gap: var(--dg-space-4); }
 .dg-welcome-error { margin: 0; max-width: 360px; color: var(--dg-text-error); font-size: var(--dg-font-size-medium); line-height: var(--dg-line-height-ui); }
+.dg-welcome-link { color: var(--dg-text-link); font-size: var(--dg-font-size); border-radius: 3px; }
+.dg-welcome-link:hover:not(:disabled) { text-decoration: underline; }
+.dg-welcome-link:disabled { opacity: 0.5; }
 
 .dg-welcome-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--dg-space-5); width: 100%; max-width: 720px; margin: 0; padding: 0; list-style: none; }
 .dg-welcome-card { display: flex; flex-direction: column; align-items: flex-start; gap: var(--dg-space-3); padding: var(--dg-space-6) var(--dg-space-5); border-radius: var(--dg-island-radius); background: var(--dg-island-bg); text-align: left; }

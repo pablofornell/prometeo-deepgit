@@ -4,16 +4,19 @@
  * in-memory repositories (`mockData.ts`); write commands mutate that state and emit `repo-changed`.
  * Every git-backed call also emits a `git-console` entry after a small random delay.
  */
+import { checkCloneInput, joinPath } from "./cloneRules";
 import { layoutGraph } from "./graphLayout";
+import { checkMergeOpts, effectiveMessage, mergeArgs } from "./mergeRules";
 import {
   DEEPGIT_ROOT, PAYMENTS_ROOT, PEOPLE, SCENARIOS, genericScenario, generateRepo, hashStr, hex40, repoId,
   type MockCommit, type MockRepo, type Scenario,
 } from "./mockData";
-import { addColoredProject, parseColorChoice, setProjectColor, setRepoColor } from "./mockColors";
+import { addColoredProject, colorizeRepos, parseColorChoice, setProjectColor, setRepoColor } from "./mockColors";
 import { buildFileDiff, fileText, toFileChange } from "./mockDiff";
 import type {
-  CommitDetails, CommitRow, ConsoleEntry, DiffSpec, FileChange, FileDiff, GraphRow, LocalBranch, LogQuery,
-  LogSessionInfo, OpResult, Project, RefLabel, Refs, RepoChanged, RepoInfo, RepoSummary, ResetMode, Workspace, WorkingTree,
+  CloneOpts, CloneProgress, CloneResult, CloneTarget, CommitDetails, CommitRow, ConsoleEntry, DiffSpec, FileChange, FileDiff, GraphRow,
+  LocalBranch, LogQuery, LogSessionInfo, MergeMode, MergeOpts, OpResult, Project, RefLabel, Refs, RepoChanged, RepoInfo, RepoSummary,
+  ResetMode, Workspace, WorkingTree,
 } from "./types";
 
 type Args = Record<string, unknown>;
@@ -478,6 +481,34 @@ function wtStatusCounts(repo: MockRepo): string {
   return `${repo.wt.staged.length} file${repo.wt.staged.length === 1 ? "" : "s"} changed`;
 }
 
+// ---------------------------------------------------------------- commit and merge helpers
+
+/** The identity of the fake user: what `Signed-off-by` carries. */
+const SIGNOFF = `Signed-off-by: ${PEOPLE[0].name} <${PEOPLE[0].email}>`;
+/** A `merge --no-commit` waiting for its commit. */
+const pendingMerges = new WeakMap<MockRepo, { oid: string; source: string }>();
+
+const hasLine = (text: string, line: string): boolean => text.split("\n").some((l) => l.trimEnd() === line);
+
+/** Adds a trailer like git: right under an existing trailer block, else after a blank line. */
+function withTrailer(message: string, line: string): string {
+  const paragraphs = message.split(/\n\n/);
+  const last = paragraphs[paragraphs.length - 1].split("\n");
+  const inBlock = paragraphs.length > 1 && last.every((l) => /^[A-Za-z][A-Za-z0-9-]*: /.test(l));
+  return message + (inBlock ? "\n" : "\n\n") + line;
+}
+
+const MERGE_MODES: readonly string[] = ["ff", "noFf", "ffOnly", "squash"];
+
+/** Reads the `opts` argument of `merge` as strictly as serde does: a wrong type or mode is an error. */
+function mergeOptsOf(v: unknown): MergeOpts {
+  const o = (v ?? {}) as Record<string, unknown>;
+  const mode = o.mode ?? "ff";
+  if (typeof mode !== "string" || !MERGE_MODES.includes(mode)) fail(`invalid args \`opts\` for command \`merge\`: unknown variant \`${String(mode)}\``);
+  if (o.message != null && typeof o.message !== "string") fail("invalid args `opts` for command `merge`: invalid type for `message`");
+  return { mode: mode as MergeMode, message: typeof o.message === "string" ? o.message : null, noCommit: o.noCommit === true, allowUnrelatedHistories: o.allowUnrelatedHistories === true };
+}
+
 // ---------------------------------------------------------------- command handlers
 
 interface Ctx {
@@ -695,18 +726,27 @@ const handlers: Record<string, Handler> = {
   },
   commit: (a, c) => {
     const repo = repoOf(a.repoId);
-    const message = str(a.message).trim();
     const amend = bool(a.amend);
-    if (!message) fail("Aborting commit due to empty commit message.", "Aborting commit due to empty commit message.");
-    if (repo.wt.staged.length === 0 && !amend) return notOk("nothing to commit");
-    const [subject, ...rest] = message.split("\n");
     const head = repo.byOid.get(repo.head.oid);
-    const parents = amend && head ? head.parents : [repo.head.oid];
+    let message = str(a.message).trim();
+    // like the backend: an empty message with amend keeps the previous one
+    if (!message && amend && head) message = head.body ? `${head.subject}\n\n${head.body}` : head.subject;
+    if (!message) fail("Aborting commit due to empty commit message.", "Aborting commit due to empty commit message.");
+    if (repo.wt.staged.length === 0 && !amend && !pendingMerges.has(repo)) return notOk("nothing to commit");
+    const signOff = bool(a.signOff) && !hasLine(message, SIGNOFF);
+    if (signOff) message = withTrailer(message, SIGNOFF);
+    const [subject, ...rest] = message.split("\n");
+    const pending = pendingMerges.get(repo);
+    const parents = pending ? [repo.head.oid, pending.oid] : amend && head ? head.parents : [repo.head.oid];
     const n = wtStatusCounts(repo);
     const commit = makeCommit(repo, parents, subject, rest.join("\n").trim());
     advanceHead(repo, commit.oid);
     repo.wt.staged = [];
-    c.git(repo, ["commit", ...(amend ? ["--amend"] : []), "-m", subject], { stdout: `[${repo.head.branch ?? "HEAD detached"} ${short(commit.oid)}] ${subject}\n ${n}\n` });
+    if (pending) {
+      pendingMerges.delete(repo);
+      repo.state = "clean";
+    }
+    c.git(repo, ["commit", ...(amend ? ["--amend"] : []), ...(signOff ? ["--signoff"] : []), "-m", subject], { stdout: `[${repo.head.branch ?? "HEAD detached"} ${short(commit.oid)}] ${subject}\n ${n}\n` });
     emitChanged(repo);
     return ok(`[${repo.head.branch ?? "HEAD"} ${short(commit.oid)}] ${subject}\n ${n}`);
   },
@@ -812,34 +852,52 @@ const handlers: Record<string, Handler> = {
   merge: (a, c) => {
     const repo = repoOf(a.repoId);
     const target = str(a.target);
+    if (target.startsWith("-") || /[\0\n\r]/.test(target)) fail(`Invalid branch or revision "${target}": it cannot start with '-'.`);
+    const opts = mergeOptsOf(a.opts);
+    const invalid = checkMergeOpts(opts);
+    if (invalid) fail(invalid);
     const oid = needRef(repo, target);
-    const noFf = bool(a.noFf);
-    const squash = bool(a.squash);
-    const flags = [...(noFf ? ["--no-ff"] : []), ...(squash ? ["--squash"] : [])];
+    // what the backend runs: the options, then `--end-of-options` and the target
+    const margs = mergeArgs(opts, target);
+    const gitArgs = ["merge", ...margs.slice(0, -1), "--end-of-options", target];
+    const message = effectiveMessage(opts.message);
     if (ancestors(repo, repo.head.oid).has(oid)) {
-      c.git(repo, ["merge", ...flags, target], { stdout: "Already up to date.\n" });
+      c.git(repo, gitArgs, { stdout: "Already up to date.\n" });
       return ok("Already up to date.");
+    }
+    const fastForward = ancestors(repo, oid).has(repo.head.oid);
+    if (opts.mode === "ffOnly" && !fastForward) {
+      c.git(repo, gitArgs, { stderr: "hint: Diverging branches can't be fast-forwarded, you need to either:\nhint: \nhint: \tgit merge --no-ff\nhint: \nhint: or:\nhint: \nhint: \tgit rebase\nhint: \nhint: Disable this message with \"git config advice.diverging false\"\nfatal: Not possible to fast-forward, aborting.\n", exit: 128 });
+      fail("Cannot fast-forward: the branches have diverged. Choose another merge mode.", "fatal: Not possible to fast-forward, aborting.");
     }
     if (wouldConflict(target)) {
       enterConflictState(repo, "merging");
-      c.git(repo, ["merge", ...flags, target], { stdout: `Auto-merging ${repo.wt.conflicted[0].path}\nCONFLICT (content): Merge conflict in ${repo.wt.conflicted[0].path}\nAutomatic merge failed; fix conflicts and then commit the result.\n`, exit: 1 });
+      c.git(repo, gitArgs, { stdout: `Auto-merging ${repo.wt.conflicted[0].path}\nCONFLICT (content): Merge conflict in ${repo.wt.conflicted[0].path}\nAutomatic merge failed; fix conflicts and then commit the result.\n`, exit: 1 });
       emitChanged(repo);
       return conflict(`CONFLICT (content): Merge conflict in ${repo.wt.conflicted[0].path}\nAutomatic merge failed; fix conflicts and then commit the result.`);
     }
-    const fastForward = ancestors(repo, oid).has(repo.head.oid) && !noFf && !squash;
-    if (fastForward) {
+    const mode: MergeMode = opts.mode;
+    if (fastForward && (mode === "ff" || mode === "ffOnly")) {
       advanceHead(repo, oid);
-      c.git(repo, ["merge", ...flags, target], { stdout: `Updating ${short(repo.head.oid)}..${short(oid)}\nFast-forward\n` });
-    } else if (squash) {
+      c.git(repo, gitArgs, { stdout: `Updating ${short(repo.head.oid)}..${short(oid)}\nFast-forward\n` });
+    } else if (mode === "squash") {
       repo.wt.staged = commitFiles(repo, repo.byOid.get(oid) as MockCommit).slice(0, 3);
-      c.git(repo, ["merge", ...flags, target], { stdout: "Squash commit -- not updating HEAD\n" });
+      c.git(repo, gitArgs, { stdout: "Automatic merge went well; stopped before committing as requested\nSquash commit -- not updating HEAD\n" });
+    } else if (opts.noCommit) {
+      // stops with the merge in progress: the changes are staged, the commit box finishes it
+      repo.wt.staged = commitFiles(repo, repo.byOid.get(oid) as MockCommit).slice(0, 3);
+      repo.state = "merging";
+      pendingMerges.set(repo, { oid, source: target });
+      c.git(repo, gitArgs, { stdout: "Automatic merge went well; stopped before committing as requested\n" });
     } else {
-      const m = makeCommit(repo, [repo.head.oid, oid], `Merge branch '${target}' into ${repo.head.branch ?? "HEAD"}`);
+      const text = message ?? `Merge branch '${target}' into ${repo.head.branch ?? "HEAD"}`;
+      const [subject, ...rest] = text.trim().split("\n");
+      const m = makeCommit(repo, [repo.head.oid, oid], subject, rest.join("\n").trim());
       advanceHead(repo, m.oid);
-      c.git(repo, ["merge", ...flags, target], { stdout: "Merge made by the 'ort' strategy.\n" });
+      c.git(repo, gitArgs, { stdout: "Merge made by the 'ort' strategy.\n" });
     }
     emitChanged(repo);
-    return ok(fastForward ? "Fast-forward" : "Merge made by the 'ort' strategy.");
+    return ok(fastForward && (mode === "ff" || mode === "ffOnly") ? "Fast-forward" : mode === "squash" ? "Squash commit -- not updating HEAD" : "Merge made by the 'ort' strategy.");
   },
   rebase: (a, c) => {
     const repo = repoOf(a.repoId);
@@ -924,6 +982,7 @@ const handlers: Record<string, Handler> = {
     const sub = repo.state === "rebasing" ? "rebase" : repo.state === "merging" ? "merge" : repo.state === "cherryPicking" ? "cherry-pick" : "revert";
     repo.state = "clean";
     repo.wt.conflicted = [];
+    if (pendingMerges.delete(repo)) repo.wt.staged = [];
     c.git(repo, [sub, "--abort"]);
     emitChanged(repo);
     return ok("Operation aborted");
@@ -1063,7 +1122,92 @@ const handlers: Record<string, Handler> = {
     emitChanged(repo);
     return ok(`Deleted tag '${name}'`);
   },
+
+  // ---- clone
+  clone_repo: (a, c) => cloneRepo(a, c),
+  clone_cancel: (a) => {
+    const running = runningClones.get(str(a.operationId));
+    if (running) running.cancelled = true;
+  },
 };
+
+// ---------------------------------------------------------------- clone
+
+const runningClones = new Map<string, { cancelled: boolean }>();
+const CLONE_PHASES = ["Counting objects", "Compressing objects", "Receiving objects", "Resolving deltas", "Updating files"];
+
+/** The mock disk: every absolute folder exists, except one that has a segment named `missing`. */
+const mockFolderExists = (p: string): boolean => !p.split(/[\\/]/).includes("missing");
+
+/**
+ * Clones into `parentDir/dirName` with the rules of the backend (`checkCloneInput`, the disk checks), emits
+ * `clone-progress` events (about 3 s) and adds a fake repo to the project. A URL with "does-not-exist" fails like a
+ * missing repository; `clone_cancel` stops it between two steps.
+ */
+async function cloneRepo(a: Args, c: Ctx): Promise<CloneResult> {
+  const operationId = str(a.operationId);
+  const url = str(a.url).trim();
+  const parentDir = str(a.parentDir).trim().replace(/(.)[\\/]+$/, "$1");
+  const dirName = str(a.dirName).trim();
+  const opts = (a.opts ?? {}) as Partial<CloneOpts>;
+  const target = (a.target ?? { kind: "newProject" }) as CloneTarget;
+  const branch = opts.branch ?? null;
+  const depth = opts.depth ?? null;
+  const invalid = checkCloneInput({ url, parentDir, dirName, branch, depth });
+  if (invalid) fail(invalid);
+  if (!mockFolderExists(parentDir)) fail(`The parent folder ${parentDir} does not exist.`);
+  const path = joinPath(parentDir, dirName);
+  if (workspace.projects.some((p) => p.path === path || p.repos.some((r) => r.path === path))) fail(`The folder ${path} already exists and is not empty.`);
+  let project: Project | undefined;
+  if (target.kind === "project") {
+    project = workspace.projects.find((p) => p.id === target.projectId) ?? fail("unknown project");
+    if (parentDir !== project.path && !parentDir.startsWith(project.path + "/")) {
+      fail(`The parent folder is outside the project folder ${project.path}. Choose a folder inside it, or add the clone to a new project.`);
+    }
+  }
+  if (runningClones.has(operationId)) fail("This clone is already running.");
+  const state = { cancelled: false };
+  runningClones.set(operationId, state);
+  const gitArgs = ["clone", "--progress", ...(branch ? ["--branch", branch] : []), ...(depth ? ["--depth", String(depth)] : []), ...(opts.recurseSubmodules ? ["--recurse-submodules"] : []), "--", url, path];
+  try {
+    if (/does-not-exist|nonexistent/i.test(url)) {
+      await sleep(400);
+      const detail = `Cloning into '${path}'...\nfatal: repository '${url}' does not exist\n`;
+      c.git(null, gitArgs, { stderr: detail, exit: 128 });
+      fail(`fatal: repository '${url}' does not exist`, detail);
+    }
+    const steps = depth ? 5 : 10;
+    for (const phase of CLONE_PHASES) {
+      for (let i = 0; i <= steps; i++) {
+        if (state.cancelled) {
+          c.git(null, gitArgs, { stderr: `Cloning into '${path}'...\n`, exit: -1 });
+          fail("The operation was cancelled.");
+        }
+        const payload: CloneProgress = { operationId, phase, percent: Math.round((i / steps) * 100) };
+        emit("clone-progress", payload);
+        await sleep(60);
+      }
+    }
+    const info: RepoInfo = { id: repoId(path), name: project ? path.slice(project.path.length + 1) : dirName, path, color: 0, customColor: null };
+    // Same colour rule as Rust: a new repo takes the least-used palette colour of the workspace.
+    colorizeRepos(workspace, null, { id: "", name: "", path: "", color: 0, customColor: null, repos: [info] });
+    registerRepo(info, genericScenario(dirName, info.color));
+    const meta = metas.get(info.id);
+    if (meta) meta.url = url;
+    let created = false;
+    if (project) {
+      project.repos.push(info);
+    } else {
+      created = true;
+      project = { id: "p-" + hex40(path).slice(0, 8), name: dirName, path, color: 0, customColor: null, repos: [info] };
+      addColoredProject(workspace, project);
+    }
+    c.git(null, gitArgs, { stderr: `Cloning into '${path}'...\nReceiving objects: 100% (350/350), done.\n` });
+    return { path, project: structuredClone(project), createdProject: created } satisfies CloneResult;
+  } finally {
+    runningClones.delete(operationId);
+  }
+}
 
 function stashRestore(a: Args, c: Ctx, drop: boolean): OpResult {
   const repo = repoOf(a.repoId);

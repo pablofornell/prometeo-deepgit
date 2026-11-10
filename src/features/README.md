@@ -54,7 +54,7 @@ feature. Cross-feature communication goes through `state/` (selection, layout, a
 | `workspace.ts` | `workspace` (store), `activeProject()`, `projectRepos()`, `repoById(id)`, `repoColor(repo)`, `selectedRepoIds()` / `selectedRepos()` (the repo filter), `setSelectedRepoIds`, `toggleRepo`, `selectOnlyRepo`, `selectAllRepos`, `isRepoFilterActive()`, `focusedRepo()` / `setFocusedRepoId` (target of single-repo commands), `summary(repoId)` (reactive `RepoSummary`), `projectTotals()` (ahead/behind/changes/operations), `refreshSummaries(ids?)`, `addProject`, `setActiveProject`, `removeProject`, `rescanProject`. Summaries refresh themselves on `repo-changed` (throttled). |
 | `refs.ts` | `repoRefs(repoId)` -> accessor of `Refs` (first read loads it), `refreshRefs`, `ensureRefs(ids)`, `cachedRefs`, `hasLocalBranch`, `hasRemoteBranch`. Auto-refresh on `repo-changed`. |
 | `selection.ts` | `selectedCommit()` / `setSelectedCommit({repoId, oid})`, `selectedFile()` / `selectFile({repoId, spec, path, oldPath?}, { reveal? })`, `detailsTab()` / `setDetailsTab("files" \| "diff")`, `mainTab()` / `setMainTab("log" \| "changes")`, `changesRepoId()` / `setChangesRepoId`, `clearSelection()`. |
-| `settings.ts` | `settings` store (`theme`, `dateFormat`, `diffMode`, `showGraph`, `laneColors`, `comfortableRows`, `showBackgroundCommands`, `fontSize`, `editorFontSize`, `uiScale`), `setSetting(key, value)` (validated, persisted as `deepgit.ui.<key>`), `resetSettings(keys?)`, `SETTING_DEFAULTS`, `zoomUi(+1 \| -1)`, `toggleTheme()`, `resolvedTheme()`. Add a key: extend `Settings`, `SETTING_DEFAULTS` and `SANITIZERS`. |
+| `settings.ts` | `settings` store (`theme`, `dateFormat`, `diffMode`, `showGraph`, `laneColors`, `comfortableRows`, `showBackgroundCommands`, `fontSize`, `editorFontSize`, `uiScale`, `autoFetchMinutes` (0 = off, 5, 15, 30, 60; default 15), `autoFetchPrune` (default true), `commitSignOff` (default false, remembered by the commit box)), `setSetting(key, value)` (validated, persisted as `deepgit.ui.<key>`), `resetSettings(keys?)`, `SETTING_DEFAULTS`, `zoomUi(+1 \| -1)`, `toggleTheme()`, `resolvedTheme()`. Add a key: extend `Settings`, `SETTING_DEFAULTS` and `SANITIZERS`. |
 | `appearance.ts` | Pure maths of font size / editor size / UI scale: limits, `sanitize*`, `appearanceVars()` (the CSS variables). `index.html` repeats it before first paint; `prepaint.test.ts` checks both agree. |
 | `metrics.ts` | `cssPx(token, fallback)` (resolved px of a CSS token, reactive to font-size changes), `appearanceRev()`. |
 | `layout.ts` | `sidebarVisible()`, `bottomTool()` ("console" \| "matrix" \| null), `toggleSidebar`, `openBottomTool(tool)`, `toggleBottomTool(tool)`. (The diff island and `diffVisible` / `toggleDiff` are gone.) |
@@ -85,14 +85,15 @@ import * as actions from "../../state/actions";
 await actions.checkout(repoId, "main");                              // one repo
 await actions.checkout(selectedRepoIds(), "feature/x", { branchOnly: true }); // many; repos without it are skipped
 await actions.createBranch([repoId], oid, { startLabel: "api-gateway @ 9f3c2a1" }); // asks the name via the "newBranch" dialog
-await actions.merge([repoId], "origin/main");   // dialog "merge"
+await actions.merge([repoId], "origin/main");   // dialog "merge": mode, message, --no-commit, unrelated histories (rules in api/mergeRules.ts)
+actions.cloneRepository(url?);                  // dialog "clone" (it runs actions.startClone itself and shows git's progress)
 await actions.rebase(ids, "main"); actions.reset(ids, oid); actions.cherryPick(repoId, [oid]); actions.revert(repoId, oid);
 await actions.fetch(ids); actions.fetchAll(); actions.pull(ids); actions.push(ids);   // push opens the "push" dialog
 actions.stashSave(ids); actions.stashApply(repoId, 0); actions.stashPop(repoId, 0); actions.stashDrop(repoId, 0);
 actions.tagCreate(ids, oid); actions.tagDelete(ids, "v1.0");
 actions.deleteBranch(ids, name); actions.renameBranch(repoId, name); actions.checkoutRemote(repoId, "origin/x");
 actions.opContinue(ids); actions.opAbort(ids); actions.opSkip(ids);
-actions.stage(repoId, paths); actions.unstage(repoId, paths); actions.discard(repoId, paths); actions.commit(ids, message, { amend });
+actions.stage(repoId, paths); actions.unstage(repoId, paths); actions.discard(repoId, paths); actions.commit(ids, message, { amend, signOff });
 actions.stageHunk(repoId, path, index, reverse); actions.discardHunk(repoId, path, index);
 ```
 
@@ -104,7 +105,7 @@ summary refresh are done for you. To add a new action, add it to `actions.ts` wi
 
 `registerDialog(name, Component)` and `showDialog(name, props) -> Promise<result | undefined>` (undefined = cancelled).
 Names and their `props` / `result` types are in `DialogRegistry`: `newBranch`, `renameBranch`, `merge`, `rebase`, `reset`,
-`confirm` (done), `push`, `stash`, `tag`, `checkoutRemote`, `settings` (`features/settings`, props `{ section? }`). Until a name is registered `showDialog` falls back to
+`confirm` (done), `push`, `stash`, `tag`, `checkoutRemote`, `settings` (`features/settings`, props `{ section? }`), `clone`. Until a name is registered `showDialog` falls back to
 `window.prompt` / `confirm`. A dialog component receives its props plus `close(result?)`:
 
 ```tsx

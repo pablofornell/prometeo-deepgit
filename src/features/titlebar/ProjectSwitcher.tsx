@@ -2,6 +2,7 @@
 import { type JSX, onCleanup } from "solid-js";
 import { Icon, initials, openMenu, plural, toast, type MenuItem } from "../../components/ui";
 import { projectColorMenu } from "../../state/colorActions";
+import * as actions from "../../state/actions";
 import { confirmAction } from "../../state/dialogs";
 import { register } from "../../state/keymap";
 import { activeProject, addProject, removeProject, repoVars, rescanProject, setActiveProject, workspace } from "../../state/workspace";
@@ -51,7 +52,11 @@ export function ProjectSwitcher(): JSX.Element {
         onSelect: () => void setActiveProject(p.id),
       });
     }
-    list.push({ separator: true }, { label: "Add project folder…", icon: "plus", onSelect: () => void add() });
+    list.push(
+      { separator: true },
+      { label: "Add project folder…", icon: "plus", onSelect: () => void add() },
+      { label: "Clone repository…", icon: "repo", onSelect: () => void actions.cloneRepository() },
+    );
     if (active) {
       list.push(
         { label: `Rescan ${active.name}`, icon: "refresh", onSelect: () => void rescan(active.id, active.name) },

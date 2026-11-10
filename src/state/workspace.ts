@@ -11,7 +11,7 @@
 import { batch, createMemo, createRoot, createSignal } from "solid-js";
 import { createStore, produce, reconcile } from "solid-js/store";
 import * as api from "../api/tauri";
-import type { Project, RepoInfo, RepoSummary } from "../api/types";
+import type { CloneResult, Project, RepoInfo, RepoSummary } from "../api/types";
 import { subscribeRepoChanged } from "./events";
 import { loadPersisted, savePersisted } from "./persist";
 
@@ -121,6 +121,34 @@ export function applyRepoColor(updated: Pick<RepoInfo, "id" | "color" | "customC
 /** Puts the colour of a project (as the backend returned it) into the store. */
 export function applyProjectColor(updated: Pick<Project, "id" | "color" | "customColor">): void {
   setWorkspace("projects", (p) => p.id === updated.id, { color: updated.color, customColor: updated.customColor });
+}
+
+/**
+ * Takes in what `cloneRepo` made: the rescanned or new project replaces / joins the store and becomes the active one,
+ * with the new repo in the log filter and focused.
+ */
+export async function adoptClonedProject(result: CloneResult): Promise<void> {
+  const { project } = result;
+  setWorkspace(
+    produce((s) => {
+      const i = s.projects.findIndex((p) => p.id === project.id);
+      if (i >= 0) s.projects[i] = project;
+      else s.projects.push(project);
+    }),
+  );
+  if (workspace.activeProjectId !== project.id) {
+    await api.projectSetActive(project.id);
+    setWorkspace("activeProjectId", project.id);
+    projectSwitched();
+  } else {
+    restoreRepoFilter();
+  }
+  const added = project.repos.find((r) => r.path === result.path);
+  if (added) {
+    if (!selectedIds().includes(added.id)) setSelectedRepoIds([...selectedIds(), added.id]);
+    setFocusedRepoId(added.id);
+  }
+  await refreshSummaries();
 }
 
 // ---------------------------------------------------------------- repo filter (log scope)

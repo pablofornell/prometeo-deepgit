@@ -10,7 +10,7 @@ use common::*;
 use gitcore::ops::HunkOpts;
 use gitcore::{
     diff, log, ops, refs, state, status, ApiError, DiffSpec, GitError, HunkRef, LogQuery,
-    RepoStateKind,
+    MergeOpts, RepoStateKind,
 };
 
 fn strs(v: &[&str]) -> Vec<String> {
@@ -60,7 +60,12 @@ fn f01_dash_names_are_rejected_by_every_operation() {
     assert!(is_invalid(ops::tag_delete(&g, i, "-x")));
     assert!(is_invalid(ops::checkout(&g, i, "-f", None)));
     assert!(is_invalid(ops::checkout(&g, i, "main", Some("-b"))));
-    assert!(is_invalid(ops::merge(&g, i, "--abort", false, false)));
+    assert!(is_invalid(ops::merge(
+        &g,
+        i,
+        "--abort",
+        &MergeOpts::default()
+    )));
     assert!(is_invalid(ops::rebase(&g, i, "--abort")));
     assert!(is_invalid(ops::cherry_pick(&g, i, &strs(&["--abort"]))));
     assert!(is_invalid(ops::revert(&g, i, "--abort")));
@@ -518,7 +523,11 @@ fn f07_a_multi_commit_cherry_pick_stays_in_progress_after_the_first_commit() {
     assert!(!res.ok && res.conflicts);
     r.write("f", "resolved\n");
     ops::stage(&g, &r.info, &strs(&["f"])).unwrap();
-    assert!(ops::commit(&g, &r.info, "A resolved", false).unwrap().ok);
+    assert!(
+        ops::commit(&g, &r.info, "A resolved", false, false)
+            .unwrap()
+            .ok
+    );
     // CHERRY_PICK_HEAD is gone but B is still queued.
     assert_eq!(
         state::repo_state(r.path()).unwrap(),
@@ -538,7 +547,7 @@ fn f07_abort_works_between_the_commits_of_a_sequence() {
     ops::cherry_pick(&g, &r.info, &strs(&["side~1", "side"])).unwrap();
     r.write("f", "resolved\n");
     ops::stage(&g, &r.info, &strs(&["f"])).unwrap();
-    ops::commit(&g, &r.info, "A resolved", false).unwrap();
+    ops::commit(&g, &r.info, "A resolved", false, false).unwrap();
     // git does not rewind a HEAD the user moved, but it drops the queued B.
     assert!(ops::op_abort(&g, &r.info).unwrap().ok);
     assert_eq!(state::repo_state(r.path()).unwrap(), RepoStateKind::Clean);
@@ -696,7 +705,7 @@ fn f10_a_rejected_tag_fetch_is_not_reported_as_a_rejected_push() {
 fn f10_commit_with_nothing_staged_maps_to_the_friendly_message() {
     let r = TestRepo::new();
     r.commit_file("a", "1\n", "init");
-    let err = ops::commit(&git(), &r.info, "msg", false).unwrap_err();
+    let err = ops::commit(&git(), &r.info, "msg", false, false).unwrap_err();
     let api: ApiError = err.into();
     assert_eq!(api.message, "Nothing to commit. Stage changes first.");
     assert!(api.detail.unwrap().contains("nothing to commit"));
@@ -766,7 +775,7 @@ fn f12_an_empty_cherry_pick_is_a_stopped_result_not_an_error() {
 fn f12_a_failure_with_nothing_in_progress_is_still_an_error() {
     let r = TestRepo::new();
     r.commit_file("f", "1\n", "init");
-    assert!(ops::merge(&git(), &r.info, "does-not-exist", false, false).is_err());
+    assert!(ops::merge(&git(), &r.info, "does-not-exist", &MergeOpts::default()).is_err());
 }
 
 // ---------------------------------------------------------------- 13. hangs

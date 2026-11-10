@@ -57,8 +57,19 @@ src/                       SolidJS UI
 - Each call reports a `ConsoleEntry` to an optional sink (`Arc<dyn Fn(ConsoleEntry) + Send + Sync>`). stdout/stderr in the entry are truncated to 8 KiB.
 - Non-zero exit → `GitError::Command { args, code, stderr }`.
 - Read commands are safe to run in parallel. Write commands for the same repo are serialized by the app (a per-repo `tokio::sync::Mutex` in src-tauri).
+- `fetch`, `pull`, `push` and `clone` are network commands: own process group, `ssh -o BatchMode=yes`, killed after 120 s without output or 60 min in total. `Git::run_streaming(dir, repo_id, args, &CancelToken, on_stderr)` runs one of them and hands its stderr to a callback while it runs; the token kills the process group and the call returns `GitError::Cancelled` ("The operation was cancelled.").
 
 ## 4. Types (Rust names; TS mirror is identical, camelCase)
+
+New in this part (the rest is in `model.rs` / `src/api/types.ts`):
+`MergeMode = "ff" | "noFf" | "ffOnly" | "squash"`;
+`MergeOpts { mode: MergeMode (default "ff"), message: string | null, noCommit: bool, allowUnrelatedHistories: bool }`
+(rules of IntelliJ `GitMergeOption`: a message needs a merge commit, so not with `ffOnly`, `squash` or `noCommit`;
+`noCommit` is not for `ffOnly` and `squash`; a blank message is no message; other mixes are refused with `GitError::Invalid`);
+`CloneOpts { branch: string | null, depth: number | null, recurseSubmodules: bool }`;
+`CloneTarget = { kind: "project", projectId } | { kind: "newProject" }`;
+`CloneProgress { phase: string, percent: number | null }` (the event adds `operationId`);
+`CloneResult { path: string, project: Project, createdProject: bool }`.
 
 ```rust
 pub struct RepoInfo { pub id: String, pub name: String, pub path: String,
@@ -224,12 +235,12 @@ The browser mock (`src/api/mock.ts`, `mockColors.ts`) applies the same rules and
 | `stage` / `unstage` / `discard` | `repoId, paths: Vec<String>` | `()` (discard of untracked = delete file) |
 | `stage_hunk` | `repoId, path, hunkIndex: u32, reverse: bool /* true = unstage */, oldPath: Option<String> /* renamed file */, expected: Option<{oldStart, oldLines, newStart, newLines, hash?: String}> /* hunk identity; stale ("The file changed. Reload the diff.") if the header numbers or, when sent, the body hash no longer match; hash = `hunk_hash`, see below */, context: Option<u32> /* diff context lines, default 3; must match the diff the UI showed */` | `()` (built from Unstaged/Staged diff with context 3, applied with `git apply --cached [-R] --unidiff-zero=false`) |
 | `discard_hunk` | `repoId, path, hunkIndex, expected: Option<{oldStart, oldLines, newStart, newLines}>, context: Option<u32>` (same meaning as in `stage_hunk`) | `()` |
-| `commit` | `repoId, message, amend: bool` | `OpResult` |
+| `commit` | `repoId, message, amend: bool, signOff: bool` | `OpResult` (`signOff` = `--signoff`: a `Signed-off-by: <name> <email>` trailer of the committer; with an empty message and `amend` it is `--amend --no-edit --signoff`. A message that has that exact line already is not signed again: git alone only looks at the last trailer and would add a second line after e.g. a `Co-authored-by`) |
 | `checkout` | `repoId, target: String, newBranch: Option<String>` | `OpResult` (remote branch target + newBranch = `checkout -b new --track remote/x`) |
 | `branch_create` | `repoId, name, startPoint: String, checkout: bool` | `OpResult` |
 | `branch_delete` | `repoId, name, force: bool, remote: bool` | `OpResult` (remote form: `name` is `"remote/branch"`, resolved against the longest configured remote name, then `push <remote> --delete refs/heads/<branch>`) |
 | `branch_rename` | `repoId, oldName, newName` | `OpResult` |
-| `merge` | `repoId, target, noFf: bool, squash: bool` | `OpResult` |
+| `merge` | `repoId, target, opts: MergeOpts` | `OpResult` (`git merge [--no-edit] [--no-ff \| --ff-only \| --squash] [--no-commit] [--allow-unrelated-histories] [-m message] [--end-of-options] target`; see `MergeOpts` below. `--ff-only` on diverged branches fails with "Cannot fast-forward: the branches have diverged. Choose another merge mode."; squash stages the changes and leaves no `MERGE_HEAD`; `--no-commit` leaves the repo `merging` and the commit box finishes it) |
 | `rebase` | `repoId, onto` | `OpResult` (runs `git rebase --autostash onto`: a dirty worktree is stashed and restored; `op_abort` restores it too; the UI does no manual stash/pop) |
 | `cherry_pick` | `repoId, oids: Vec<String>` | `OpResult` |
 | `revert` | `repoId, oid` | `OpResult` |
@@ -266,8 +277,31 @@ any output on stdout or stderr, or after 60 min in total; the error is `Timeout`
 `pull` leaves `.git/index.lock`, the message says "A git lock file may remain: .git/index.lock"
 (the file is not removed).
 
+### 5.6 Clone
+
+| command | args | returns |
+|---|---|---|
+| `clone_repo` | `operationId: String, url: String, parentDir: String, dirName: String, opts: CloneOpts, target: CloneTarget` | `CloneResult` |
+| `clone_cancel` | `operationId: String` | `()` (does nothing when that clone has finished) |
+
+`git clone --progress [--branch b] [--depth n] [--recurse-submodules] -- <url> <parentDir>/<dirName>`, run in
+`parentDir`. The frontend makes `operationId` up; it ties the `clone-progress` events and `clone_cancel` to the call.
+Rules (`gitcore::clone::plan_clone`, mirrored in `src/api/cloneRules.ts` and the mock): the URL is trimmed, not empty,
+does not start with `-`, has no control character and no `ext::` / `fd::` transport; `dirName` is one path segment (no
+`/`, `\`, `..`); `parentDir` is an existing absolute folder (`~` is expanded); the target does not exist, or is an
+empty folder (not a link); the branch passes `check_name`; the depth is at least 1.
+Stderr is cut at `\r` / `\n` and every `Phase: NN%` segment ("Receiving objects", "Resolving deltas", "Counting
+objects", "Compressing objects", "Updating files"; "Enumerating objects: 11, done." has `percent: null`) becomes one
+`clone-progress` event, once per change. A failed, timed out or cancelled clone removes what it made: the folder when the
+clone created it, else only the files in it (it was empty). On success `target` decides where the repo goes:
+`{ kind: "project", projectId }` rescans that project (the parent folder must be inside its folder: this is checked
+before the clone starts) and `{ kind: "newProject" }` adds a project whose folder is the clone.
+`gitcore::clone::default_dir_name(url)` is the folder name git would pick (`https://h/o/r.git/` -> `r`,
+`git@h:o/r.git` -> `r`, `file:///x/r` -> `r`, `/x/r/.git` -> `r`).
+
 ### 5.5 Events (backend → frontend)
 - `git-console` : `ConsoleEntry` (every git call).
+- `clone-progress` : `{ operationId, phase, percent: number | null }` while `clone_repo` runs.
 - `repo-changed` : `RepoChanged` (watcher, debounced 400 ms; also after each write command).
   The watcher watches the worktree recursively and ignores paths inside `.git` except
   `HEAD`, `index`, `refs/**`, `packed-refs`, `MERGE_HEAD`, `rebase-merge`, `rebase-apply`, `CHERRY_PICK_HEAD`.

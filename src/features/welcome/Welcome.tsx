@@ -6,6 +6,7 @@
 import { For, type JSX, Show, createSignal } from "solid-js";
 import { pickFolder } from "../../api/dialog";
 import { Button, Icon, type IconName, Kbd, Spinner, WindowControls, dragRegion } from "../../components/ui";
+import { cloneRepository } from "../../state/actions";
 import { addProject } from "../../state/workspace";
 import "./welcome.css";
 
@@ -87,6 +88,9 @@ export function Welcome(): JSX.Element {
               </Show>
               Add project folder…
             </Button>
+            <button type="button" class="dg-welcome-link" disabled={busy()} onClick={() => void cloneRepository()}>
+              Clone repository…
+            </button>
             <Show when={error()}>
               {(msg) => (
                 <p class="dg-welcome-error" role="alert">

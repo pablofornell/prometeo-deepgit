@@ -22,11 +22,22 @@ export type DateFormat = "relative" | "absolute";
 export type DiffMode = "sideBySide" | "unified";
 export type LaneColorMode = "repo" | "branch";
 
+/** Periods the auto-fetch can have, in minutes (0 = off). */
+export const AUTO_FETCH_CHOICES = [0, 5, 15, 30, 60] as const;
+
 export interface Settings {
   theme: ThemePref;
   /** Date column of the log: "4 min ago" style or "10 Nov 2026 10:42". */
   dateFormat: DateFormat;
   diffMode: DiffMode;
+  // ---- auto-fetch and commit sign-off (wave 1: git features) -----------------------------------------------------
+  /** Fetch every repo of the project in the background every N minutes; 0 = off (`state/autoFetch.ts`). */
+  autoFetchMinutes: number;
+  /** Auto-fetch runs `fetch --all --prune` (true) or `fetch --all` (false). */
+  autoFetchPrune: boolean;
+  /** The "Sign-off" box of the commit box starts ticked; the box remembers its last state here. */
+  commitSignOff: boolean;
+  // ---- end of the auto-fetch and sign-off block ------------------------------------------------------------------
   /** Draw the commit graph in the log. */
   showGraph: boolean;
   /** Lane colours in the combined log (DESIGN.md 11.6). */
@@ -47,6 +58,11 @@ export const SETTING_DEFAULTS: Readonly<Settings> = {
   theme: "dark",
   dateFormat: "relative",
   diffMode: "sideBySide",
+  // ---- auto-fetch and commit sign-off
+  autoFetchMinutes: 15,
+  autoFetchPrune: true,
+  commitSignOff: false,
+  // ----
   showGraph: true,
   laneColors: "repo",
   comfortableRows: false,
@@ -67,6 +83,9 @@ export const SANITIZERS: { [K in keyof Settings]: (v: unknown) => Settings[K] } 
   theme: oneOf<ThemePref>("dark", "light", "system")(SETTING_DEFAULTS.theme),
   dateFormat: oneOf<DateFormat>("relative", "absolute")(SETTING_DEFAULTS.dateFormat),
   diffMode: oneOf<DiffMode>("sideBySide", "unified")(SETTING_DEFAULTS.diffMode),
+  autoFetchMinutes: (v) => ((AUTO_FETCH_CHOICES as readonly number[]).includes(v as number) ? (v as number) : SETTING_DEFAULTS.autoFetchMinutes),
+  autoFetchPrune: (v) => (typeof v === "boolean" ? v : SETTING_DEFAULTS.autoFetchPrune),
+  commitSignOff: (v) => (typeof v === "boolean" ? v : SETTING_DEFAULTS.commitSignOff),
   showGraph: (v) => (typeof v === "boolean" ? v : SETTING_DEFAULTS.showGraph),
   laneColors: oneOf<LaneColorMode>("repo", "branch")(SETTING_DEFAULTS.laneColors),
   comfortableRows: (v) => (typeof v === "boolean" ? v : SETTING_DEFAULTS.comfortableRows),

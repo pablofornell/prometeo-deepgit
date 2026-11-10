@@ -17,17 +17,18 @@
  */
 import { ApiError, toApiError } from "../api/tauri";
 import * as api from "../api/tauri";
-import type { HunkOpts, OpResult } from "../api/types";
+import type { CloneOpts, CloneProgress, CloneResult, HunkOpts, OpResult } from "../api/types";
 import { joinNames, plural, toast, type ToastAction } from "../components/ui";
 import { beginActivity } from "./activity";
 import { confirmAction, showDialog, type PushResult } from "./dialogs";
 import { notifyRepoChanged } from "./events";
 import { openBottomTool } from "./layout";
 import { planPush } from "./pushPlan";
+import { beginRepoOp } from "./repoBusy";
 import { remoteCounterpart, splitRemoteRef } from "./remoteRefs";
 import { cachedRefs, ensureRefs, hasLocalBranch, hasRemoteBranch, refreshRefs } from "./refs";
 import { setChangesRepoId, setMainTab } from "./selection";
-import { projectRepos, refreshSummaries, repoById, summary } from "./workspace";
+import { activeProject, adoptClonedProject, projectRepos, refreshSummaries, repoById, summary } from "./workspace";
 
 // ---------------------------------------------------------------- result type
 
@@ -94,6 +95,8 @@ interface RunSpec {
   actions?: ToastAction[];
   /** Success body override. */
   body?: (r: BatchResult) => string | undefined;
+  /** Background work: no progress activity and no toast at all (success, conflicts or errors); the caller reads the result. */
+  silent?: boolean;
 }
 
 async function runBatch(spec: RunSpec): Promise<BatchResult> {
@@ -104,8 +107,9 @@ async function runBatch(spec: RunSpec): Promise<BatchResult> {
     if (reason) res.skipped.push({ repoId: id, reason });
     else todo.push(id);
   }
-  const activity = todo.length > 1 ? beginActivity(spec.progress ?? `${cap(spec.verb)} in ${todo.length} repositories`, todo.length) : null;
+  const activity = todo.length > 1 && !spec.silent ? beginActivity(spec.progress ?? `${cap(spec.verb)} in ${todo.length} repositories`, todo.length) : null;
   await pool(todo, MAX_PARALLEL, async (id) => {
+    const endOp = beginRepoOp(id);
     try {
       const r = await spec.run(id);
       res.results[id] = r ?? undefined;
@@ -115,6 +119,7 @@ async function runBatch(spec: RunSpec): Promise<BatchResult> {
     } catch (e) {
       res.failed.push({ repoId: id, error: toApiError(e) });
     } finally {
+      endOp();
       activity?.step();
     }
   });
@@ -126,7 +131,7 @@ async function runBatch(spec: RunSpec): Promise<BatchResult> {
     if (cachedRefs(id)) void refreshRefs(id);
   }
   if (touched.length > 0) void refreshSummaries(touched);
-  report(spec, res);
+  if (!spec.silent) report(spec, res);
   return res;
 }
 
@@ -388,11 +393,23 @@ export async function renameBranch(repoId: string, oldName: string): Promise<Bat
 
 // ---------------------------------------------------------------- integrate
 
-/** Merges `source` into the current branch of each repo (dialog "merge"). */
+/** What `source` names, for the default merge message. */
+function mergeSourceKind(id: string, source: string): "branch" | "remote" | "tag" | "commit" {
+  const refs = cachedRefs(id);
+  if (refs?.local.some((b) => b.name === source)) return "branch";
+  if (refs?.remote.some((b) => b.fullName === source)) return "remote";
+  if (refs?.tags.some((t) => t.name === source)) return "tag";
+  return /^[0-9a-f]{4,40}$/.test(source) ? "commit" : "branch";
+}
+
+/**
+ * Merges `source` into the current branch of each repo (dialog "merge": mode, message, `--no-commit`,
+ * unrelated histories). Repos on a diverged branch fail on "fast-forward only" with a clear error; the others go on.
+ */
 export async function merge(repoIds: RepoIds, source: string): Promise<BatchResult> {
   const ids = toIds(repoIds);
   await ensureRefs(ids);
-  const r = await showDialog("merge", { repoIds: ids, source, target: currentBranch(ids[0]) });
+  const r = await showDialog("merge", { repoIds: ids, source, target: currentBranch(ids[0]), sourceKind: mergeSourceKind(ids[0], source) });
   if (!r) return emptyResult(true);
   return runBatch({
     verb: "merge",
@@ -400,7 +417,7 @@ export async function merge(repoIds: RepoIds, source: string): Promise<BatchResu
     what: source,
     repoIds: ids,
     skip: (id) => busy(id) ?? (cachedRefs(id) && !hasBranchSomewhere(id, source) && !/^[0-9a-f]{4,40}$/.test(source) ? `no ${source}` : null),
-    run: (id) => api.merge(id, source, r.noFf, r.squash),
+    run: (id) => api.merge(id, source, r),
   });
 }
 
@@ -521,8 +538,10 @@ export function opSkip(repoIds: RepoIds): Promise<BatchResult> {
 export interface FetchOptions {
   remote?: string | null;
   prune?: boolean;
-  /** No success toast (background auto-fetch). */
+  /** No success toast. Errors still show. */
   quiet?: boolean;
+  /** Background auto-fetch: no activity and no toast of any kind; read the returned `BatchResult` (`state/autoFetch.ts`). */
+  silent?: boolean;
 }
 
 /** Fetches the given repos (all remotes unless `opts.remote`). */
@@ -533,6 +552,7 @@ export function fetch(repoIds: RepoIds, opts: FetchOptions = {}): Promise<BatchR
     past: "Fetched",
     repoIds: ids,
     quiet: opts.quiet,
+    silent: opts.silent,
     progress: `Fetching ${plural(ids.length, "repository", "repositories")}`,
     run: (id) => api.fetch(id, opts.remote ?? null, opts.prune ?? false),
     body: (r) => (r.ok.length > 1 ? `${plural(r.ok.length, "repository", "repositories")} up to date.${r.failed.length ? ` ${r.failed.length} failed.` : ""}` : undefined),
@@ -736,7 +756,7 @@ export async function discardHunk(repoId: string, path: string, hunkIndex: numbe
  * Commits the staged changes of each repo with one message ("Commit in 3 repos"). Repos with nothing
  * staged are skipped unless `amend`.
  */
-export function commit(repoIds: RepoIds, message: string, opts: { amend?: boolean } = {}): Promise<BatchResult> {
+export function commit(repoIds: RepoIds, message: string, opts: { amend?: boolean; signOff?: boolean } = {}): Promise<BatchResult> {
   const ids = toIds(repoIds);
   const subject = firstLine(message, 100);
   return runBatch({
@@ -744,8 +764,80 @@ export function commit(repoIds: RepoIds, message: string, opts: { amend?: boolea
     past: opts.amend ? "Amended commit" : "Committed",
     repoIds: ids,
     skip: (id) => (!opts.amend && summary(id) && (summary(id)?.staged ?? 0) === 0 ? "nothing staged" : null),
-    run: (id) => api.commit(id, message, opts.amend ?? false),
+    run: (id) => api.commit(id, message, opts.amend ?? false, opts.signOff ?? false),
     body: () => subject,
     progress: `Committing in ${plural(ids.length, "repository", "repositories")}`,
   });
+}
+
+// ---------------------------------------------------------------- clone
+
+export interface CloneRequest {
+  url: string;
+  /** Folder that will contain the clone. */
+  parentDir: string;
+  /** Name of the new folder. */
+  dirName: string;
+  branch: string | null;
+  depth: number | null;
+  recurseSubmodules: boolean;
+  /** "current": add to the active project (its folder must contain `parentDir`); "new": a new project at the clone. */
+  addTo: "current" | "new";
+}
+
+export type CloneOutcome =
+  | { ok: true; result: CloneResult }
+  | { ok: false; cancelled: boolean; error: ApiError | null };
+
+export interface CloneRun {
+  /** Settles when the clone ends. Never rejects. Success also adds the repo to the workspace and shows a toast. */
+  done: Promise<CloneOutcome>;
+  /** Stops the clone; `done` then resolves with `cancelled: true`. */
+  cancel(): void;
+}
+
+let cloneSeq = 0;
+const CANCELLED = "The operation was cancelled.";
+
+/**
+ * Starts a clone (the "clone" dialog calls this) and reports the progress of git (phase and percent) to `onProgress`.
+ * The dialog shows errors inline, so this does not toast a failure; it toasts the success.
+ */
+export function startClone(req: CloneRequest, onProgress: (p: CloneProgress) => void): CloneRun {
+  const id = `clone-${Date.now().toString(36)}-${++cloneSeq}`;
+  let cancelRequested = false;
+  const project = activeProject();
+  const opts: CloneOpts = { branch: req.branch, depth: req.depth, recurseSubmodules: req.recurseSubmodules };
+  const target = req.addTo === "current" && project ? ({ kind: "project", projectId: project.id } as const) : ({ kind: "newProject" } as const);
+  const done = (async (): Promise<CloneOutcome> => {
+    let stop: (() => void) | undefined;
+    try {
+      // listen first: the first progress line can come before `cloneRepo` returns control
+      stop = await api.onCloneProgress((e) => {
+        if (e.operationId === id) onProgress(e);
+      });
+      const result = await api.cloneRepo(id, req.url, req.parentDir, req.dirName, opts, target);
+      await adoptClonedProject(result);
+      toast({ kind: "success", title: `Cloned ${req.dirName}`, body: result.createdProject ? `New project ${result.project.name}.` : `Added to ${result.project.name}.` });
+      return { ok: true, result };
+    } catch (e) {
+      const err = toApiError(e);
+      const cancelled = cancelRequested || err.message === CANCELLED;
+      return { ok: false, cancelled, error: cancelled ? null : err };
+    } finally {
+      stop?.();
+    }
+  })();
+  return {
+    done,
+    cancel: () => {
+      cancelRequested = true;
+      void api.cloneCancel(id).catch(() => undefined);
+    },
+  };
+}
+
+/** Opens the "clone" dialog. Resolves to what the clone made, or undefined when the user closed the dialog without cloning. */
+export function cloneRepository(url?: string) {
+  return showDialog("clone", { url });
 }

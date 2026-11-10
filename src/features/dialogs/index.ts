@@ -4,6 +4,7 @@
  */
 import { registerDialog } from "../../state/dialogs";
 import { CheckoutRemoteDialog } from "./CheckoutRemoteDialog";
+import { CloneDialog } from "./CloneDialog";
 import { MergeDialog } from "./MergeDialog";
 import { NewBranchDialog } from "./NewBranchDialog";
 import { PushDialog } from "./PushDialog";
@@ -23,4 +24,5 @@ export function registerAllDialogs(): void {
   registerDialog("stash", StashDialog);
   registerDialog("tag", TagDialog);
   registerDialog("checkoutRemote", CheckoutRemoteDialog);
+  registerDialog("clone", CloneDialog);
 }

@@ -1,6 +1,6 @@
 /**
  * Commit message editor and commit bar (DESIGN.md 5.12): message with a subject counter and a 72 column ruler,
- * Amend, "Commit" (Ctrl+Enter) and "Commit and Push" (Ctrl+Alt+K). One message goes to every repo that has
+ * Amend, Sign-off, "Commit" (Ctrl+Enter) and "Commit and Push" (Ctrl+Alt+K). One message goes to every repo that has
  * staged changes. The draft is kept per project in `localStorage` (`deepgit.draft.<projectId>`).
  */
 import { For, type JSX, Show, createEffect, createMemo, createSignal, on, onCleanup } from "solid-js";
@@ -10,6 +10,7 @@ import { Button, Checkbox, Icon, Splitter, plural, toast } from "../../component
 import * as actions from "../../state/actions";
 import { register } from "../../state/keymap";
 import { mainTab } from "../../state/selection";
+import { setSetting, settings } from "../../state/settings";
 import { activeProject, repoColor, summary } from "../../state/workspace";
 import { SUBJECT_LIMIT, commitLabel, subjectLength } from "./model";
 
@@ -64,6 +65,8 @@ export function CommitBox(props: CommitBoxProps): JSX.Element {
   const projectId = () => activeProject()?.id;
   const [message, setMessage] = createSignal(loadDraft(projectId()));
   const [amend, setAmend] = createSignal(false);
+  /** Starts from the setting and is remembered there (`commitSignOff`). */
+  const signOff = () => settings.commitSignOff;
   const [busy, setBusy] = createSignal(false);
   let area: HTMLTextAreaElement | undefined;
   /** Message loaded by "Amend": removed again when Amend is switched off without edits. */
@@ -123,7 +126,7 @@ export function CommitBox(props: CommitBoxProps): JSX.Element {
     const repos = commitRepos();
     setBusy(true);
     try {
-      const r = await actions.commit(repos.map((x) => x.id), message().trim(), { amend: amend() });
+      const r = await actions.commit(repos.map((x) => x.id), message().trim(), { amend: amend(), signOff: signOff() });
       if (r.cancelled || r.ok.length === 0) return;
       if (r.failed.length === 0) {
         edit("");
@@ -143,6 +146,9 @@ export function CommitBox(props: CommitBoxProps): JSX.Element {
     register("changes.commitPush", "Ctrl+Alt+K", () => void run(true), { title: "Commit and push", group: "Local changes", when: active, allowInInput: true }),
   ];
   onCleanup(() => offs.forEach((off) => off()));
+
+  /** The command the buttons run, for their tooltips. */
+  const commandText = () => `git commit${amend() ? " --amend" : ""}${signOff() ? " --signoff" : ""} -F -`;
 
   const summaryLine = () => {
     const only = commitRepos()[0];
@@ -205,11 +211,17 @@ export function CommitBox(props: CommitBoxProps): JSX.Element {
       </div>
       <div class="dg-changes-bar">
         <Checkbox checked={amend()} onChange={(v) => void onAmend(v)} label="Amend" title="Replace the last commit instead of adding a new one" />
+        <Checkbox
+          checked={signOff()}
+          onChange={(v) => setSetting("commitSignOff", v)}
+          label="Sign-off"
+          title="Add a Signed-off-by line with your name and email (git commit --signoff). It is not added twice."
+        />
         <span class="dg-grow" />
         <Button
           variant="primary"
           disabled={!canCommit()}
-          title={blocker() ?? (amend() ? "Amend the last commit" : "Commit the staged changes")}
+          title={`${blocker() ?? (amend() ? "Amend the last commit" : "Commit the staged changes")}\n${commandText()}`}
           shortcut="Ctrl+Enter"
           onClick={() => void run(false)}
         >
@@ -217,7 +229,7 @@ export function CommitBox(props: CommitBoxProps): JSX.Element {
         </Button>
         <Button
           disabled={!canCommit()}
-          title={blocker() ?? "Commit, then push"}
+          title={`${blocker() ?? "Commit, then push"}\n${commandText()}`}
           shortcut="Ctrl+Alt+K"
           onClick={() => void run(true)}
         >

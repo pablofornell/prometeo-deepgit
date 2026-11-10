@@ -1,7 +1,7 @@
 // @vitest-environment node
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { ConsoleEntry } from "../api/types";
-import { isBackgroundEntry, splitGitArgs } from "./console";
+import { clearConsole, isBackgroundEntry, markBackgroundFetch, pushConsoleEntry, splitGitArgs } from "./console";
 
 const entry = (...args: string[]): ConsoleEntry => ({ args }) as unknown as ConsoleEntry;
 const bg = (...args: string[]) => isBackgroundEntry(entry(...args));
@@ -61,5 +61,42 @@ describe("isBackgroundEntry", () => {
     expect(bg("branch", "-M", "a", "b")).toBe(false);
     expect(bg("branch", "--delete", "x")).toBe(false);
     expect(bg("branch", "--set-upstream-to=origin/x")).toBe(false);
+  });
+});
+
+describe("clone and background fetch", () => {
+  it("shows a clone as a user command", () => {
+    expect(bg("clone", "--progress", "--", "https://h/r.git", "/work/r")).toBe(false);
+  });
+
+  it("classifies the fetch entries of a repo with a background fetch running as background, once and for good", () => {
+    const e = (id: number, repoId: string, ...args: string[]): ConsoleEntry => ({ id, repoId, args, startedAt: 0, durationMs: 1, exitCode: 0, stdout: "", stderr: "" });
+    vi.useFakeTimers();
+    try {
+      const release = markBackgroundFetch(["a"]);
+      const auto = e(1, "a", "fetch", "--all", "--prune");
+      const otherRepo = e(2, "b", "fetch", "--all");
+      const read = e(3, "a", "log", "-1");
+      pushConsoleEntry(auto);
+      pushConsoleEntry(otherRepo);
+      pushConsoleEntry(read);
+      expect(isBackgroundEntry(auto)).toBe(true);
+      expect(isBackgroundEntry(otherRepo)).toBe(false);
+      release();
+      // the entry may arrive just after the reply: the mark lasts a moment
+      vi.advanceTimersByTime(1000);
+      const late = e(4, "a", "fetch", "--all");
+      pushConsoleEntry(late);
+      expect(isBackgroundEntry(late)).toBe(true);
+      vi.advanceTimersByTime(2000);
+      const user = e(5, "a", "fetch", "origin");
+      pushConsoleEntry(user);
+      expect(isBackgroundEntry(user)).toBe(false);
+      // the earlier verdict does not change
+      expect(isBackgroundEntry(auto)).toBe(true);
+    } finally {
+      clearConsole();
+      vi.useRealTimers();
+    }
   });
 });

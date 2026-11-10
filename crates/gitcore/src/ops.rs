@@ -452,22 +452,65 @@ pub fn discard_hunk(
 // ---------------------------------------------------------------- commit, branches, history
 
 /// `git commit -F -` (message on stdin); `--amend` when asked. An empty message with `amend` keeps
-/// the previous message.
+/// the previous message. With `sign_off` the commit gets a `Signed-off-by: <name> <email>` trailer
+/// (`--signoff`), unless the message already has that exact line: git itself only checks the last
+/// line, so an amend of a message with a later trailer would get the sign-off twice.
 pub fn commit(
     git: &Git,
     repo: &RepoInfo,
     message: &str,
     amend: bool,
+    sign_off: bool,
 ) -> Result<OpResult, GitError> {
-    if amend && message.trim().is_empty() {
-        return op(git, repo, &["commit", "--amend", "--no-edit"], None, false);
+    let keep_message = amend && message.trim().is_empty();
+    let sign_off = sign_off && {
+        let text = if keep_message {
+            diff::last_commit_message(git, repo)?
+        } else {
+            message.to_string()
+        };
+        !has_own_signoff(git, repo, &text)
+    };
+    if keep_message {
+        let mut args = vec!["commit", "--amend", "--no-edit"];
+        if sign_off {
+            args.push("--signoff");
+        }
+        return op(git, repo, &args, None, false);
     }
     let mut args = vec!["commit"];
     if amend {
         args.push("--amend");
     }
+    if sign_off {
+        args.push("--signoff");
+    }
     args.extend(["-F", "-"]);
     op(git, repo, &args, Some(message.as_bytes()), false)
+}
+
+/// True when a line of `message` is exactly the sign-off git would add (`Signed-off-by: <committer
+/// name> <email>`). False when the committer identity cannot be read: git then decides.
+fn has_own_signoff(git: &Git, repo: &RepoInfo, message: &str) -> bool {
+    let Ok(out) = git.run_unchecked(
+        path_of(repo),
+        Some(&repo.id),
+        &["var", "GIT_COMMITTER_IDENT"],
+        false,
+        None,
+    ) else {
+        return false;
+    };
+    // "Name <email> 1700000000 +0100": the sign-off keeps the part up to the closing '>'.
+    let ident = out.stdout.trim();
+    let Some(end) = ident.rfind('>') else {
+        return false;
+    };
+    if out.code != 0 {
+        return false;
+    }
+    let line = format!("Signed-off-by: {}", &ident[..=end]);
+    message.lines().any(|l| l.trim_end() == line)
 }
 
 fn is_remote_branch(git: &Git, repo: &RepoInfo, name: &str) -> Result<bool, GitError> {
@@ -587,23 +630,63 @@ pub fn branch_rename(
     op(git, repo, &["branch", "-m", old, new], None, false)
 }
 
+/// Rejects option mixes git would ignore or refuse (the rules of IntelliJ `GitMergeOption`).
+fn check_merge_opts(opts: &MergeOpts, message: Option<&str>) -> Result<(), GitError> {
+    let no_merge_commit = matches!(opts.mode, MergeMode::FfOnly | MergeMode::Squash);
+    if message.is_some() && no_merge_commit {
+        return Err(GitError::Invalid(
+            "A commit message needs a merge commit. It cannot be used with fast-forward only or squash."
+                .into(),
+        ));
+    }
+    if message.is_some() && opts.no_commit {
+        return Err(GitError::Invalid(
+            "A commit message cannot be used with --no-commit: no commit is made.".into(),
+        ));
+    }
+    if opts.no_commit && no_merge_commit {
+        return Err(GitError::Invalid(
+            "--no-commit cannot be used with fast-forward only or squash.".into(),
+        ));
+    }
+    Ok(())
+}
+
+/// `git merge [--no-edit] [--no-ff | --ff-only | --squash] [--no-commit] [--allow-unrelated-histories]
+/// [-m message] [--end-of-options] target`. A blank message means git's default. Squash stages the
+/// changes and leaves no `MERGE_HEAD`; `--ff-only` on diverged branches fails with a clear error.
 pub fn merge(
     git: &Git,
     repo: &RepoInfo,
     target: &str,
-    no_ff: bool,
-    squash: bool,
+    opts: &MergeOpts,
 ) -> Result<OpResult, GitError> {
     check_name("branch or revision", target)?;
-    let mut args = vec!["merge"];
-    if squash {
-        args.push("--squash");
-    } else {
-        args.push("--no-edit");
-        if no_ff {
-            args.push("--no-ff");
-        }
+    let message = opts.message.as_deref().filter(|m| !m.trim().is_empty());
+    if message.is_some_and(|m| m.contains('\0')) {
+        return Err(GitError::Invalid(
+            "The commit message contains a NUL character.".into(),
+        ));
     }
+    check_merge_opts(opts, message)?;
+    let mut args = vec!["merge"];
+    match opts.mode {
+        MergeMode::Ff => args.push("--no-edit"),
+        MergeMode::NoFf => args.extend(["--no-edit", "--no-ff"]),
+        MergeMode::FfOnly => args.extend(["--no-edit", "--ff-only"]),
+        MergeMode::Squash => args.push("--squash"),
+    }
+    if opts.no_commit {
+        args.push("--no-commit");
+    }
+    if opts.allow_unrelated_histories {
+        args.push("--allow-unrelated-histories");
+    }
+    // `-m` takes the next argument whatever it starts with; git reads no message from stdin here.
+    if let Some(m) = message {
+        args.extend(["-m", m]);
+    }
+    args.extend(git.end_of_options());
     args.push(target);
     op(git, repo, &args, None, true)
 }

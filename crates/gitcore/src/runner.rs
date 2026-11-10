@@ -4,7 +4,7 @@
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{self, RecvTimeoutError};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -15,9 +15,37 @@ use crate::model::ConsoleEntry;
 /// Receives one entry per git call.
 pub type Sink = Arc<dyn Fn(ConsoleEntry) + Send + Sync>;
 
+/// Receives the raw bytes git writes to stderr, as they arrive (several lines or half a line).
+pub type StderrSink = Arc<dyn Fn(&[u8]) + Send + Sync>;
+
+/// Asks a running `run_streaming` call to stop: the process group is killed and the call fails
+/// with `GitError::Cancelled`. Clones share the flag.
+#[derive(Clone, Debug, Default)]
+pub struct CancelToken(Arc<AtomicBool>);
+
+impl CancelToken {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn cancel(&self) {
+        self.0.store(true, Ordering::SeqCst);
+    }
+
+    pub fn is_cancelled(&self) -> bool {
+        self.0.load(Ordering::SeqCst)
+    }
+}
+
+/// What `run_streaming` adds to a call: live stderr and cancellation.
+struct Stream<'a> {
+    cancel: &'a CancelToken,
+    on_stderr: StderrSink,
+}
+
 static NEXT_ENTRY_ID: AtomicU64 = AtomicU64::new(1);
 const CONSOLE_CAP: usize = 8 * 1024;
-/// Fetch, pull and push are killed after this long without a single byte on stdout or stderr
+/// Fetch, pull, push and clone are killed after this long without a single byte on stdout or stderr
 /// (a dead connection); `--progress` keeps a healthy transfer talking.
 const NETWORK_INACTIVITY: Duration = Duration::from_secs(120);
 /// Absolute limit of fetch, pull and push, however much they print.
@@ -217,6 +245,41 @@ impl Git {
         write: bool,
         stdin: Option<&[u8]>,
     ) -> Result<RawOutput, GitError> {
+        self.run_reported(repo, repo_id, args, write, stdin, None)
+    }
+
+    /// Runs a network command (`clone`) and hands its stderr to `on_stderr` while it runs, for
+    /// progress. `cancel` kills the process group and gives `GitError::Cancelled`; the usual
+    /// network limits apply. A non-zero exit is an error, like `run`. `dir` is where git starts
+    /// (`-C`): it must exist.
+    pub fn run_streaming(
+        &self,
+        dir: &Path,
+        repo_id: Option<&str>,
+        args: &[&str],
+        cancel: &CancelToken,
+        on_stderr: StderrSink,
+    ) -> Result<Output, GitError> {
+        let stream = Stream { cancel, on_stderr };
+        let out = self
+            .run_reported(dir, repo_id, args, true, None, Some(&stream))?
+            .into_output();
+        if out.code == 0 {
+            Ok(out)
+        } else {
+            Err(command_error(dir, args, &out))
+        }
+    }
+
+    fn run_reported(
+        &self,
+        repo: &Path,
+        repo_id: Option<&str>,
+        args: &[&str],
+        write: bool,
+        stdin: Option<&[u8]>,
+        stream: Option<&Stream>,
+    ) -> Result<RawOutput, GitError> {
         let started_at = unix_ms();
         let timer = Instant::now();
         let limits = is_network(args).then_some(Limits {
@@ -224,9 +287,10 @@ impl Git {
             cap: self.network_cap,
         });
         let result = self
-            .spawn(repo, args, write, stdin, limits)
+            .spawn(repo, args, write, stdin, limits, stream)
             .map_err(|e| match e {
                 SpawnError::Io(e) => GitError::Io(e),
+                SpawnError::Cancelled => GitError::Cancelled,
                 SpawnError::Killed(limit) => {
                     let command = subcommand(args).to_string();
                     GitError::Timeout {
@@ -296,6 +360,7 @@ impl Git {
         write: bool,
         stdin: Option<&[u8]>,
         limits: Option<Limits>,
+        stream: Option<&Stream>,
     ) -> Result<RawOutput, SpawnError> {
         let mut cmd = Command::new(&self.bin);
         cmd.arg("-C")
@@ -372,12 +437,22 @@ impl Git {
         let out = child
             .stdout
             .take()
-            .map(|p| Reader::start(p, start, activity.clone()));
-        let err = child
-            .stderr
-            .take()
-            .map(|p| Reader::start(p, start, activity.clone()));
-        let waited = wait(&mut child, limits, start, &activity);
+            .map(|p| Reader::start(p, start, activity.clone(), None));
+        let err = child.stderr.take().map(|p| {
+            Reader::start(
+                p,
+                start,
+                activity.clone(),
+                stream.map(|s| s.on_stderr.clone()),
+            )
+        });
+        let waited = wait(
+            &mut child,
+            limits,
+            stream.map(|s| s.cancel),
+            start,
+            &activity,
+        );
         // After a kill the readers are not waited for forever: a grandchild that survived (no
         // process group on Windows) would hold the pipes open and block this call.
         let grace = waited.is_err().then_some(KILLED_JOIN_GRACE);
@@ -406,6 +481,8 @@ struct Limits {
 
 enum SpawnError {
     Io(std::io::Error),
+    /// Stopped on request (`CancelToken`).
+    Cancelled,
     /// Killed for running past this limit.
     Killed(Duration),
 }
@@ -427,6 +504,7 @@ impl Reader {
         mut pipe: R,
         start: Instant,
         activity: Arc<AtomicU64>,
+        on_chunk: Option<StderrSink>,
     ) -> Self {
         let buf = Arc::new(Mutex::new(Vec::new()));
         let (tx, done) = mpsc::channel();
@@ -438,6 +516,9 @@ impl Reader {
                     break;
                 }
                 activity.store(start.elapsed().as_millis() as u64, Ordering::Relaxed);
+                if let Some(f) = &on_chunk {
+                    f(&chunk[..n]);
+                }
                 if let Ok(mut b) = shared.lock() {
                     b.extend_from_slice(&chunk[..n]);
                 }
@@ -468,33 +549,42 @@ impl Reader {
 }
 
 /// Waits for the child. With `limits` it is killed (with its process group) after `inactivity`
-/// without output or after `cap` in total, and the result is `SpawnError::Killed`.
+/// without output or after `cap` in total, and the result is `SpawnError::Killed`. A set `cancel`
+/// token kills it too, with `SpawnError::Cancelled`.
 fn wait(
     child: &mut std::process::Child,
     limits: Option<Limits>,
+    cancel: Option<&CancelToken>,
     start: Instant,
     activity: &AtomicU64,
 ) -> Result<std::process::ExitStatus, SpawnError> {
-    let Some(limits) = limits else {
+    if limits.is_none() && cancel.is_none() {
         return Ok(child.wait()?);
-    };
+    }
     loop {
         if let Some(status) = child.try_wait()? {
             return Ok(status);
         }
-        let now = start.elapsed();
-        let last = Duration::from_millis(activity.load(Ordering::Relaxed));
-        let exceeded = if now >= limits.cap {
-            Some(limits.cap)
-        } else if now.saturating_sub(last) >= limits.inactivity {
-            Some(limits.inactivity)
-        } else {
-            None
-        };
-        if let Some(limit) = exceeded {
+        if cancel.is_some_and(CancelToken::is_cancelled) {
             kill_tree(child);
             let _ = child.wait();
-            return Err(SpawnError::Killed(limit));
+            return Err(SpawnError::Cancelled);
+        }
+        if let Some(limits) = limits {
+            let now = start.elapsed();
+            let last = Duration::from_millis(activity.load(Ordering::Relaxed));
+            let exceeded = if now >= limits.cap {
+                Some(limits.cap)
+            } else if now.saturating_sub(last) >= limits.inactivity {
+                Some(limits.inactivity)
+            } else {
+                None
+            };
+            if let Some(limit) = exceeded {
+                kill_tree(child);
+                let _ = child.wait();
+                return Err(SpawnError::Killed(limit));
+            }
         }
         std::thread::sleep(Duration::from_millis(20));
     }
@@ -548,9 +638,9 @@ fn subcommand<'a>(args: &[&'a str]) -> &'a str {
         .unwrap_or("")
 }
 
-/// fetch, pull and push talk to the network and get a time limit.
+/// fetch, pull, push and clone talk to the network and get a time limit.
 fn is_network(args: &[&str]) -> bool {
-    matches!(subcommand(args), "fetch" | "pull" | "push")
+    matches!(subcommand(args), "fetch" | "pull" | "push" | "clone")
 }
 
 /// Builds the error for a failed call. `stderr` falls back to stdout (git prints

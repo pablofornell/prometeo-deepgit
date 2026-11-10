@@ -121,6 +121,8 @@ pub fn run() {
             commands::stash_drop,
             commands::tag_create,
             commands::tag_delete,
+            commands::clone_repo,
+            commands::clone_cancel,
         ])
         .run(tauri::generate_context!())
         .expect("error while running DeepGit");

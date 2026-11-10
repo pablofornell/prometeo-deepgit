@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex, MutexGuard, RwLock};
 
 use gitcore::discover::make_project;
 use gitcore::palette::ColorChoice;
-use gitcore::{ApiError, Git, Project, RepoInfo, Workspace};
+use gitcore::{ApiError, CancelToken, CloneResult, CloneTarget, Git, Project, RepoInfo, Workspace};
 
 use crate::logsession::LogSessions;
 use crate::watcher::WatcherHandle;
@@ -42,6 +42,8 @@ pub struct AppState {
     /// Serializes write commands per repo.
     pub repo_locks: Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>>,
     pub watcher: Mutex<WatcherHandle>,
+    /// Running clones by operation id, to cancel them.
+    pub clones: Mutex<HashMap<String, CancelToken>>,
 }
 
 impl AppState {
@@ -58,6 +60,7 @@ impl AppState {
             sessions: Mutex::new(LogSessions::default()),
             repo_locks: Mutex::new(HashMap::new()),
             watcher: Mutex::new(watcher),
+            clones: Mutex::new(HashMap::new()),
         }
     }
 
@@ -197,6 +200,71 @@ impl AppState {
         self.persist(&ws).map(|()| updated)
     }
 
+    /// Registers a clone and returns its cancel token. An id that is running already is refused.
+    pub fn begin_clone(&self, operation_id: &str) -> Result<CancelToken, ApiError> {
+        let mut clones = lock(&self.clones);
+        if clones.contains_key(operation_id) {
+            return Err(api_error("This clone is already running."));
+        }
+        let token = CancelToken::new();
+        clones.insert(operation_id.to_string(), token.clone());
+        Ok(token)
+    }
+
+    /// Asks a running clone to stop. Unknown ids (already finished) are ignored.
+    pub fn cancel_clone(&self, operation_id: &str) {
+        if let Some(token) = lock(&self.clones).get(operation_id) {
+            token.cancel();
+        }
+    }
+
+    pub fn end_clone(&self, operation_id: &str) {
+        lock(&self.clones).remove(operation_id);
+    }
+
+    /// Fails before the clone starts when `target` is a project whose folder will not contain the
+    /// clone (a rescan could never find it).
+    pub fn check_clone_target(&self, parent: &Path, target: &CloneTarget) -> Result<(), ApiError> {
+        let CloneTarget::Project { project_id } = target else {
+            return Ok(());
+        };
+        let ws = lock(&self.workspace);
+        let project = ws
+            .projects
+            .iter()
+            .find(|p| &p.id == project_id)
+            .ok_or_else(|| api_error("unknown project"))?;
+        if parent.starts_with(&project.path) {
+            Ok(())
+        } else {
+            Err(api_error(format!(
+                "The parent folder is outside the project folder {}. Choose a folder inside it, or add the clone to a new project.",
+                project.path
+            )))
+        }
+    }
+
+    /// Adds the cloned repository at `path` to the project: a rescan of the chosen project, or a
+    /// new project whose folder is the clone (blocking: scans the folder).
+    pub fn add_cloned(&self, path: &Path, target: &CloneTarget) -> Result<CloneResult, ApiError> {
+        let path_str = path.to_string_lossy().into_owned();
+        let (project, created_project) = match target {
+            CloneTarget::Project { project_id } => (self.rescan_project(project_id)?, false),
+            CloneTarget::NewProject => {
+                let known = lock(&self.workspace)
+                    .projects
+                    .iter()
+                    .any(|p| Path::new(&p.path) == path);
+                (self.add_project(&path_str)?, !known)
+            }
+        };
+        Ok(CloneResult {
+            path: path_str,
+            project,
+            created_project,
+        })
+    }
+
     pub fn set_active_project(&self, id: &str) -> Result<(), ApiError> {
         let mut ws = lock(&self.workspace);
         if !workspace::set_active(&mut ws, id) {
@@ -229,6 +297,71 @@ mod tests {
             .unwrap()
             .success();
         assert!(ok);
+    }
+
+    #[test]
+    fn clones_register_cancel_and_end() {
+        let dir = tempfile::tempdir().unwrap();
+        let st = state(dir.path());
+        let token = st.begin_clone("op1").unwrap();
+        assert!(st.begin_clone("op1").is_err(), "the same id twice");
+        assert!(!token.is_cancelled());
+        st.cancel_clone("op1");
+        assert!(token.is_cancelled());
+        st.cancel_clone("unknown"); // nothing happens
+        st.end_clone("op1");
+        assert!(st.begin_clone("op1").is_ok(), "the id is free again");
+    }
+
+    #[test]
+    fn a_cloned_repo_joins_the_project_or_becomes_a_new_one() {
+        let dir = tempfile::tempdir().unwrap();
+        let st = state(dir.path());
+        let root = std::fs::canonicalize(dir.path()).unwrap().join("work");
+        init_repo(&root.join("first"));
+        let project = st.add_project(root.to_str().unwrap()).unwrap();
+        let join = CloneTarget::Project {
+            project_id: project.id.clone(),
+        };
+
+        // a parent inside the project folder is fine, one outside is refused before the clone
+        assert!(st.check_clone_target(&root.join("sub"), &join).is_ok());
+        assert!(st.check_clone_target(&root, &join).is_ok());
+        let outside = std::fs::canonicalize(dir.path()).unwrap();
+        let err = st.check_clone_target(&outside, &join).unwrap_err();
+        assert!(
+            err.message.contains("outside the project folder"),
+            "{}",
+            err.message
+        );
+        let unknown = CloneTarget::Project {
+            project_id: "nope".into(),
+        };
+        assert!(st.check_clone_target(&root, &unknown).is_err());
+        assert!(st
+            .check_clone_target(&outside, &CloneTarget::NewProject)
+            .is_ok());
+
+        // the clone lands in the project folder: a rescan finds it
+        init_repo(&root.join("cloned"));
+        let r = st.add_cloned(&root.join("cloned"), &join).unwrap();
+        assert!(!r.created_project);
+        assert_eq!(r.project.id, project.id);
+        assert_eq!(r.project.repos.len(), 2);
+        assert!(r.project.repos.iter().any(|x| x.path.ends_with("cloned")));
+        assert!(st.repo(&r.project.repos[1].id).is_ok());
+
+        // or it becomes a project of its own
+        let alone = std::fs::canonicalize(dir.path()).unwrap().join("alone");
+        init_repo(&alone);
+        let r = st.add_cloned(&alone, &CloneTarget::NewProject).unwrap();
+        assert!(r.created_project);
+        assert_eq!(r.project.path, alone.to_string_lossy());
+        assert_eq!(st.workspace_snapshot().projects.len(), 2);
+        // the same folder again is not a new project
+        let again = st.add_cloned(&alone, &CloneTarget::NewProject).unwrap();
+        assert!(!again.created_project);
+        assert_eq!(st.workspace_snapshot().projects.len(), 2);
     }
 
     #[test]

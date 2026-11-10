@@ -10,6 +10,7 @@ import { SearchEverywhere } from "./features/palette/SearchEverywhere";
 import { SettingsHost, registerSettings } from "./features/settings";
 import { Shell } from "./features/shell/Shell";
 import { Welcome } from "./features/welcome/Welcome";
+import { startAutoFetch } from "./state/autoFetch";
 import { startEvents } from "./state/events";
 import { installKeymap } from "./state/keymap";
 import { initSettings } from "./state/settings";
@@ -20,6 +21,7 @@ export default function App(): JSX.Element {
   onMount(() => {
     initSettings();
     startEvents();
+    startAutoFetch();
     registerAllDialogs();
     registerSettings();
     registerGlobalShortcuts();

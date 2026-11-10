@@ -6,9 +6,10 @@ use std::sync::Arc;
 
 use gitcore::GitError;
 use gitcore::{
-    diff, log, ops, refs as gitrefs, status, ApiError, CommitDetails, CommitRow, DiffSpec,
-    FileDiff, Git, HunkRef, LogQuery, LogSessionInfo, OpResult, Project, Refs, RepoChanged,
-    RepoInfo, RepoSummary, ResetMode, WorkingTree, Workspace,
+    clone as gitclone, diff, log, ops, refs as gitrefs, status, ApiError, CloneOpts, CloneProgress,
+    CloneResult, CloneTarget, CommitDetails, CommitRow, DiffSpec, FileDiff, Git, HunkRef, LogQuery,
+    LogSessionInfo, MergeOpts, OpResult, Project, Refs, RepoChanged, RepoInfo, RepoSummary,
+    ResetMode, WorkingTree, Workspace,
 };
 use tauri::{AppHandle, Emitter, State};
 
@@ -359,9 +360,10 @@ pub async fn commit(
     repo_id: String,
     message: String,
     amend: bool,
+    sign_off: bool,
 ) -> Res<OpResult> {
     write(&app, &state, &repo_id, move |g, r| {
-        ops::commit(g, r, &message, amend)
+        ops::commit(g, r, &message, amend, sign_off)
     })
     .await
 }
@@ -431,11 +433,10 @@ pub async fn merge(
     state: St<'_>,
     repo_id: String,
     target: String,
-    no_ff: bool,
-    squash: bool,
+    opts: MergeOpts,
 ) -> Res<OpResult> {
     write(&app, &state, &repo_id, move |g, r| {
-        ops::merge(g, r, &target, no_ff, squash)
+        ops::merge(g, r, &target, &opts)
     })
     .await
 }
@@ -627,6 +628,66 @@ pub async fn tag_delete(
         ops::tag_delete(g, r, &name)
     })
     .await
+}
+
+// ------------------------------------------------------------------ clone
+
+/// Payload of the `clone-progress` event.
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CloneProgressEvent {
+    operation_id: String,
+    #[serde(flatten)]
+    progress: CloneProgress,
+}
+
+/// JS: `{ operationId, url, parentDir, dirName, opts, target }`. Clones into `parentDir/dirName`,
+/// emits `clone-progress` events tagged with `operationId`, then adds the new repository to the
+/// project (`target`). `clone_cancel` with the same id stops it. A failed or cancelled clone
+/// leaves nothing behind.
+// Mirrors the PLAN.md argument list.
+#[allow(clippy::too_many_arguments)]
+#[tauri::command]
+pub async fn clone_repo(
+    app: AppHandle,
+    state: St<'_>,
+    operation_id: String,
+    url: String,
+    parent_dir: String,
+    dir_name: String,
+    opts: CloneOpts,
+    target: CloneTarget,
+) -> Res<CloneResult> {
+    let cancel = state.begin_clone(&operation_id)?;
+    let st = state.inner().clone();
+    let id = operation_id.clone();
+    let result = blocking(move || {
+        let plan =
+            gitclone::plan_clone(&url, &parent_dir, &dir_name, &opts).map_err(ApiError::from)?;
+        st.check_clone_target(&plan.parent, &target)?;
+        let sink: gitclone::ProgressSink = Arc::new(move |progress| {
+            let _ = app.emit(
+                "clone-progress",
+                CloneProgressEvent {
+                    operation_id: id.clone(),
+                    progress,
+                },
+            );
+        });
+        let path =
+            gitclone::run_clone(&st.git, &plan, &opts, &cancel, sink).map_err(ApiError::from)?;
+        st.add_cloned(&path, &target)
+    })
+    .await;
+    state.end_clone(&operation_id);
+    result
+}
+
+/// Stops the clone with this operation id. Does nothing when it has finished already.
+#[tauri::command]
+pub async fn clone_cancel(state: St<'_>, operation_id: String) -> Res<()> {
+    state.cancel_clone(&operation_id);
+    Ok(())
 }
 
 #[cfg(test)]

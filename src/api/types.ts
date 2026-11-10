@@ -324,6 +324,58 @@ export interface OpResult {
 
 export type ResetMode = "soft" | "mixed" | "hard" | "keep";
 
+/** How a merge joins the histories: fast-forward when possible, `--no-ff`, `--ff-only`, `--squash`. */
+export type MergeMode = "ff" | "noFf" | "ffOnly" | "squash";
+
+/**
+ * Options of `merge`. A message needs a merge commit (not `ffOnly`, `squash` or `noCommit`); `noCommit` is not for
+ * `ffOnly` and `squash`. The backend refuses other mixes (see `features/dialogs/mergeOptions.ts`).
+ */
+export interface MergeOpts {
+  mode: MergeMode;
+  /** Message of the merge commit; null / blank keeps git's default. */
+  message: string | null;
+  /** `--no-commit`. */
+  noCommit: boolean;
+  /** `--allow-unrelated-histories`. */
+  allowUnrelatedHistories: boolean;
+}
+
+/** Options of `cloneRepo`. */
+export interface CloneOpts {
+  /** `--branch`: a branch or tag to check out. null = the remote HEAD. */
+  branch: string | null;
+  /** `--depth`: a shallow clone (at least 1). null = full history. */
+  depth: number | null;
+  recurseSubmodules: boolean;
+}
+
+/** Where a clone is added. Tagged by `kind`. */
+export type CloneTarget =
+  /** The folder of this project must contain the clone: the project is rescanned. */
+  | { kind: "project"; projectId: string }
+  /** A new project whose folder is the clone. */
+  | { kind: "newProject" };
+
+/** Payload of the `clone-progress` event: one phase of git's progress output. */
+export interface CloneProgress {
+  /** The id given to `cloneRepo`. */
+  operationId: string;
+  /** "Receiving objects", "Resolving deltas", "Counting objects"... */
+  phase: string;
+  /** 0..100; null when git prints the phase without a percentage. */
+  percent: number | null;
+}
+
+export interface CloneResult {
+  /** Absolute path of the new repository. */
+  path: string;
+  /** The project that now holds it (rescanned, or new). */
+  project: Project;
+  /** True when `project` was just created. */
+  createdProject: boolean;
+}
+
 /** Shape of every rejection of an API call (see `ApiError` in `./tauri`). */
 export interface ApiErrorShape {
   message: string;

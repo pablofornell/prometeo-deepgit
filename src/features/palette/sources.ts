@@ -41,6 +41,7 @@ const EXTRAS: ExtraAction[] = [
   { key: "x.repoColor", title: "Set repository color…", icon: "palette", group: "Project", run: () => { const r = focusedRepo(); if (r) showColorMenu(`Color of ${r.name}`, repoColorMenu(r)); } },
   { key: "x.projectColor", title: "Set project color…", icon: "palette", group: "Project", run: () => { const p = activeProject(); if (p) showColorMenu(`Color of ${p.name}`, projectColorMenu(p)); } },
   { key: "x.addProject", title: "Add project…", icon: "plus", group: "Project", run: () => void addProject() },
+  { key: "x.clone", title: "Clone repository…", icon: "repo", group: "Project", run: () => void actions.cloneRepository() },
   { key: "x.rescan", title: "Rescan project for repositories", icon: "refresh", group: "Project", run: () => { const p = activeProject(); if (p) void rescanProject(p.id); } },
   { key: "x.showLog", title: "Show log", icon: "log", group: "View", run: () => setMainTab("log") },
   { key: "x.allRepos", title: "Show all repositories in the log", icon: "repo", group: "View", run: selectAllRepos },

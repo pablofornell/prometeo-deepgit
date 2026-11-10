@@ -469,6 +469,83 @@ pub enum ResetMode {
     Keep,
 }
 
+/// How `merge` joins the histories (the radio group of the merge dialog).
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, Default)]
+#[serde(rename_all = "camelCase")]
+pub enum MergeMode {
+    /// Fast-forward when possible, else a merge commit (git's default).
+    #[default]
+    Ff,
+    /// `--no-ff`: always a merge commit.
+    NoFf,
+    /// `--ff-only`: fail when the branches have diverged.
+    FfOnly,
+    /// `--squash`: stage the changes, commit nothing.
+    Squash,
+}
+
+/// Options of `merge`. The rules of IntelliJ `GitMergeOption`: `message` needs a merge commit (not
+/// `ffOnly`, `squash` or `noCommit`); `noCommit` is not for `ffOnly` and `squash`.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct MergeOpts {
+    pub mode: MergeMode,
+    /// Message of the merge commit (`-m`); `None` keeps git's default.
+    pub message: Option<String>,
+    /// `--no-commit`: merge, then stop before the commit.
+    pub no_commit: bool,
+    /// `--allow-unrelated-histories`.
+    pub allow_unrelated_histories: bool,
+}
+
+/// Options of `clone` (PLAN.md section 5.6).
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct CloneOpts {
+    /// `--branch`: a branch or tag to check out instead of the remote HEAD.
+    pub branch: Option<String>,
+    /// `--depth`: a shallow clone with this many commits (at least 1).
+    pub depth: Option<u32>,
+    /// `--recurse-submodules`.
+    pub recurse_submodules: bool,
+}
+
+/// Where a clone adds the new repository.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase",
+    tag = "kind"
+)]
+pub enum CloneTarget {
+    /// The folder of this project must contain the clone: the project is rescanned.
+    Project { project_id: String },
+    /// A new project whose folder is the clone.
+    NewProject,
+}
+
+/// One phase of git's clone progress output. The `clone-progress` event adds the operation id.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct CloneProgress {
+    /// "Receiving objects", "Resolving deltas", "Counting objects"...
+    pub phase: String,
+    /// 0..=100; `None` when git prints a phase without a percentage.
+    pub percent: Option<u8>,
+}
+
+/// Result of `clone_repo`.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct CloneResult {
+    /// Absolute path of the new repository.
+    pub path: String,
+    /// The project that now holds it (rescanned, or new).
+    pub project: Project,
+    /// True when `project` was just created.
+    pub created_project: bool,
+}
+
 /// Error sent to the frontend.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]

@@ -1,10 +1,17 @@
 mod common;
 
 use common::*;
-use gitcore::{ops, refs, state, status, GitError, RepoStateKind, ResetMode};
+use gitcore::{ops, refs, state, status, GitError, MergeMode, MergeOpts, RepoStateKind, ResetMode};
 
 fn strs(v: &[&str]) -> Vec<String> {
     v.iter().map(|s| s.to_string()).collect()
+}
+
+fn merge_opts(mode: MergeMode) -> MergeOpts {
+    MergeOpts {
+        mode,
+        ..MergeOpts::default()
+    }
 }
 
 fn ten_lines(first: &str, last: &str) -> String {
@@ -150,7 +157,7 @@ fn commit_and_amend() {
     let g = git();
     r.write("a.txt", "1\n");
     ops::stage(&g, &r.info, &strs(&["a.txt"])).unwrap();
-    let res = ops::commit(&g, &r.info, "first\n\nbody text", false).unwrap();
+    let res = ops::commit(&g, &r.info, "first\n\nbody text", false, false).unwrap();
     assert!(res.ok && !res.conflicts);
     assert_eq!(
         r.sh(&["log", "-1", "--format=%B"]).trim(),
@@ -164,19 +171,19 @@ fn commit_and_amend() {
     let before = r.head();
     r.write("a.txt", "2\n");
     ops::stage(&g, &r.info, &strs(&["a.txt"])).unwrap();
-    ops::commit(&g, &r.info, "amended", true).unwrap();
+    ops::commit(&g, &r.info, "amended", true, false).unwrap();
     assert_ne!(r.head(), before);
     assert_eq!(r.sh(&["rev-list", "--count", "HEAD"]), "1");
     assert_eq!(r.sh(&["log", "-1", "--format=%s"]), "amended");
     assert_eq!(r.sh(&["show", "HEAD:a.txt"]), "2");
 
     // Amend with an empty message keeps the previous one.
-    ops::commit(&g, &r.info, "", true).unwrap();
+    ops::commit(&g, &r.info, "", true, false).unwrap();
     assert_eq!(r.sh(&["log", "-1", "--format=%s"]), "amended");
 
     // Nothing to commit is an error, not an OpResult.
     assert!(matches!(
-        ops::commit(&g, &r.info, "again", false),
+        ops::commit(&g, &r.info, "again", false, false),
         Err(GitError::Command { .. })
     ));
 }
@@ -195,7 +202,7 @@ fn conflicted_repo() -> TestRepo {
 fn merge_conflict_then_abort() {
     let r = conflicted_repo();
     let g = git();
-    let res = ops::merge(&g, &r.info, "other", false, false).unwrap();
+    let res = ops::merge(&g, &r.info, "other", &MergeOpts::default()).unwrap();
     assert!(!res.ok);
     assert!(res.conflicts);
     assert_eq!(state::repo_state(r.path()).unwrap(), RepoStateKind::Merging);
@@ -217,7 +224,7 @@ fn merge_conflict_resolved_and_continued() {
     let r = conflicted_repo();
     let g = git();
     assert!(
-        ops::merge(&g, &r.info, "other", false, false)
+        ops::merge(&g, &r.info, "other", &MergeOpts::default())
             .unwrap()
             .conflicts
     );
@@ -244,7 +251,7 @@ fn merge_fast_forward_squash_and_no_ff() {
     r.sh(&["checkout", "-q", "-b", "f1"]);
     r.commit_file("b", "1", "two");
     r.sh(&["checkout", "-q", "main"]);
-    let res = ops::merge(&g, &r.info, "f1", true, false).unwrap();
+    let res = ops::merge(&g, &r.info, "f1", &merge_opts(MergeMode::NoFf)).unwrap();
     assert!(res.ok);
     assert_eq!(
         r.sh(&["rev-list", "--parents", "-n", "1", "HEAD"])
@@ -257,7 +264,11 @@ fn merge_fast_forward_squash_and_no_ff() {
     r.commit_file("c", "1", "three");
     r.sh(&["checkout", "-q", "main"]);
     let before = r.head();
-    assert!(ops::merge(&g, &r.info, "f2", false, true).unwrap().ok);
+    assert!(
+        ops::merge(&g, &r.info, "f2", &merge_opts(MergeMode::Squash))
+            .unwrap()
+            .ok
+    );
     assert_eq!(r.head(), before); // squash does not commit
     assert_eq!(status::working_tree(&g, &r.info).unwrap().staged.len(), 1);
 }

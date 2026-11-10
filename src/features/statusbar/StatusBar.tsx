@@ -3,6 +3,7 @@ import { For, type JSX, Show, createMemo, createSignal } from "solid-js";
 import { AheadBehind, Icon, Popup, ProgressBar, RepoSquare, Spinner } from "../../components/ui";
 import * as actions from "../../state/actions";
 import { activities } from "../../state/activity";
+import { autoFetchLine, autoFetchStatus } from "../../state/autoFetch";
 import { consoleEntries, formatCommand, isBackgroundEntry, lastUserEntry } from "../../state/console";
 import { fetchAge } from "../../state/fetchAge";
 import { openBottomTool, setSidebarVisible } from "../../state/layout";
@@ -124,12 +125,23 @@ export function StatusBar(): JSX.Element {
           </>
         )}
       </Show>
+      <Show when={autoFetchStatus().failing.length > 0}>
+        <button
+          type="button"
+          class="dg-statusbar-widget dg-statusbar-autofetch"
+          data-tip={`${autoFetchLine()}\nIt tries again later. Open the Git console to see the command.`}
+          aria-label={autoFetchLine()}
+          onClick={() => openBottomTool("console")}
+        >
+          <Icon name="warning" size={14} class="dg-statusbar-bad" />
+        </button>
+      </Show>
       <button
         type="button"
         class="dg-statusbar-widget dg-statusbar-fetch"
         classList={{ [`is-${age().level}`]: true }}
         style={{ "--dg-statusbar-age": `${age().fraction * 360}deg` }}
-        data-tip={`${age().tooltip}\nClick to fetch all repositories`}
+        data-tip={`${age().tooltip} ${autoFetchLine()}\nClick to fetch all repositories`}
         onClick={() => void actions.fetchAll()}
       >
         <span class="dg-statusbar-age" />
