@@ -12,14 +12,17 @@
  *   openMenu(buttonEl, items);   // dropdown under a button
  *
  * Keyboard: Up/Down/Home/End move, Right opens a submenu, Left closes it, Enter/Space selects, Esc closes.
+ * Panels are keyed by depth, so hovering only moves the highlight (no remount, no re-measure, no pop-in replay). A pointer
+ * travelling diagonally towards an open submenu does not close it (`menuGeometry.ts`).
  * Items are listed top to bottom exactly as given; build the array when the menu opens (`items` may be a function).
  */
-import { For, type JSX, Show, createSignal, onCleanup, onMount } from "solid-js";
+import { type Accessor, For, Index, type JSX, Show, createEffect, createMemo, createSignal, onCleanup, onMount } from "solid-js";
 import { Portal } from "solid-js/web";
 import { trackOverlay } from "../../state/keymap";
 import { Icon } from "./Icon";
 import type { IconName } from "./icons";
 import { Kbd } from "./Kbd";
+import { movingToward } from "./menuGeometry";
 
 export interface MenuItem {
   label?: string;
@@ -53,6 +56,8 @@ interface Level {
 
 const [levels, setLevels] = createSignal<Level[]>([]);
 let openTimer = 0;
+/** Last pointer position seen over the menu; used to tell "moving towards the submenu" from "moving to another item". */
+let lastPointer: { x: number; y: number } | null = null;
 
 const selectable = (it: MenuItem) => !it.separator && !it.heading && !it.disabled;
 
@@ -173,19 +178,51 @@ function onKey(e: KeyboardEvent): void {
   }
 }
 
-function MenuPanel(props: { level: Level; depth: number }): JSX.Element {
-  let box: HTMLDivElement | undefined;
-  const [pos, setPos] = createSignal<{ left: number; top: number } | null>(null);
+/** Applies the hover result of item `index` at `depth` (highlight, and the submenu if the item has one). */
+function hoverItem(depth: number, index: number, item: MenuItem, rect: DOMRect): void {
+  if (item.submenu && selectable(item)) {
+    setActive(depth, index, false);
+    openTimer = window.setTimeout(() => setActive(depth, index, true, rect), 150);
+  } else {
+    setLevels((ls) => {
+      const next = ls.slice(0, depth + 1);
+      next[depth] = { ...next[depth], active: selectable(item) ? index : -1 };
+      return next;
+    });
+  }
+}
 
-  onMount(() => {
+/**
+ * One menu panel. Panels are keyed by depth (`<Index>`), so hovering only changes `level().active` and the panel stays
+ * mounted: no re-measure, no `visibility: hidden` frame, no pop-in animation replay.
+ */
+function MenuPanel(props: { level: Accessor<Level>; depth: number }): JSX.Element {
+  let box: HTMLDivElement | undefined;
+  // Memos so the positioning effect does not re-run when only `active` changes.
+  const x = createMemo(() => props.level().x);
+  const y = createMemo(() => props.level().y);
+  const parent = createMemo(() => props.level().parent);
+  const items = createMemo(() => props.level().items);
+
+  createEffect(() => {
+    const px = x();
+    const py = y();
+    const pr = parent();
+    items();
     if (!box) return;
-    const r = box.getBoundingClientRect();
-    let left = props.level.x;
-    let top = props.level.y;
-    if (props.depth > 0 && props.level.parent && left + r.width > window.innerWidth - 6) left = props.level.parent.left - r.width + 4;
-    left = Math.min(Math.max(6, left), Math.max(6, window.innerWidth - r.width - 6));
-    if (top + r.height > window.innerHeight - 6) top = Math.max(6, window.innerHeight - r.height - 6);
-    setPos({ left, top });
+    // Measure at the requested spot, using the layout size (getBoundingClientRect would include the pop-in scale).
+    box.style.left = px + "px";
+    box.style.top = py + "px";
+    const w = box.offsetWidth;
+    const h = box.offsetHeight;
+    let left = px;
+    let top = py;
+    if (props.depth > 0 && pr && left + w > window.innerWidth - 6) left = pr.left - w + 4;
+    left = Math.min(Math.max(6, left), Math.max(6, window.innerWidth - w - 6));
+    if (top + h > window.innerHeight - 6) top = Math.max(6, window.innerHeight - h - 6);
+    box.style.left = left + "px";
+    box.style.top = top + "px";
+    box.style.visibility = "visible";
   });
 
   return (
@@ -194,10 +231,11 @@ function MenuPanel(props: { level: Level; depth: number }): JSX.Element {
       class="dg-popup dg-menu"
       role="menu"
       data-menu-level={props.depth}
-      style={{ left: (pos()?.left ?? props.level.x) + "px", top: (pos()?.top ?? props.level.y) + "px", visibility: pos() ? "visible" : "hidden" }}
+      style={{ visibility: "hidden" }}
       onContextMenu={(e) => e.preventDefault()}
+      onMouseEnter={() => window.clearTimeout(openTimer)}
     >
-      <For each={props.level.items}>
+      <For each={items()}>
         {(item, i) => (
           <Show
             when={!item.separator}
@@ -210,7 +248,7 @@ function MenuPanel(props: { level: Level; depth: number }): JSX.Element {
               <div
                 class="dg-menu-item"
                 classList={{
-                  "is-active": props.level.active === i(),
+                  "is-active": props.level().active === i(),
                   "is-disabled": !!item.disabled,
                   "is-danger": !!item.danger,
                 }}
@@ -223,16 +261,15 @@ function MenuPanel(props: { level: Level; depth: number }): JSX.Element {
                 onMouseEnter={(e) => {
                   window.clearTimeout(openTimer);
                   const rect = e.currentTarget.getBoundingClientRect();
-                  if (item.submenu && selectable(item)) {
-                    setActive(props.depth, i(), false);
-                    openTimer = window.setTimeout(() => setActive(props.depth, i(), true, rect), 150);
-                  } else {
-                    setLevels((ls) => {
-                      const next = ls.slice(0, props.depth + 1);
-                      next[props.depth] = { ...next[props.depth], active: selectable(item) ? i() : -1 };
-                      return next;
-                    });
+                  const ls = levels();
+                  const child = ls.length > props.depth + 1 && ls[props.depth].active !== i();
+                  const sub = child ? document.querySelector<HTMLElement>(`[data-menu-level="${props.depth + 1}"]`) : null;
+                  // Pointer on its way to the open submenu: keep it open; leave the decision to the submenu's own mouseenter.
+                  if (sub && movingToward(lastPointer, { x: e.clientX, y: e.clientY }, sub.getBoundingClientRect())) {
+                    openTimer = window.setTimeout(() => hoverItem(props.depth, i(), item, rect), 250);
+                    return;
                   }
+                  hoverItem(props.depth, i(), item, rect);
                 }}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -274,12 +311,18 @@ export function MenuHost(): JSX.Element {
       closeMenu();
     };
     const dismiss = () => closeMenu();
+    const move = (e: MouseEvent) => {
+      lastPointer = { x: e.clientX, y: e.clientY };
+    };
+    document.addEventListener("mousemove", move, true);
     window.addEventListener("keydown", onKey, true);
     document.addEventListener("pointerdown", down, true);
     window.addEventListener("blur", dismiss);
     window.addEventListener("resize", dismiss);
     window.addEventListener("wheel", dismiss, { passive: true });
     onCleanup(() => {
+      document.removeEventListener("mousemove", move, true);
+      lastPointer = null;
       window.removeEventListener("keydown", onKey, true);
       document.removeEventListener("pointerdown", down, true);
       window.removeEventListener("blur", dismiss);
@@ -290,7 +333,7 @@ export function MenuHost(): JSX.Element {
   return (
     <Show when={levels().length > 0}>
       <Portal>
-        <For each={levels()}>{(level, d) => <MenuPanel level={level} depth={d()} />}</For>
+        <Index each={levels()}>{(level, d) => <MenuPanel level={level} depth={d} />}</Index>
       </Portal>
     </Show>
   );
