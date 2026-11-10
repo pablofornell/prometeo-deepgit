@@ -1,4 +1,4 @@
-/** Sidebar island (DESIGN.md 5.3): project header and card, sync strip, repository tree with branches, tags, stashes and submodules. */
+/** Sidebar island (DESIGN.md 5.3): project header and card, repository tree with branches, tags, stashes and submodules. */
 import { type JSX, Show, createEffect, createMemo, createSignal, on } from "solid-js";
 import {
   AheadBehind, EmptyState, Icon, IconButton, RepoIcon, Tree, createExpanded, initials, openContextMenu, openMenu, plural,
@@ -18,7 +18,6 @@ import { nodeMenu } from "./menus";
 import { ProjectNameEditor } from "./ProjectNameEditor";
 import { renamingAfterSwitch } from "./rename";
 import { buildTree, expandableIds, filterTree, ids, repoDot, stateLabel, type SidebarNode } from "./nodes";
-import { SyncStrip } from "./SyncStrip";
 import { cssPx } from "../../state/metrics";
 import "./sidebar.css";
 
@@ -389,8 +388,6 @@ export function Sidebar(): JSX.Element {
           </Show>
         )}
       </Show>
-
-      <SyncStrip />
 
       <Show when={!single()}>
         <div class="dg-sidebar-section">

@@ -202,7 +202,7 @@
   --dg-ruler-tag: var(--dg-warning);
   --dg-ruler-match: var(--dg-warning);
 
-  /* ---- branch matrix and sync strip: checked out green, local grey, only on origin violet ---- */
+  /* ---- branch matrix: checked out green, local grey, only on origin violet ---- */
   --dg-matrix-current: var(--dg-success);
   --dg-matrix-local: var(--dg-neutral);
   --dg-matrix-remote-only: var(--dg-special);

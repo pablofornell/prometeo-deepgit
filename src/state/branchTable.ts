@@ -1,6 +1,6 @@
 /**
  * Branch table across the repos of the active project (DESIGN.md 11.2): one column per branch name, one cell per repo.
- * Shared by the title bar branch popup, the sidebar sync strip and the branch matrix tool window.
+ * Shared by the title bar branch popup and the branch matrix tool window.
  *
  *   const col = branchColumn("feature/x");   // reactive; undefined when no repo has the branch
  *   col?.cells[repoId].state                 // "current" | "local" | "remote" | "missing"

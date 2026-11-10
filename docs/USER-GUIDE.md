@@ -55,7 +55,7 @@ A project with several repositories shows all of them together:
 - The log merges the commits of all repositories.
 - Each commit row has a repository chip with the repository name.
 - The sidebar lists all repositories.
-- The branch matrix and the sync strip appear.
+- The branch matrix appears.
 - Operations such as checkout, new branch, merge and commit can run in many repositories at once.
 
 ### Manage projects
@@ -90,7 +90,7 @@ The window has these parts:
 |---|---|---|
 | Title bar | Top | Project switcher, branch widget, Fetch, Pull and Push buttons, Search Everywhere field, Git console button, notifications, settings, window buttons. |
 | Tool stripe | Left edge | Buttons for the Project sidebar (`Alt+1`), Local changes (`Alt+0`), Branch matrix (`Alt+2`), Stashes (`Alt+3`, shows the sidebar) and Git console (`Alt+9`). Also the notifications button. |
-| Sidebar | Left | The project card, the sync strip and the tree of repositories, branches, tags and stashes. |
+| Sidebar | Left | The project card and the tree of repositories, branches, tags and stashes. |
 | Main island | Centre | Two tabs: **Log** and **Local changes**. |
 | Right column | Right of the main island | Two tabs. **Changed files** shows the selected commit and its changed files. **File changes** shows the diff of the selected file. |
 | Bottom tool window | Below the main island and the right column | **Git console** or **Branch matrix**. It shows only when you open it. |
@@ -477,18 +477,6 @@ To run an operation on many repositories:
 DeepGit skips a repository when the operation does not apply to it. A skip is not a failure. Examples: the branch is missing, or a merge or rebase is in progress.
 
 Double-click a cell to check out the branch in that repository only.
-
-### Sync strip
-
-When the project has several repositories and the current branch of the focused repository exists in at least two of them, the sidebar shows the sync strip.
-It has one segment for each repository:
-
-- Filled: the branch is checked out.
-- Dimmed: the branch is local but not checked out.
-- Outline only: the branch exists only on `origin`.
-- Grey: the branch is missing.
-
-Click a segment to focus that repository. Click **Matrix** to open the matrix with this branch selected.
 
 ### Dialogs and command preview
 

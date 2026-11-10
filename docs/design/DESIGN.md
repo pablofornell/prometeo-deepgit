@@ -38,7 +38,7 @@ Four principles control every decision:
 3. **Show the git command.** Every operation writes its exact git command to the Git console. The status bar shows the last command. Users trust what they can see.
 4. **Dense and calm.** Rows are 24 px. Text is 13 px. Chrome is quiet grey. Only state uses colour: refs, status letters, diff, ahead/behind, conflicts.
 
-Where DeepGit spends its boldness: the **branch matrix** and the **sync strip**. The rest of the UI stays close to JetBrains so that IntelliJ users feel at home on the first day.
+Where DeepGit spends its boldness: the **branch matrix**. The rest of the UI stays close to JetBrains so that IntelliJ users feel at home on the first day.
 
 ---
 
@@ -414,7 +414,7 @@ The washes are transparent, so they work on every surface. Where an opaque colou
 2. **Active tab.** `--dg-tab-active-bg` (accent wash), `--dg-tab-active-fg` text and a 2 px `--dg-selection-edge` underline: Log / Local changes, Changed files / File changes, Git console / Branch matrix, the Search Everywhere tabs. Toggled icon buttons and tool stripe buttons: accent strong wash, accent text, 1 px accent border. A selected matrix column: accent wash down the column and an accent underline on its header.
 3. **Focus ring.** `--dg-focus-ring` is the accent solid.
 4. **Ref pills.** HEAD: accent fill, white text. Local branch: success wash, fg and border (current branch: the strong wash and bold). Remote branch: special. Tag: warning. Stash: info. "+3": neutral.
-5. **Ahead and behind.** Ahead is green (`--dg-ahead-*`, success), behind is blue (`--dg-behind-*`, accent), both is amber (`--dg-diverged-*`, warning wash and border). The same capsule everywhere: sidebar, sync strip, matrix, status bar, branch popup, Search Everywhere. Push with commits to push: a success wash on the title bar button.
+5. **Ahead and behind.** Ahead is green (`--dg-ahead-*`, success), behind is blue (`--dg-behind-*`, accent), both is amber (`--dg-diverged-*`, warning wash and border). The same capsule everywhere: sidebar, matrix, status bar, branch popup, Search Everywhere. Push with commits to push: a success wash on the title bar button.
 6. **File status.** Letter and file name in `--dg-status-*`: added success, modified warning, deleted danger (and struck through), renamed and copied accent, untracked info, conflicted danger (and the row gets a danger soft wash, a strong one when selected), type change special, ignored neutral. The same in Changed files, Local changes, the diff header, Search Everywhere, the conflicts dialog and the merge window title. The name keeps its colour on a selected row.
 7. **Diff.** Added lines are success, removed lines are danger, modified lines (side by side) are accent; the changed words are the stronger mix of the same family. Hunk headers are an info wash with info text and a 1 px info edge. Merge window chunks: conflict danger, modified accent, inserted success, deleted neutral; changed words in a chunk are its marker at `--dg-merge-word-a`.
 8. **Banners.** An operation in progress (merge, rebase, cherry-pick, revert) is the special strong wash with a special border and a 3 px special bar at the left. Errors are the danger wash, warnings the warning wash, done states the success wash, information the info wash, each with its border and a 3 px bar.
@@ -481,9 +481,8 @@ Content from top to bottom:
 
 1. **Header** (36 px): title "Project", then icon buttons Fetch all, Add repository, More.
 2. **Project card** (52 px): 32 × 32 project badge (radius 8), name 13/600, path and repo count 12 secondary. Bottom border 1 px `--dg-separator`, side margin 8.
-3. **Sync strip** (signature 11.2). Shows only when the project has more than one repo and the current branch of the focused repo exists in more than one repo.
-4. **Section label** "Repositories" (12/500 secondary, padding 8 8 4) with a right-aligned hint ("5 of 12 shown in log") when the log filter hides repos.
-5. **Repository tree.**
+3. **Section label** "Repositories" (12/500 secondary, padding 8 8 4) with a right-aligned hint ("5 of 12 shown in log") when the log filter hides repos.
+4. **Repository tree.**
 
 Repository row (26 px):
 
@@ -1068,27 +1067,13 @@ These features make DeepGit different from Fork and from IntelliJ. Build each on
 
 Removed. Repositories have no colour, so there is no spine. The **Repository** column of the log (a neutral repo chip with the name) says which repository owns a commit.
 
-### 11.2 Branch matrix and sync strip (synchronous branch control)
+### 11.2 Branch matrix (synchronous branch control)
 
-**What it is.** A grid of repositories (rows) × branches (columns). Each cell shows the state of that branch in that repo. Select a column to run one branch operation over many repos. The sidebar shows a one-line version: the sync strip.
-
-**Sync strip (sidebar card).**
-
-1. Card: margin 10 12 2, padding 8 10, radius 8, `--dg-layer-1-bg`.
-2. Line 1: matrix icon, branch name (12/600, ellipsis), link "Matrix" (11) at the right.
-3. Line 2: 12 equal segments in a grid (gap 3, height 6, radius 2), one per repo in sidebar order.
-   - Branch is current in the repo: filled with `--dg-matrix-current` (green).
-   - Branch exists only on origin: 1 px inset ring in `--dg-matrix-remote-only` (violet), no fill.
-   - Branch is local but not current: `--dg-matrix-current` at 40 %.
-   - Branch is missing: `--dg-matrix-missing`.
-4. Line 3: a legend with counts: "3 current", "2 on origin", "7 missing" (11 secondary, with 8 × 6 swatches).
-5. Hover a segment: tooltip "web-checkout: only origin/feature/PAY-2318-refunds".
-6. Click a segment: focus that repo in the sidebar.
-7. For more than 24 repos, segments shrink to a min width of 4 px; then the strip scrolls.
+**What it is.** A grid of repositories (rows) × branches (columns). Each cell shows the state of that branch in that repo. Select a column to run one branch operation over many repos.
 
 **Matrix tool window.**
 
-1. Open with `Alt+2`, the stripe button, the "Matrix" link or the toast action. It opens as a large island that replaces the log area (the log stays one click away in the tabs).
+1. Open with `Alt+2`, the stripe button, the title-bar branch popup or the toast action. It opens as a large island that replaces the log area (the log stays one click away in the tabs).
 2. Rows: repos (repository icon + name + current branch), 28 px high.
 3. Columns: branches that exist in 2 or more repos, sorted by number of repos, then by the newest commit date. Column width 120. Header: branch name rotated 0° (horizontal, ellipsis) with a repo count "7/12".
 4. Cell (28 × 120, `--dg-matrix-cell-bg`, hover `--dg-matrix-cell-hover-bg`) shows one glyph and the ahead/behind capsule against the column's base branch:

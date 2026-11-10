@@ -51,7 +51,7 @@ The backend is written in Rust and runs the `git` command-line program. The inte
 - The branch matrix is a grid of repositories and branches. Each cell shows if the branch is checked out, local, only on `origin`, or missing.
 - Select a branch column and run one operation on all repositories: checkout, create, pull, push, merge or delete.
 - Repositories where the operation does not apply are skipped. They do not fail.
-- The sidebar sync strip and the title-bar branch popup give the same control in a smaller space.
+- The title-bar branch popup gives the same control in a smaller space.
 
 ### Search Everywhere
 
