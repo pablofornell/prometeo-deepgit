@@ -555,6 +555,86 @@ pub struct ApiError {
     pub detail: Option<String>,
 }
 
+/// Status of one side of a conflicted file (versus the common ancestor).
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum SideStatus {
+    /// The side has the file and so does the ancestor.
+    Modified,
+    /// The side has the file, the ancestor does not.
+    Added,
+    /// The ancestor has the file, the side does not.
+    Deleted,
+    /// Neither the side nor the ancestor has the file.
+    Missing,
+}
+
+/// Which side of a conflict to keep. `Ours` is the user's own side ("Yours" in the UI): git's
+/// stage 2, except during a rebase where it is stage 3 (see `conflicts::side_stages`).
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum ConflictSide {
+    Ours,
+    Theirs,
+}
+
+/// One unmerged path. `ours` and `theirs` are already mapped to the user's view (rebase swap done).
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ConflictEntry {
+    pub path: String,
+    /// Reserved for rename conflicts; always `None` for now.
+    pub old_path: Option<String>,
+    pub ours: SideStatus,
+    pub theirs: SideStatus,
+    /// Binary, not valid UTF-8, over 2 MiB, a symlink or a submodule: only Accept Yours / Theirs.
+    pub binary: bool,
+}
+
+/// One version (stage) of a conflicted file.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct Blob {
+    /// Object id of the blob.
+    pub oid: String,
+    /// The content, only when it is valid UTF-8 and not binary (and at most 2 MiB).
+    pub text: Option<String>,
+    pub bytes_len: u64,
+    pub binary: bool,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ConflictLabels {
+    /// The user's side: a branch name, or "branch (abc1234 subject)" during a rebase.
+    pub ours: String,
+    /// The other side: MERGE_HEAD, the picked / reverted commit, or the branch rebased onto.
+    pub theirs: String,
+    pub base: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum Eol {
+    Lf,
+    Crlf,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ConflictVersions {
+    /// Stage 1. `None`: add/add conflict.
+    pub base: Option<Blob>,
+    /// The user's side. `None`: that side deleted the file.
+    pub ours: Option<Blob>,
+    pub theirs: Option<Blob>,
+    pub labels: ConflictLabels,
+    /// True during a rebase: `ours` is git's stage 3 and `theirs` is stage 2.
+    pub swapped: bool,
+    /// Line ending of the file in the worktree (else of the first text version).
+    pub eol: Eol,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

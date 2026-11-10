@@ -3,6 +3,7 @@
 
 pub mod auth;
 pub mod clone;
+pub mod conflicts;
 pub mod diff;
 pub mod discover;
 pub mod error;

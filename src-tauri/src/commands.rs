@@ -5,8 +5,9 @@
 use std::sync::Arc;
 
 use gitcore::{
-    clone as gitclone, diff, log, ops, refs as gitrefs, status, ApiError, CloneOpts, CloneProgress,
-    CloneResult, CloneTarget, CommitDetails, CommitRow, DiffSpec, FileDiff, Git, HunkRef, LogQuery,
+    clone as gitclone, conflicts as gitconflicts, diff, log, ops, refs as gitrefs, status,
+    ApiError, CloneOpts, CloneProgress, CloneResult, CloneTarget, CommitDetails, CommitRow,
+    ConflictEntry, ConflictSide, ConflictVersions, DiffSpec, FileDiff, Git, HunkRef, LogQuery,
     LogSessionInfo, MergeOpts, OpResult, Project, Refs, RepoChanged, RepoInfo, RepoSummary,
     ResetMode, WorkingTree, Workspace,
 };
@@ -697,6 +698,66 @@ pub async fn clone_repo(
 pub async fn clone_cancel(state: St<'_>, operation_id: String) -> Res<()> {
     state.cancel_clone(&operation_id);
     Ok(())
+}
+
+// ------------------------------------------------------------------ conflicts
+
+/// Every unmerged file of a repo; `ours` / `theirs` already follow the user's view (rebase swap).
+#[tauri::command]
+pub async fn conflicts(state: St<'_>, repo_id: String) -> Res<Vec<ConflictEntry>> {
+    read(&state, &repo_id, gitconflicts::conflicts).await
+}
+
+/// Base, yours and theirs of one conflicted file, with labels, the swap flag and the line ending.
+#[tauri::command]
+pub async fn conflict_versions(
+    state: St<'_>,
+    repo_id: String,
+    path: String,
+) -> Res<ConflictVersions> {
+    read(&state, &repo_id, move |g, r| {
+        gitconflicts::conflict_versions(g, r, &path)
+    })
+    .await
+}
+
+/// Keeps one whole side of each path (`git checkout --ours|--theirs` + `git add`, or `git rm`).
+#[tauri::command]
+pub async fn accept_side(
+    app: AppHandle,
+    state: St<'_>,
+    repo_id: String,
+    paths: Vec<String>,
+    side: ConflictSide,
+) -> Res<()> {
+    write(&app, &state, &repo_id, move |g, r| {
+        gitconflicts::accept_side(g, r, &paths, side)
+    })
+    .await
+}
+
+/// Writes a hand-made resolution; `resolved` also stages it. See `gitcore::conflicts`.
+#[tauri::command]
+pub async fn save_resolution(
+    app: AppHandle,
+    state: St<'_>,
+    repo_id: String,
+    path: String,
+    content: String,
+    expected_ours_oid: Option<String>,
+    resolved: bool,
+) -> Res<()> {
+    write(&app, &state, &repo_id, move |g, r| {
+        gitconflicts::save_resolution(
+            g,
+            r,
+            &path,
+            &content,
+            expected_ours_oid.as_deref(),
+            resolved,
+        )
+    })
+    .await
 }
 
 #[cfg(test)]

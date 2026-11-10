@@ -145,7 +145,7 @@ fn has_head(git: &Git, repo: &RepoInfo) -> Result<bool, GitError> {
 }
 
 /// Rejects absolute paths and `..` so a path can never point outside the repo.
-fn check_rel(path: &str) -> Result<(), GitError> {
+pub(crate) fn check_rel(path: &str) -> Result<(), GitError> {
     if Path::new(path)
         .components()
         .any(|c| !matches!(c, Component::Normal(_) | Component::CurDir))
@@ -156,7 +156,7 @@ fn check_rel(path: &str) -> Result<(), GitError> {
 }
 
 /// `args` prefixed with the literal-pathspec switch, then `--` and the paths.
-fn with_paths<'a>(head: &[&'a str], paths: &'a [String]) -> Vec<&'a str> {
+pub(crate) fn with_paths<'a>(head: &[&'a str], paths: &'a [String]) -> Vec<&'a str> {
     let mut v = vec!["--literal-pathspecs"];
     v.extend_from_slice(head);
     v.push("--");

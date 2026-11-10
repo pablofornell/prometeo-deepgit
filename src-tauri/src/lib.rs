@@ -136,6 +136,10 @@ pub fn run() {
             auth::auth_reply,
             auth::set_auth_prefs,
             auth::credentials_clear,
+            commands::conflicts,
+            commands::conflict_versions,
+            commands::accept_side,
+            commands::save_resolution,
         ])
         .build(tauri::generate_context!())
         .expect("error while building DeepGit")
