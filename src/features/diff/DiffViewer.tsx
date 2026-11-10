@@ -8,11 +8,11 @@
 import { type JSX, Match, Show, Switch, batch, createEffect, createMemo, createResource, createSignal, For, on, onCleanup, onMount, untrack } from "solid-js";
 import * as api from "../../api/tauri";
 import type { DiffSpec, FileDiff, HunkRef } from "../../api/types";
-import { Button, EmptyState, Icon, IconButton, SegmentedControl, Spinner, StatusLetter, copyText, fileIconFor, openMenu, shortOid, splitPath, statusColorVar, toast, type MenuItem } from "../../components/ui";
+import { Button, EmptyState, Icon, IconButton, SegmentedControl, Spinner, StatusLetter, copyText, fileIconFor, openMenu, shortOid, splitDragging, splitPath, statusColorVar, toast, type MenuItem } from "../../components/ui";
 import { confirmAction } from "../../state/dialogs";
 import { repoVersion } from "../../state/events";
 import { cssPx } from "../../state/metrics";
-import { settings } from "../../state/settings";
+import { settings, type DiffMode } from "../../state/settings";
 import { chooseDiffMode, collapseOn, explicitDiffMode, ignoreWs, lineNumbersOn, setCollapseOn, setIgnoreWs, setLineNumbersOn, setSyntaxOn, setWordDiffOn, syntaxOn, wordDiffOn } from "./diffPrefs";
 import { activateDiff, releaseDiff, type DiffController } from "./diffKeys";
 import { NARROW_DIFF_PX, effectiveDiffMode } from "./diffMode";
@@ -66,7 +66,12 @@ export function DiffViewer(props: DiffViewerProps): JSX.Element {
   // Width of the whole viewer (last measured while visible). A narrow pane shows unified unless the user chose a layout this session.
   const [width, setWidth] = createSignal(0);
   const narrow = () => width() > 0 && width() < NARROW_DIFF_PX;
-  const mode = createMemo(() => effectiveDiffMode(explicitDiffMode(), settings.diffMode, width()));
+  // The layout shown feeds back into the choice (hysteresis band) and is held while a splitter drag is in progress.
+  const mode = createMemo<DiffMode>((shown) => {
+    const explicit = explicitDiffMode();
+    if (!explicit && shown && splitDragging()) return shown;
+    return effectiveDiffMode(explicit, settings.diffMode, width(), shown ?? null);
+  });
 
   let loadedKey = "";
   let root: HTMLDivElement | undefined;

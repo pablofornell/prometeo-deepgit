@@ -1,5 +1,6 @@
 import { type JSX, createSignal } from "solid-js";
 import { loadPersisted, savePersisted } from "../../state/persist";
+import { setSplitDragging } from "./dragState";
 import { dragSize } from "./splitterMath";
 
 export interface SplitterProps {
@@ -48,24 +49,35 @@ export function Splitter(props: SplitterProps): JSX.Element {
     const start = vertical() ? e.clientX : e.clientY;
     const startSize = props.size;
     let last = dragSize(startSize, 0, false, props.min, maxSize());
+    // A click without movement changes nothing: it must not save the clamped size of a column that was beyond its limit.
+    let moved = false;
+    let done = false;
     setDragging(true);
+    setSplitDragging(true);
     document.body.classList.add(vertical() ? "dg-resizing-col" : "dg-resizing-row");
     const move = (ev: PointerEvent) => {
       const d = (vertical() ? ev.clientX : ev.clientY) - start;
       last = dragSize(startSize, d, !!props.reverse, props.min, maxSize());
+      if (last !== startSize) moved = true;
       props.onSize(last);
     };
+    // Also runs for a cancelled drag and a lost pointer capture, so the drag state never stays on.
     const up = () => {
+      if (done) return;
+      done = true;
       el.removeEventListener("pointermove", move);
       el.removeEventListener("pointerup", up);
       el.removeEventListener("pointercancel", up);
+      el.removeEventListener("lostpointercapture", up);
       setDragging(false);
+      setSplitDragging(false);
       document.body.classList.remove("dg-resizing-col", "dg-resizing-row");
-      if (props.persistKey) savePersisted("split." + props.persistKey, last);
+      if (moved && props.persistKey) savePersisted("split." + props.persistKey, last);
     };
     el.addEventListener("pointermove", move);
     el.addEventListener("pointerup", up);
     el.addEventListener("pointercancel", up);
+    el.addEventListener("lostpointercapture", up);
   };
 
   const onKey = (e: KeyboardEvent) => {

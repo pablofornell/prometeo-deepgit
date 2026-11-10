@@ -269,7 +269,7 @@ If you select another commit while a file is open, the file stays open when the 
 The **File changes** tab shows the diff of the selected file. Both tabs stay alive, so the diff keeps its scroll position when you switch.
 The header shows the file path, the status letter, the number of added and removed lines, and the layout switch.
 
-- **Side by side** and **Unified** are the two layouts. Press `Ctrl+Alt+D` to switch. When the diff is narrower than 720 px, DeepGit shows **Unified** by itself, unless you chose a layout in this session. Maximize the column to get more room.
+- **Side by side** and **Unified** are the two layouts. Press `Ctrl+Alt+D` to switch. When the diff is narrower than 720 px, DeepGit shows **Unified** by itself, unless you chose a layout in this session. It goes back to your layout only when the diff is at least 820 px wide; between 720 and 820 px it keeps the layout it shows. While you drag the column's edge, the layout does not change; it is decided when you let go. Maximize the column to get more room.
 - Press `F7` for the next change and `Shift+F7` for the previous change. The header shows "Change 3 of 9".
 - Unchanged lines far from a change are folded. Click **Show N hidden lines** to unfold them.
 - Changed words are highlighted inside changed lines. DeepGit does not highlight words when more than 60 % of the line changed.

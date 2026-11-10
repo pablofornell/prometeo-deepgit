@@ -23,6 +23,7 @@ export {
 } from "./Toast";
 export { TooltipHost, tooltip, tip, type TooltipValue } from "./Tooltip";
 export { Splitter, loadSplitSize, type SplitterProps } from "./Splitter";
+export { splitDragging } from "./dragState";
 export { VirtualList, type VirtualListProps, type VirtualListApi } from "./VirtualList";
 export { Tree, createExpanded, type TreeProps, type TreeApi, type TreeRowInfo } from "./Tree";
 export { Badge, Pill, type BadgeProps, type PillProps } from "./Badge";
