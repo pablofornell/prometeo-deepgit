@@ -58,6 +58,7 @@
 .dg-changes-repo-name { overflow: hidden; text-overflow: ellipsis; }
 .dg-changes-repo-branch { display: inline-flex; align-items: center; gap: var(--dg-space-2); min-width: 0; overflow: hidden; text-overflow: ellipsis; font-weight: var(--dg-weight-regular); font-size: var(--dg-font-size-medium); color: var(--dg-text-muted); }
 .dg-changes-repo-branch .dg-icon { color: var(--dg-icon-secondary); flex: none; }
+.dg-changes-repo-branch-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }  /* the "…" needs a block box, not the flex row */
 .dg-changes-repo-counts { display: inline-flex; gap: var(--dg-space-4); flex: none; font-weight: var(--dg-weight-regular); font-size: var(--dg-font-size-small); color: var(--dg-text-secondary); font-variant-numeric: tabular-nums; }
 .dg-changes-count-conflict { color: var(--dg-status-conflict); }
 

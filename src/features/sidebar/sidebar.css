@@ -52,10 +52,14 @@
 /* ---- tree */
 .dg-sidebar-body { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .dg-sidebar-body > .dg-tree { padding-top: var(--dg-space-2); }
-.dg-sidebar-repo { display: flex; align-items: center; gap: var(--dg-tree-icon-gap); flex: 1; min-width: 0; }
+.dg-sidebar-repo { display: flex; align-items: center; gap: var(--dg-tree-icon-gap); flex: 1; min-width: 0; container-type: inline-size; }
 .dg-sidebar-sqbtn { display: inline-grid; place-items: center; width: calc(14 * var(--dg-u)); height: calc(18 * var(--dg-u)); flex: none; margin: 0 -2px; border-radius: 3px; }
-.dg-sidebar-name { font-weight: var(--dg-weight-medium); flex: none; }
-.dg-sidebar-branch { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--dg-text-secondary); font-size: var(--dg-font-size-medium); }
+/* Long names: the name and the branch label shrink with an ellipsis (the branch label twice as fast, never below "f…"),
+   the icons and badges (flex: none) always stay visible at the right end. Every level of the row has min-width: 0. */
+.dg-sidebar-name { font-weight: var(--dg-weight-medium); flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.dg-sidebar-branch { flex: 1 2 auto; min-width: 1.6em; overflow: hidden; text-overflow: ellipsis; color: var(--dg-text-secondary); font-size: var(--dg-font-size-medium); }
+/* too narrow for both (small sidebar, big font): the name keeps the room instead of a sliver of branch name */
+@container (max-width: 9em) { .dg-sidebar-branch { display: none; } }
 .dg-sidebar-branch.is-error { color: var(--dg-text-error); }
 .dg-sidebar-branch.is-mono { font-family: var(--dg-font-mono); font-size: var(--dg-font-size-small); }
 .dg-sidebar-repo.is-filtered .dg-sidebar-name, .dg-sidebar-repo.is-filtered .dg-sidebar-branch { opacity: 0.55; }
@@ -66,7 +70,7 @@
 .dg-sidebar-dot.is-conflict { background: var(--dg-conflict-dot); box-shadow: 0 0 0 3px var(--dg-danger-wash-strong); }
 .dg-sidebar-icon { flex: none; color: var(--dg-icon-secondary); }
 .dg-sidebar-icon.is-current { color: var(--dg-ref-local-fg); }
-.dg-sidebar-label { flex: none; }
+.dg-sidebar-label { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .dg-sidebar-count { color: var(--dg-text-secondary); font-size: var(--dg-font-size-medium); flex: none; font-variant-numeric: tabular-nums; }
 .dg-sidebar-bname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .dg-sidebar-bname.is-current { font-weight: var(--dg-weight-semibold); }

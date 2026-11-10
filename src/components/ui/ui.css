@@ -288,6 +288,8 @@
   overflow: hidden; text-overflow: ellipsis;
 }
 .dg-repo-icon { color: var(--dg-icon-secondary); }
+/* A long name ends in "…": text-overflow needs a block container (in an inline-flex chip the name was cut without it). */
+.dg-repochip { display: inline-block; line-height: var(--dg-chip-repo-height); vertical-align: middle; }
 
 .dg-refs { display: inline-flex; gap: 4px; flex: none; align-items: center; }
 .dg-ref {

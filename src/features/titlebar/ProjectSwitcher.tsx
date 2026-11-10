@@ -46,7 +46,7 @@ export function ProjectSwitcher(): JSX.Element {
         label: p.name,
         shortcut: plural(p.repos.length, "repo"),
         checked: p.id === active?.id,
-        tooltip: p.path,
+        tooltip: `${p.name}\n${p.path}`,
         onSelect: () => void setActiveProject(p.id),
         onRename: () => void actions.renameProject(p.id),
       });

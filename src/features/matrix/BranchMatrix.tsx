@@ -291,8 +291,8 @@ export function BranchMatrix(): JSX.Element {
                       onClick={() => setFocusedRepoId(r.id)}
                     >
                       <RepoIcon />
-                      <span class="dg-matrix-rname">{r.name}</span>
-                      <span class="dg-matrix-rbranch">{summary(r.id)?.branch ?? ""}</span>
+                      <span class="dg-matrix-rname" data-tip={`${r.name}\n${r.path}`}>{r.name}</span>
+                      <span class="dg-matrix-rbranch" data-tip={summary(r.id)?.branch ?? undefined}>{summary(r.id)?.branch ?? ""}</span>
                     </button>
                     <For each={shown()}>
                       {(c) => {

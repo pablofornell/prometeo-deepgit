@@ -29,8 +29,9 @@
 }
 .dg-matrix-rowhead:hover { background-color: var(--dg-row-hover-bg); }
 .dg-matrix-rowhead.is-focused { background: var(--dg-selection-inactive-bg); box-shadow: inset var(--dg-focus-width) 0 0 var(--dg-selection-edge); }
-.dg-matrix-rname { flex: none; font-weight: var(--dg-weight-medium); }
-.dg-matrix-rbranch { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dg-text-secondary); font-size: var(--dg-font-size-medium); }
+/* long names: name and branch shrink with an ellipsis (the branch twice as fast, never below "f…"), the repo icon stays */
+.dg-matrix-rname { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--dg-weight-medium); }
+.dg-matrix-rbranch { flex: 1 2 auto; min-width: 1.6em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dg-text-secondary); font-size: var(--dg-font-size-medium); }
 
 .dg-matrix-cell {
   display: flex; align-items: center; justify-content: center; gap: var(--dg-space-3); min-width: 0;

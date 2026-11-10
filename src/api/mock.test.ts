@@ -13,9 +13,9 @@ async function setup() {
 }
 
 describe("mock backend", () => {
-  it("has the payments-platform project with 6 repos and a single-repo deepgit project", async () => {
+  it("has the payments-platform project with 7 repos (one with a very long name) and a single-repo deepgit project", async () => {
     const { ws, project } = await setup();
-    expect(project.repos.map((r) => r.name)).toEqual(["api-gateway", "ledger-service", "refunds-worker", "web-checkout", "shared-proto", "docs-site"]);
+    expect(project.repos.map((r) => r.name)).toEqual(["api-gateway", "ledger-service", "refunds-worker", "web-checkout", "shared-proto", "docs-site", "prometeo-simple-time-tracker-web"]);
     expect(ws.projects.find((p) => p.name === "deepgit")?.repos).toHaveLength(1);
     expect(ws.activeProjectId).toBe(project.id);
   });

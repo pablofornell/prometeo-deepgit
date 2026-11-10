@@ -155,12 +155,12 @@ export function RepoRowView(props: { row: RepoRow; ctl: RowCtl; open: boolean })
     >
       <Chevron open={props.open} />
       <RepoIcon />
-      <span class="dg-changes-repo-name">{repo()?.name ?? props.row.repoId}</span>
+      <span class="dg-changes-repo-name" data-tip={repo() ? `${repo()!.name}\n${repo()!.path}` : undefined}>{repo()?.name ?? props.row.repoId}</span>
       <Show when={summary(props.row.repoId)?.branch ?? "detached HEAD"}>
         {(b) => (
-          <span class="dg-changes-repo-branch" title={`Current branch: ${b()}`}>
+          <span class="dg-changes-repo-branch" data-tip={`Current branch: ${b()}`}>
             <Icon name="branch" size={12} />
-            {b()}
+            <span class="dg-changes-repo-branch-text">{b()}</span>
           </span>
         )}
       </Show>

@@ -9,7 +9,7 @@ import { formatDate, fullDate } from "../../state/dates";
 import { setSidebarVisible } from "../../state/layout";
 import { repoRefs } from "../../state/refs";
 import {
-  activeProject, addProject, focusedRepoIdSignal, isRepoFilterActive, projectRepos, rescanProject, selectAllRepos, selectOnlyRepo, selectedRepoIds,
+  repoById, activeProject, addProject, focusedRepoIdSignal, isRepoFilterActive, projectRepos, rescanProject, selectAllRepos, selectOnlyRepo, selectedRepoIds,
   setFocusedRepoId, summary, toggleRepo,
 } from "../../state/workspace";
 import { nodeMenu } from "./menus";
@@ -45,7 +45,11 @@ function RepoBranch(props: { repoId: string; query: string }): JSX.Element {
   const s = () => summary(props.repoId);
   const op = () => (s() ? stateLabel(s()!.state) : null);
   return (
-    <span class="dg-sidebar-branch" classList={{ "is-error": !!op(), "is-mono": !op() && !!s() && !s()!.branch }}>
+    <span
+      class="dg-sidebar-branch"
+      classList={{ "is-error": !!op(), "is-mono": !op() && !!s() && !s()!.branch }}
+      data-tip={op() ? `${op()} in progress` : s()?.branch ? `On branch ${s()!.branch}` : s() ? `Detached HEAD at ${(s()!.headOid ?? "").slice(0, 7)}` : undefined}
+    >
       <Show when={op()} fallback={s()?.branch ? <Hl text={s()!.branch!} query={props.query} /> : (s()?.headOid ?? "").slice(0, 7)}>
         {op()}
       </Show>
@@ -228,6 +232,7 @@ export function Sidebar(): JSX.Element {
         const s = () => summary(n.repoId);
         const hidden = () => !selectedRepoIds().includes(n.repoId);
         const dot = () => repoDot(s());
+        const repo = () => repoById(n.repoId);
         return (
           <span class="dg-sidebar-repo" classList={{ "is-filtered": hidden() }}>
             <button
@@ -245,7 +250,7 @@ export function Sidebar(): JSX.Element {
             >
               <RepoIcon />
             </button>
-            <span class="dg-sidebar-name"><Hl text={n.label} query={q()} /></span>
+            <span class="dg-sidebar-name" data-tip={repo() ? `${n.label}\n${repo()!.path}` : n.label}><Hl text={n.label} query={q()} /></span>
             <RepoBranch repoId={n.repoId} query={q()} />
             <AheadBehind ahead={s()?.ahead ?? 0} behind={s()?.behind ?? 0} upstream={s()?.upstream} />
             <span
@@ -267,7 +272,7 @@ export function Sidebar(): JSX.Element {
         return (
           <>
             <Icon name="remote" class="dg-sidebar-icon" />
-            <span class="dg-sidebar-label">{n.label}</span>
+            <span class="dg-sidebar-label" data-tip={n.label}>{n.label}</span>
             <span class="dg-sidebar-count">{n.count}</span>
           </>
         );
@@ -302,7 +307,7 @@ export function Sidebar(): JSX.Element {
         return (
           <>
             <Icon name="stash" class="dg-sidebar-icon" />
-            <span class="dg-sidebar-bname"><Hl text={n.label} query={q()} /></span>
+            <span class="dg-sidebar-bname" data-tip={n.stash.message}><Hl text={n.label} query={q()} /></span>
             <span class="dg-sidebar-count" data-tip={fullDate(n.stash.time)}>{formatDate(n.stash.time)}</span>
           </>
         );
@@ -310,7 +315,7 @@ export function Sidebar(): JSX.Element {
         return (
           <>
             <Icon name="submodule" class="dg-sidebar-icon" />
-            <span class="dg-sidebar-bname"><Hl text={n.label} query={q()} /></span>
+            <span class="dg-sidebar-bname" data-tip={n.label}><Hl text={n.label} query={q()} /></span>
             <span class="dg-sidebar-count">{n.sub.status.trim() || "ok"}</span>
           </>
         );

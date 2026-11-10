@@ -108,16 +108,16 @@ export function StatusBar(): JSX.Element {
           <>
             <button
               type="button"
-              class="dg-statusbar-widget"
-              data-tip="Focused repository: show it in the sidebar"
+              class="dg-statusbar-widget dg-statusbar-shrink"
+              data-tip={`${r().name}\n${r().path}\nFocused repository: show it in the sidebar`}
               onClick={() => {
                 setSidebarVisible(true);
               }}
             >
               <RepoIcon size={12} />
-              {r().name}
+              <span class="dg-statusbar-name">{r().name}</span>
             </button>
-            <button type="button" class="dg-statusbar-widget" data-tip="Branches" data-tip-shortcut="Ctrl+Shift+`" onClick={() => runBinding("branch.popup")}>
+            <button type="button" class="dg-statusbar-widget dg-statusbar-shrink" data-tip={s()?.branch ? `Branches (on ${s()!.branch})` : "Branches"} data-tip-shortcut="Ctrl+Shift+`" onClick={() => runBinding("branch.popup")}>
               <Icon name={s() && !s()!.branch ? "detachedHead" : "branch"} size={14} />
               <span class="dg-statusbar-branch">{branchText()}</span>
               <AheadBehind ahead={s()?.ahead ?? 0} behind={s()?.behind ?? 0} upstream={s()?.upstream} />

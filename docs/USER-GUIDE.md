@@ -108,6 +108,8 @@ The window has these parts:
 
 DeepGit remembers panel sizes and which panels are visible.
 
+A name that is too long for its place ends in "…": repository and branch names in the sidebar, the branch matrix, the log, **Local changes** and the status bar. The icons and badges next to a name always stay visible. Hover the name to see it in full (for a repository, also its folder). In a very narrow sidebar with a big font, the repository row hides the branch name first.
+
 ### Title bar buttons
 
 - **Fetch** (`Ctrl+T`) fetches all repositories of the project. A thin ring around the icon shows how old the oldest fetch is. The ring fills over 2 hours. Its colour shows if the data is fresh (under 15 minutes), aging (up to 2 hours) or stale (older, or never fetched).

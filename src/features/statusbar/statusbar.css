@@ -28,6 +28,9 @@ button.dg-statusbar-widget:hover { background: var(--dg-statusbar-hover-bg); col
 
 /* ---- right side */
 .dg-statusbar-branch { overflow: hidden; text-overflow: ellipsis; max-width: 280px; }
+/* long repo and branch names shrink with an ellipsis, so the fetch age and the theme switch stay on screen */
+.dg-statusbar-shrink { flex: 0 1 auto; }
+.dg-statusbar-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; max-width: 240px; }
 .dg-statusbar-fetch { --ring: var(--dg-fetch-fresh); }
 .dg-statusbar-fetch.is-aging { --ring: var(--dg-fetch-aging); }
 .dg-statusbar-fetch.is-stale { --ring: var(--dg-fetch-stale); }

@@ -473,6 +473,8 @@ export const SCENARIOS: Scenario[] = [
   { name: "web-checkout", commits: 2400, head: "main", dirty: { staged: 0, unstaged: 3, untracked: 0 }, remoteOnly: ["feature/PAY-2318-refunds"] },
   { name: "shared-proto", commits: 900, head: "main" },
   { name: "docs-site", commits: 1200, head: "main", ahead: 1, stashes: 1, state: "merging", conflicts: 4 },
+  // very long repo and branch names: they must truncate with an ellipsis everywhere (sidebar, popups, chips)
+  { name: "prometeo-simple-time-tracker-web", commits: 400, head: "feature/SHOP-482-search-dark-mode", ahead: 2, behind: 1, stashes: 1 },
   { name: "deepgit", commits: 700, head: "main", dirty: { staged: 1, unstaged: 2, untracked: 1 } },
 ];
 
