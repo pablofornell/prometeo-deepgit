@@ -8,6 +8,7 @@ import * as actions from "../../state/actions";
 import { formatDate, fullDate } from "../../state/dates";
 import { setSidebarVisible } from "../../state/layout";
 import { repoRefs } from "../../state/refs";
+import { changesRepoForNode } from "../../state/changesScope";
 import { setChangesRepoId } from "../../state/selection";
 import {
   repoById, activeProject, addProject, focusedRepoIdSignal, isRepoFilterActive, projectRepos, rescanProject, selectAllRepos, selectOnlyRepo, selectedRepoIds,
@@ -128,8 +129,9 @@ export function Sidebar(): JSX.Element {
     if (n.kind === "loading") return;
     setSelected(n.id);
     setFocusedRepoId(n.repoId);
-    // Local changes follows the repo picked here; a single-repo project has nothing to narrow
-    if (projectRepos().length > 1) setChangesRepoId(n.repoId);
+    // Local changes follows a repo row picked here (not its branches, tags or stashes)
+    const only = changesRepoForNode(n.kind, n.repoId, projectRepos().length);
+    if (only) setChangesRepoId(only);
     if (n.kind === "more") setMoreOpen(new Set([...moreOpen(), n.groupId]));
   };
 

@@ -17,7 +17,7 @@ import { notifyRepoChanged, repoVersion } from "../../state/events";
 import { register } from "../../state/keymap";
 import { loadPersisted, savePersisted } from "../../state/persist";
 import { changesRepoId, changesScopeRepos, mainTab, selectFile, selectedFile, setChangesRepoId } from "../../state/selection";
-import { projectRepos, repoById, summary } from "../../state/workspace";
+import { isRepoFilterActive, projectRepos, repoById, summary } from "../../state/workspace";
 import { CommitBox, DEFAULT_HEIGHT, type CommitTarget } from "./CommitBox";
 import {
   buildRows, isSelectableKey, nearestSurvivor, rangeKeys, repoIdOfKey, rowItems, sectionFiles, selectedItems,
@@ -53,6 +53,8 @@ export function ChangesView(): JSX.Element {
     const only = scope();
     return id && projectRepos().length > 1 && only.length === 1 && only[0].id === id ? only[0] : undefined;
   });
+  /** Back to the project level view, which follows the repo filter: say so when the filter hides repos. */
+  const backLabel = (): string => (isRepoFilterActive() ? "Show repos of the log" : "Show all repos");
   const scopeIds = createMemo(() => scope().map((r) => r.id), [], { equals: (a, b) => a.length === b.length && a.every((v, i) => v === b[i]) });
 
   const [trees, setTrees] = createSignal<Record<string, WorkingTree>>({});
@@ -323,7 +325,7 @@ export function ChangesView(): JSX.Element {
       menu.push({ separator: true });
       menu.push(
         focusRepo()
-          ? { label: "Show all repos", onSelect: () => setChangesRepoId(null) }
+          ? { label: backLabel(), onSelect: () => setChangesRepoId(null) }
           : { label: `Show only ${repoById(id)?.name ?? "this repo"}`, onSelect: () => setChangesRepoId(id) },
       );
       menu.push({ label: collapsed().has(row.key) ? "Expand" : "Collapse", onSelect: () => toggleCollapsed(row.key) });
@@ -480,7 +482,7 @@ export function ChangesView(): JSX.Element {
               Showing only <strong>{r().name}</strong>
             </span>
             <span class="dg-grow" />
-            <Button size="small" variant="ghost" onClick={() => setChangesRepoId(null)}>Show all repos</Button>
+            <Button size="small" variant="ghost" onClick={() => setChangesRepoId(null)}>{backLabel()}</Button>
           </div>
         )}
       </Show>

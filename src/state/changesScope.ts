@@ -17,6 +17,14 @@ export function changesScope<T extends { id: string }>(all: readonly T[], filter
   return [...filtered];
 }
 
+/**
+ * The repo that selecting a sidebar node scopes Local changes to, or null when it must not narrow anything: only a
+ * repo row does it (not a branch, tag, stash, group or "more" row), and only in a project with several repos.
+ */
+export function changesRepoForNode(nodeKind: string, repoId: string, repoCount: number): string | null {
+  return nodeKind === "repo" && repoCount > 1 ? repoId : null;
+}
+
 /** Changed files in a repo: staged + unstaged + untracked + conflicted (what the working tree list shows). */
 export function dirtyCount(s: Pick<RepoSummary, "staged" | "unstaged" | "untracked" | "conflicted"> | undefined): number {
   return s ? s.staged + s.unstaged + s.untracked + s.conflicted : 0;

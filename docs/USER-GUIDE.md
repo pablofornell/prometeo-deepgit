@@ -310,7 +310,7 @@ DeepGit refuses to apply a hunk that no longer matches the file, for example aft
 
 Open the **Local changes** tab or press `Alt+0`.
 The tab shows the repositories that the log shows. Each repository with changes has its own group.
-Click a repository in the sidebar to show only its changes; a note at the top says so, and **Show all repos** goes back. Changing the repository filter also goes back to all repositories. The badges on the tab and on the tool stripe count the files of the repositories that the tab shows.
+Click a repository in the sidebar to show only its changes; a note at the top says so. Clicking a branch, tag or stash does not change the tab. **Show all repos** (named **Show repos of the log** while the repository filter hides some repositories) goes back to the repositories that the log shows. Changing the repository filter also goes back. The badges on the tab and on the tool stripe count the files of the repositories that the tab shows.
 
 ### Files
 

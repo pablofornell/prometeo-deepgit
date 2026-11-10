@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 import { generateRepo, repoId, type MockRepo, type Scenario } from "../api/mockData";
 import type { RepoInfo, RepoSummary } from "../api/types";
-import { changesCount, changesScope, dirtyCount } from "./changesScope";
+import { changesCount, changesRepoForNode, changesScope, dirtyCount } from "./changesScope";
 
 /** Three mock repos with different amounts of local changes: 3 (api), 6 (web) and 0 (docs). */
 const SCENARIOS: Scenario[] = [
@@ -83,5 +83,19 @@ describe("changesCount (badges and totals)", () => {
   it("counts conflicted files too", () => {
     const s = summaryOf(api.id)!;
     expect(dirtyCount({ ...s, conflicted: 2 })).toBe(5);
+  });
+});
+
+describe("changesRepoForNode (sidebar click scope)", () => {
+  it("a repo row scopes Local changes to its repo", () => {
+    expect(changesRepoForNode("repo", web.id, 3)).toBe(web.id);
+  });
+
+  it.each(["branch", "remoteBranch", "tag", "stash", "group", "remote", "submodule", "more"])("a %s row does not narrow anything", (kind) => {
+    expect(changesRepoForNode(kind, web.id, 3)).toBeNull();
+  });
+
+  it("a single-repo project has nothing to narrow", () => {
+    expect(changesRepoForNode("repo", api.id, 1)).toBeNull();
   });
 });
