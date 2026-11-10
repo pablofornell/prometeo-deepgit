@@ -20,9 +20,14 @@ import "./titlebar.css";
 const LOGO = (
   <svg class="dg-titlebar-logo" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true">
     <rect width="20" height="20" rx="5" fill="var(--dg-accent)" />
-    <path d="M6 5v10M6 9c0-2.5 8-1.5 8-4.5M6 11c0 2.5 8 1.5 8 4.5" stroke="var(--dg-text-over-accent)" stroke-width="1.6" fill="none" stroke-linecap="round" />
-    <circle cx="14" cy="4.6" r="1.6" fill="var(--dg-text-over-accent)" />
-    <circle cx="14" cy="15.4" r="1.6" fill="var(--dg-text-over-accent)" />
+    <path d="M10 16V4M10 10C8.4 10 4.5 9 4.5 6.6M10 10C11.6 10 15.5 9 15.5 6.6" stroke="var(--dg-text-over-accent)" stroke-width="1.8" fill="none" stroke-linecap="round" />
+    <g fill="var(--dg-text-over-accent)" stroke="var(--dg-accent)" stroke-width="0.8">
+      <circle cx="10" cy="16" r="2" />
+      <circle cx="10" cy="10" r="2" />
+      <circle cx="10" cy="4" r="2" />
+      <circle cx="4.5" cy="6.6" r="2" />
+      <circle cx="15.5" cy="6.6" r="2" />
+    </g>
   </svg>
 );
 
