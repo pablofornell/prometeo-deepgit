@@ -822,7 +822,7 @@ If the system key store is missing, a note says that DeepGit asks for the login 
 ### Quick settings in the gear menu
 
 The gear menu keeps the most used switches: theme, commit graph, comfortable rows and background commands.
-You can also click the theme name (**Dark** or **Light**) at the right end of the status bar to switch the theme.
+You can also click the theme name (**Dark** or **Light**) at the right end of the status bar to switch the theme. Its icon shows the theme you chose: a sun for Light, a moon for Dark and a half-filled circle when it follows the system. The Settings gear in the title bar is a cog.
 
 ### Zoom keys
 

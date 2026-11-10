@@ -92,11 +92,19 @@ const ICONS = {
   minimize: `<path d="M4 8h8"/>`,
   maximize: `<rect x="4" y="4" width="8" height="8" rx="1"/>`,
   restore: `<rect x="3.5" y="5.5" width="7" height="7" rx="1"/><path d="M5.5 5.5v-1a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-1"/>`,
-  gear: `<circle cx="8" cy="8" r="2"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4"/>`,
+  // settings: a cog (8 teeth and a hole), never rays: rays are the sun of the light theme
+  gear: `<path d="M6.73 3.27L6.98 1.58L9.02 1.58L9.27 3.27A4.9 4.9 0 0 1 10.45 3.76L11.82 2.74L13.26 4.18L12.24 5.55A4.9 4.9 0 0 1 12.73 6.73L14.42 6.98L14.42 9.02L12.73 9.27A4.9 4.9 0 0 1 12.24 10.45L13.26 11.82L11.82 13.26L10.45 12.24A4.9 4.9 0 0 1 9.27 12.73L9.02 14.42L6.98 14.42L6.73 12.73A4.9 4.9 0 0 1 5.55 12.24L4.18 13.26L2.74 11.82L3.76 10.45A4.9 4.9 0 0 1 3.27 9.27L1.58 9.02L1.58 6.98L3.27 6.73A4.9 4.9 0 0 1 3.76 5.55L2.74 4.18L4.18 2.74L5.55 3.76A4.9 4.9 0 0 1 6.73 3.27Z"/><circle cx="8" cy="8" r="2"/>`,
+  // ---- theme: sun (light), crescent moon (dark), half-filled circle (follow the system)
+  themeLight: `<circle cx="8" cy="8" r="2.5"/><path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1.06 1.06M11.54 11.54l1.06 1.06M3.4 12.6l1.06-1.06M11.54 4.46l1.06-1.06"/>`,
+  themeDark: `<path d="M13 9.6A5.5 5.5 0 1 1 6.4 3a4.4 4.4 0 0 0 6.6 6.6Z"/>`,
+  themeSystem: `<circle cx="8" cy="8" r="5.5"/><path d="M8 2.5a5.5 5.5 0 0 1 0 11Z" fill="currentColor"/>`,
   bell: `<path d="M4 11.5V7a4 4 0 0 1 8 0v4.5l1 1H3Z"/><path d="M6.5 14h3"/>`,
 } as const;
 
 export type IconName = keyof typeof ICONS;
+
+/** Icon of a theme choice: sun, crescent moon, half-filled circle. */
+export const THEME_ICONS: Record<"dark" | "light" | "system", IconName> = { dark: "themeDark", light: "themeLight", system: "themeSystem" };
 
 /** Inner SVG markup of an icon (16x16 viewBox). */
 export function iconMarkup(name: IconName): string {

@@ -5,12 +5,12 @@
  */
 import * as api from "../../api/tauri";
 import type { DiffSpec, FileStatus } from "../../api/types";
-import { type IconName, toast } from "../../components/ui";
+import { type IconName, THEME_ICONS, toast } from "../../components/ui";
 import * as actions from "../../state/actions";
 import { bindings, runBinding } from "../../state/keymap";
 import { repoRefs } from "../../state/refs";
 import { selectFile, selectedCommit, setChangesRepoId, setMainTab, setSelectedCommit } from "../../state/selection";
-import { settings, setSetting } from "../../state/settings";
+import { resolvedTheme, settings, setSetting } from "../../state/settings";
 import {
   activeProject, addProject, focusedRepo, projectRepos, rescanProject, selectAllRepos, selectOnlyRepo,
   selectedRepoIds, setFocusedRepoId, summary, toggleRepo,
@@ -53,7 +53,7 @@ const EXTRAS: ExtraAction[] = [
 
 const ICON_BY_BINDING: Record<string, IconName> = {
   "git.fetchAll": "fetch", "git.pull": "pull", "git.pullAll": "pull", "git.push": "push", "git.newBranch": "newBranch",
-  "git.stash": "stashPush", "view.refresh": "refresh", "view.toggleTheme": "palette", "tool.sidebar": "project",
+  "git.stash": "stashPush", "view.refresh": "refresh", "settings.open": "gear", "tool.sidebar": "project",
   "tool.changes": "changes", "tool.matrix": "matrix", "tool.console": "console", "tool.diff": "sideBySide", "tool.closeBottom": "close",
 };
 const ICON_BY_GROUP: Record<string, IconName> = { Log: "log", Diff: "sideBySide", "Tool windows": "console", Global: "arrowRight" };
@@ -63,7 +63,9 @@ export function actionItems(): ActionItem[] {
   const out: ActionItem[] = [];
   for (const b of bindings()) {
     if (!b.title || b.id.startsWith("palette.")) continue;
-    out.push({ kind: "action", key: b.id, title: b.title, group: b.group ?? "Actions", icon: ICON_BY_BINDING[b.id] ?? ICON_BY_GROUP[b.group ?? ""] ?? "arrowRight" });
+    // the theme toggle shows the current theme (sun or moon), like the status bar
+    const icon = b.id === "view.toggleTheme" ? THEME_ICONS[resolvedTheme()] : ICON_BY_BINDING[b.id] ?? ICON_BY_GROUP[b.group ?? ""] ?? "arrowRight";
+    out.push({ kind: "action", key: b.id, title: b.title, group: b.group ?? "Actions", icon });
   }
   for (const x of EXTRAS) out.push({ kind: "action", key: x.key, title: x.title, group: x.group, icon: x.icon });
   return out;

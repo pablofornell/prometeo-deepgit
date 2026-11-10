@@ -1,6 +1,6 @@
 /** Appearance: theme, text and editor sizes, page zoom, row density, date format. */
 import { type JSX } from "solid-js";
-import { Checkbox, SegmentedControl } from "../../../components/ui";
+import { Checkbox, SegmentedControl, THEME_ICONS } from "../../../components/ui";
 import {
   EDITOR_FONT_SIZE_DEFAULT, FONT_SIZE_MAX, FONT_SIZE_MIN, UI_SCALE_MAX, UI_SCALE_MIN, UI_SCALE_STEP, effectiveEditorFontSize,
 } from "../../../state/appearance";
@@ -10,10 +10,10 @@ import { type DateFormat, type ThemePref, resetSettings, setSetting, settings } 
 import { registerSettingsSection } from "../registry";
 import { type Choice, ChoiceList, Row, Section, SizeControl } from "../widgets";
 
-const THEMES: { value: ThemePref; label: string }[] = [
-  { value: "dark", label: "Dark" },
-  { value: "light", label: "Light" },
-  { value: "system", label: "System" },
+const THEMES: { value: ThemePref; label: string; icon: (typeof THEME_ICONS)[ThemePref] }[] = [
+  { value: "dark", label: "Dark", icon: THEME_ICONS.dark },
+  { value: "light", label: "Light", icon: THEME_ICONS.light },
+  { value: "system", label: "System", icon: THEME_ICONS.system },
 ];
 /** Each choice shows the moment 3 hours ago in that format; the examples follow the clock. */
 const DATES: Choice<DateFormat>[] = [

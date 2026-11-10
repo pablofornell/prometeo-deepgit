@@ -1,6 +1,6 @@
 /** Status bar (DESIGN.md 5.19): command ticker (11.3), progress area (5.17), focused repo, branch, fetch age, theme. */
 import { For, type JSX, Show, createMemo, createSignal } from "solid-js";
-import { AheadBehind, Icon, Popup, ProgressBar, RepoIcon, Spinner } from "../../components/ui";
+import { AheadBehind, Icon, Popup, ProgressBar, RepoIcon, Spinner, THEME_ICONS } from "../../components/ui";
 import * as actions from "../../state/actions";
 import { activities } from "../../state/activity";
 import { autoFetchLine, autoFetchStatus } from "../../state/autoFetch";
@@ -8,7 +8,7 @@ import { consoleEntries, formatCommand, isBackgroundEntry, lastUserEntry } from 
 import { fetchAge } from "../../state/fetchAge";
 import { openBottomTool, setSidebarVisible } from "../../state/layout";
 import { runBinding } from "../../state/keymap";
-import { resolvedTheme, toggleTheme } from "../../state/settings";
+import { resolvedTheme, settings, toggleTheme } from "../../state/settings";
 import { focusedRepo, repoById, summary } from "../../state/workspace";
 import { middleTruncate } from "./format";
 import "./statusbar.css";
@@ -147,7 +147,13 @@ export function StatusBar(): JSX.Element {
         <span class="dg-statusbar-age" />
         {age().text}
       </button>
-      <button type="button" class="dg-statusbar-widget" data-tip="Switch theme" onClick={toggleTheme}>
+      <button
+        type="button"
+        class="dg-statusbar-widget"
+        data-tip={`${settings.theme === "system" ? `Theme follows the system (${resolvedTheme()})` : `${resolvedTheme() === "dark" ? "Dark" : "Light"} theme`}\nClick to switch to ${resolvedTheme() === "dark" ? "light" : "dark"}`}
+        onClick={toggleTheme}
+      >
+        <Icon name={THEME_ICONS[settings.theme]} />
         {resolvedTheme() === "dark" ? "Dark" : "Light"}
       </button>
     </div>

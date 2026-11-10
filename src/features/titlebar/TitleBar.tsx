@@ -2,7 +2,7 @@
 import { type JSX, Show, createMemo } from "solid-js";
 import {
   Icon, Kbd, Spinner, WindowControls, dragRegion, markNotificationsRead, notifications, openMenu, plural, unreadCount,
-  type IconName, type MenuItem,
+  type IconName, type MenuItem, THEME_ICONS,
 } from "../../components/ui";
 import * as actions from "../../state/actions";
 import { activities } from "../../state/activity";
@@ -62,7 +62,7 @@ export function TitleBar(): JSX.Element {
     if (target.length > 0) void actions.push(target);
   };
 
-  const themeItem = (label: string, value: ThemePref): MenuItem => ({ label, checked: settings.theme === value, onSelect: () => setSetting("theme", value) });
+  const themeItem = (label: string, value: ThemePref): MenuItem => ({ label, icon: THEME_ICONS[value], checked: settings.theme === value, onSelect: () => setSetting("theme", value) });
   /** Gear menu: the full Settings dialog (it owns Ctrl+, and Ctrl+Alt+S, see features/settings) and the quick toggles. */
   const openSettingsMenu = (anchor: HTMLElement | undefined) => {
     if (!anchor) return;

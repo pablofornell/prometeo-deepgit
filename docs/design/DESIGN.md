@@ -924,7 +924,8 @@ Icon list (v1):
 | Navigation | chevron-down, chevron-right, arrow-up, arrow-down, search, filter, close, more (three dots), plus, refresh, external-link |
 | People / time | user, calendar, path |
 | Status | check, warning, error, info, progress (spinner), conflict |
-| Window | minimize, maximize, restore, close, settings (gear), bell |
+| Window | minimize, maximize, restore, close, settings (gear: a toothed cog with a centre hole, never rays), bell |
+| Theme | theme-light (sun with rays), theme-dark (crescent moon), theme-system (half-filled circle). Used by the gear menu, the Color theme control, the status bar switch and Search Everywhere; each shows the theme it names. |
 
 ---
 
