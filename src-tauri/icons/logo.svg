@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <rect x="0" y="0" width="1024" height="1024" rx="224" ry="224" fill="#191A1C"/>
+  <g fill="none" stroke-width="52" stroke-linecap="round" stroke-linejoin="round">
+    <!-- main line -->
+    <path d="M352 232 V792" stroke="#3871E1"/>
+    <!-- branch leaving the top commit -->
+    <path d="M352 232 H540 Q672 232 672 364" stroke="#D59637"/>
+    <!-- branch leaving the bottom commit -->
+    <path d="M352 792 H540 Q672 792 672 660" stroke="#6DB083"/>
+  </g>
+  <g stroke="#191A1C" stroke-width="24">
+    <circle cx="352" cy="232" r="68" fill="#3871E1"/>
+    <circle cx="352" cy="512" r="68" fill="#3871E1"/>
+    <circle cx="352" cy="792" r="68" fill="#3871E1"/>
+    <circle cx="672" cy="364" r="68" fill="#D59637"/>
+    <circle cx="672" cy="660" r="68" fill="#6DB083"/>
+  </g>
+</svg>
