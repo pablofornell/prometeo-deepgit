@@ -788,6 +788,8 @@ Every change applies **at once**. There is no OK button. Press `Esc` or click **
 
 The preview under **UI scale** shows the sizes you choose.
 
+One action changes a size one time. While you drag a slider, only the number changes; the new size applies when you release the mouse button. A click on `-` or `+` is one step (holding the button down does not repeat). An arrow key on a slider is one step per key press. A typed number applies when you press `Enter` or leave the field. After the change the Settings window moves a little, so the control stays under the pointer.
+
 **Font size** makes the text bigger. Rows, buttons, icons and bars grow with it, so the text does not get cut off. **UI scale** is different: it zooms everything, including lines and spaces.
 If your eyes get tired, try **Font size** 15 or 16 first.
 

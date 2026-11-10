@@ -24,6 +24,7 @@ import { Dynamic, Portal } from "solid-js/web";
 import { trackOverlay } from "../../state/keymap";
 import { setDialogDepth } from "../../state/overlays";
 import { Button, IconButton } from "./Button";
+import { type Offset, clampDialogOffset } from "./dialogGeometry";
 import { copyText } from "./util";
 
 /** Props every dialog body component receives in addition to its own. */
@@ -61,6 +62,23 @@ export function openDialog<P extends object, T>(component: Component<P & DialogC
 }
 
 export const hasOpenDialog = (): boolean => stack().length > 0;
+
+/**
+ * Moves the dialog that contains `inside` by `shift` px (on top of the offset it has), kept inside the window.
+ * For controls that resize the page (Settings: font size, UI scale): the dialog follows, so the control stays under
+ * the pointer. The offset ends when the window is resized or the dialog closes.
+ */
+export function moveDialogBy(inside: Element, shift: Offset): void {
+  const box = inside.closest<HTMLElement>(".dg-dialog");
+  if (!box) return;
+  const cur = { x: parseFloat(box.style.left) || 0, y: parseFloat(box.style.top) || 0 };
+  const r = box.getBoundingClientRect();
+  const natural = { left: r.left - cur.x, top: r.top - cur.y, width: r.width, height: r.height };
+  const next = clampDialogOffset(cur, shift, natural, { width: window.innerWidth, height: window.innerHeight });
+  box.style.position = "relative";
+  box.style.left = `${next.x}px`;
+  box.style.top = `${next.y}px`;
+}
 
 /** Renders the open dialogs (stacked). Mount once near the root. */
 export function DialogHost(): JSX.Element {
@@ -111,6 +129,14 @@ export function Dialog(props: DialogProps): JSX.Element {
     const first = box?.querySelector<HTMLElement>("input:not([disabled]), textarea, select") ?? box?.querySelector<HTMLElement>(FOCUSABLE);
     (first ?? box)?.focus();
     if (first instanceof HTMLInputElement) first.select();
+    // a dialog that was moved (`moveDialogBy`) goes back to its place when the window changes size
+    const recentre = () => {
+      if (!box) return;
+      box.style.left = "";
+      box.style.top = "";
+    };
+    window.addEventListener("resize", recentre);
+    onCleanup(() => window.removeEventListener("resize", recentre));
   });
   onCleanup(() => previous?.focus?.());
 

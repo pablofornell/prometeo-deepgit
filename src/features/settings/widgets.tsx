@@ -2,12 +2,13 @@
  * Building blocks for settings pages. Every section is a stack of `Section` groups holding `Row`s:
  *
  *   <Section title="Text">
- *     <Row label="Font size" hint="Applies at once."><SizeControl label="Font size" value={13} min={10} max={20} unit="px" onChange={...} /></Row>
+ *     <Row label="Font size" hint="Applies at once."><SizeControl label="Font size" value={13} min={10} max={20} unit="px" pin="layout" onChange={...} /></Row>
  *     <Row label="Show the graph"><Checkbox checked={...} onChange={...} /></Row>
  *   </Section>
  */
-import { type JSX, Show, createEffect, createSignal, createUniqueId } from "solid-js";
-import { IconButton } from "../../components/ui";
+import { type JSX, Show, createEffect, createSignal, createUniqueId, onCleanup } from "solid-js";
+import { IconButton, moveDialogBy } from "../../components/ui";
+import { type NumberRange, type Point, SLIDER_IDLE, type SliderEvent, parseNumberText, pinShift, sliderStep, snapToRange, stepBy } from "./sizeControl";
 
 /** A titled group of rows inside a page. */
 export function Section(props: { title?: string; children: JSX.Element }): JSX.Element {
@@ -50,25 +51,81 @@ export interface NumberFieldProps {
   /** Accessible name. */
   label: string;
   disabled?: boolean;
+  /**
+   * Set it when a change of this value resizes the page, so that the control would move away from the pointer:
+   * "layout" for a size that reflows the page (font size), "zoom" when the value is the page zoom in percent.
+   * After a change made with the pointer the dialog is moved so that the control is still under the pointer.
+   */
+  pin?: "layout" | "zoom";
+}
+
+const inTauri = (): boolean => typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+/** The keys that change a number: holding one down gives one step, not a run of them (each step resizes the page). */
+const STEP_KEYS = new Set(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "PageUp", "PageDown", "Home", "End"]);
+
+/**
+ * Runs `change` (it resizes the page) and then moves the dialog so that `anchor` is under the pointer again
+ * (`pinShift`). `zoom` is `[old percent, new percent]` when the change is a page zoom: the webview applies it a moment
+ * later and client coordinates change with it, so the move waits for the `resize` that the zoom causes.
+ */
+function changeInPlace(anchor: HTMLElement, pointer: Point | null, change: () => void, zoom?: [number, number]): void {
+  const before = anchor.getBoundingClientRect();
+  const settle = (scale: number) => {
+    if (anchor.isConnected) moveDialogBy(anchor, pinShift(before, anchor.getBoundingClientRect(), pointer, scale));
+  };
+  if (!zoom) {
+    change();
+    settle(1);
+    return;
+  }
+  // In a browser the zoom is the CSS `zoom` of <html>: nothing to wait for, and the dialog is not moved.
+  if (!inTauri()) return change();
+  let timer = 0;
+  const done = () => {
+    window.clearTimeout(timer);
+    window.removeEventListener("resize", onResize);
+  };
+  const onResize = () => {
+    done();
+    requestAnimationFrame(() => settle(zoom[0] / zoom[1]));
+  };
+  window.addEventListener("resize", onResize);
+  timer = window.setTimeout(done, 1500);
+  change();
 }
 
 /**
- * Minus button, number box, plus button. Type a number and press Enter or leave the box; Up / Down step the value.
- * Out-of-range input is clamped, text that is not a number goes back to the current value.
+ * Minus button, number box, plus button. A click on `-` / `+` is exactly one step (no repeat while the button is held).
+ * Type a number and press Enter or leave the box; Up / Down step the value. Out-of-range input is clamped, text that is
+ * not a number goes back to the current value.
  */
 export function NumberField(props: NumberFieldProps): JSX.Element {
-  const step = () => props.step ?? 1;
+  const range = (): NumberRange => ({ min: props.min, max: props.max, step: props.step ?? 1 });
   const [text, setText] = createSignal(String(props.value));
   createEffect(() => setText(String(props.value)));
-  const set = (v: number) => props.onChange(Math.min(props.max, Math.max(props.min, v)));
+  const set = (v: number) => {
+    const next = snapToRange(v, range());
+    if (next !== props.value) props.onChange(next);
+  };
+  /** One step from a `-` / `+` click. A real pointer click keeps the button under the pointer (`pin`). */
+  const stepClick = (e: MouseEvent, dir: 1 | -1) => {
+    const next = stepBy(props.value, dir, range());
+    if (next === props.value) return;
+    const button = e.currentTarget;
+    if (props.pin && e.detail > 0 && button instanceof HTMLElement) {
+      changeInPlace(button, { x: e.clientX, y: e.clientY }, () => props.onChange(next), props.pin === "zoom" ? [props.value, next] : undefined);
+    } else {
+      props.onChange(next);
+    }
+  };
   const commit = () => {
-    const n = Number(text().trim().replace(",", "."));
-    if (text().trim() !== "" && Number.isFinite(n)) set(n);
+    const n = parseNumberText(text());
+    if (n !== null) set(n);
     setText(String(props.value));
   };
   return (
     <div class="dg-settings-num" classList={{ "is-disabled": props.disabled }}>
-      <IconButton icon="minus" label={`Decrease ${props.label}`} size="small" disabled={props.disabled || props.value <= props.min} onClick={() => set(props.value - step())} />
+      <IconButton icon="minus" label={`Decrease ${props.label}`} size="small" disabled={props.disabled || props.value <= props.min} onClick={(e) => stepClick(e, -1)} />
       <input
         class="dg-settings-num-input"
         type="text"
@@ -85,11 +142,11 @@ export function NumberField(props: NumberFieldProps): JSX.Element {
             commit();
           } else if (e.key === "ArrowUp" || e.key === "ArrowDown") {
             e.preventDefault();
-            set(props.value + (e.key === "ArrowUp" ? step() : -step()));
+            if (!e.repeat) set(stepBy(props.value, e.key === "ArrowUp" ? 1 : -1, range()));
           }
         }}
       />
-      <IconButton icon="plus" label={`Increase ${props.label}`} size="small" disabled={props.disabled || props.value >= props.max} onClick={() => set(props.value + step())} />
+      <IconButton icon="plus" label={`Increase ${props.label}`} size="small" disabled={props.disabled || props.value >= props.max} onClick={(e) => stepClick(e, 1)} />
       <Show when={props.unit}>
         <span class="dg-settings-num-unit">{props.value === 0 && props.zeroLabel ? props.zeroLabel : props.unit}</span>
       </Show>
@@ -97,22 +154,78 @@ export function NumberField(props: NumberFieldProps): JSX.Element {
   );
 }
 
-export interface SizeControlProps extends NumberFieldProps {
-  /**
-   * `live` (default): the value is applied while the slider moves.
-   * `release`: the slider only previews the number and applies on release (use it when the change moves the slider itself, like page zoom).
-   */
-  apply?: "live" | "release";
-}
+export type SizeControlProps = NumberFieldProps;
 
-/** Slider and number box for the same value. */
+/**
+ * Slider and number box for the same value.
+ *
+ * A drag of the slider only previews: the number box shows the value under the pointer and the setting changes once,
+ * when the pointer is released. Applying while the slider moves would be a loop for a size setting: the new size moves
+ * the slider under the pressed pointer, which reads a new value from the same pointer position (`sizeControl.ts`).
+ * Arrow keys on the slider apply at once, one step per key press.
+ */
 export function SizeControl(props: SizeControlProps): JSX.Element {
-  const [drag, setDrag] = createSignal<number | null>(null);
-  const shown = () => drag() ?? props.value;
+  let input: HTMLInputElement | undefined;
+  let state = SLIDER_IDLE;
+  /** Where the pointer is during a drag (window coordinates). */
+  let pointer: Point | null = null;
+  let stopTracking: (() => void) | undefined;
+  const [preview, setPreview] = createSignal<number | null>(null);
+  const shown = () => preview() ?? props.value;
   const fill = () => ((shown() - props.min) / (props.max - props.min)) * 100;
+
+  const dispatch = (event: SliderEvent) => {
+    const wasDragging = state.dragging;
+    const r = sliderStep(state, event, props.value);
+    state = r.state;
+    setPreview(r.state.preview);
+    if (r.apply === null) return;
+    const next = r.apply;
+    if (props.pin && wasDragging && input) {
+      changeInPlace(input, pointer, () => props.onChange(next), props.pin === "zoom" ? [props.value, next] : undefined);
+    } else {
+      props.onChange(next);
+    }
+  };
+
+  /** A pointer went down on the slider: follow it on the window until it is released (also outside the slider). */
+  const begin = (e: MouseEvent) => {
+    if (e.button !== 0 || props.disabled || state.dragging) return;
+    pointer = { x: e.clientX, y: e.clientY };
+    dispatch({ type: "down" });
+    const move = (ev: MouseEvent) => {
+      pointer = { x: ev.clientX, y: ev.clientY };
+    };
+    // `change` is the normal end of a drag and comes with the release; this is the net for an engine that does not send it
+    const up = () => {
+      stop();
+      window.setTimeout(() => dispatch({ type: "release", value: input ? Number(input.value) : undefined }), 0);
+    };
+    const cancel = () => {
+      stop();
+      dispatch({ type: "cancel" });
+    };
+    const stop = () => {
+      window.removeEventListener("pointermove", move, true);
+      window.removeEventListener("mousemove", move, true);
+      window.removeEventListener("pointerup", up, true);
+      window.removeEventListener("mouseup", up, true);
+      window.removeEventListener("pointercancel", cancel, true);
+      stopTracking = undefined;
+    };
+    window.addEventListener("pointermove", move, true);
+    window.addEventListener("mousemove", move, true);
+    window.addEventListener("pointerup", up, true);
+    window.addEventListener("mouseup", up, true);
+    window.addEventListener("pointercancel", cancel, true);
+    stopTracking = stop;
+  };
+  onCleanup(() => stopTracking?.());
+
   return (
     <div class="dg-settings-size">
       <input
+        ref={input}
         class="dg-settings-slider"
         type="range"
         min={props.min}
@@ -123,15 +236,13 @@ export function SizeControl(props: SizeControlProps): JSX.Element {
         aria-label={props.label}
         aria-valuetext={shown() === 0 && props.zeroLabel ? props.zeroLabel : `${shown()}${props.unit ?? ""}`}
         style={{ "--dg-fill": `${fill()}%` }}
-        onInput={(e) => {
-          const v = Number(e.currentTarget.value);
-          if ((props.apply ?? "live") === "live") props.onChange(v);
-          else setDrag(v);
+        onPointerDown={begin}
+        onMouseDown={begin}
+        onKeyDown={(e) => {
+          if (e.repeat && STEP_KEYS.has(e.key)) e.preventDefault();
         }}
-        onChange={(e) => {
-          if (drag() !== null) props.onChange(Number(e.currentTarget.value));
-          setDrag(null);
-        }}
+        onInput={(e) => dispatch({ type: "input", value: Number(e.currentTarget.value) })}
+        onChange={(e) => dispatch({ type: "release", value: Number(e.currentTarget.value) })}
       />
       <NumberField {...props} value={shown()} />
     </div>

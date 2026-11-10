@@ -14,7 +14,7 @@ export { Checkbox, type CheckboxProps } from "./Checkbox";
 export { Select, type SelectProps, type SelectOption } from "./Select";
 export { MenuHost, openContextMenu, openMenu, closeMenu, isMenuOpen, type MenuItem } from "./Menu";
 export { Popup, type PopupProps, type PopupPlacement } from "./Popup";
-export { Dialog, DialogHost, openDialog, hasOpenDialog, type DialogProps, type DialogAction, type DialogComponentProps } from "./Dialog";
+export { Dialog, DialogHost, openDialog, hasOpenDialog, moveDialogBy, type DialogProps, type DialogAction, type DialogComponentProps } from "./Dialog";
 export { ConfirmDialog, type ConfirmProps, type ConfirmResult, type ConfirmCheckbox } from "./ConfirmDialog";
 export {
   ToastHost, toast, dismissToast, notifications, unreadCount, markNotificationsRead, clearNotifications,

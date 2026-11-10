@@ -54,12 +54,13 @@ function AppearanceSection(): JSX.Element {
 
       <Section title="Size">
         <Row label="Font size" hint="Text, rows, buttons and icons grow with it. Default 13.">
-          <SizeControl label="Font size" value={settings.fontSize} min={FONT_SIZE_MIN} max={FONT_SIZE_MAX} unit="px" onChange={(v) => setSetting("fontSize", v)} />
+          <SizeControl label="Font size" pin="layout" value={settings.fontSize} min={FONT_SIZE_MIN} max={FONT_SIZE_MAX} unit="px" onChange={(v) => setSetting("fontSize", v)} />
         </Row>
         <Row label="Editor font size" hint="Diff, console and commit hashes.">
           <div class="dg-settings-stack">
             <SizeControl
               label="Editor font size"
+              pin="layout"
               value={editorSize()}
               min={FONT_SIZE_MIN}
               max={FONT_SIZE_MAX}
@@ -77,7 +78,7 @@ function AppearanceSection(): JSX.Element {
         <Row label="UI scale" hint={`Zooms the whole window. ${formatKeys("Ctrl+=")} in, ${formatKeys("Ctrl+-")} out, ${formatKeys("Ctrl+0")} back to 100%.`}>
           <SizeControl
             label="UI scale"
-            apply="release"
+            pin="zoom"
             value={settings.uiScale}
             min={UI_SCALE_MIN}
             max={UI_SCALE_MAX}

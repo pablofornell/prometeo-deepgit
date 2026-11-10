@@ -245,6 +245,13 @@ Rules: apply changes **live** (write to the store in the handler; there is no OK
 `Settings`, `SETTING_DEFAULTS` and `SANITIZERS` in `state/settings.ts`; every stored value is validated) or in your own store that
 validates what it reads. Do not import another feature from a section.
 
+**One user action, one change** (`widgets.tsx`, logic in `sizeControl.ts`). The slider of `SizeControl` only previews while it is dragged
+(the number box shows the value) and calls `onChange` once, on release; arrow keys on it apply at once, one step per key press. A click
+on `-` / `+` is one step and there is no press-and-hold repeat. A typed number applies on Enter or when the box loses focus. Never apply
+a size while a pointer is down: the new size moves the control under the pointer and the pointer then reads another value (a loop).
+Give a control whose value resizes the page `pin="layout"` (font sizes) or `pin="zoom"` (UI scale): after a change made with the pointer
+the dialog moves (`moveDialogBy` of `components/ui`, kept inside the window) so that the control stays under the pointer.
+
 Zoom keys (`Ctrl+=`, `Ctrl++`, `Ctrl+-`, `Ctrl+0`) are registered in `features/settings/index.ts`; do not reuse them.
 
 ## Tests and verification
