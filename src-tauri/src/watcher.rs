@@ -680,7 +680,16 @@ mod live_tests {
         std::fs::write(root.join("a.txt"), "1").unwrap();
         std::fs::write(root.join("b.txt"), "2").unwrap();
         assert_eq!(rx.recv_timeout(Duration::from_secs(5)).unwrap(), "r1");
-        assert!(rx.recv_timeout(Duration::from_millis(1000)).is_err());
+        // Windows (ReadDirectoryChangesW) can deliver the create and the write of a file in
+        // separate bursts, so the debouncer may emit a second time: one refresh too many, never
+        // a missed one. CI run 42798038150. Elsewhere the burst must give exactly one event.
+        if cfg!(windows) {
+            while let Ok(id) = rx.recv_timeout(Duration::from_millis(1000)) {
+                assert_eq!(id, "r1");
+            }
+        } else {
+            assert!(rx.recv_timeout(Duration::from_millis(1000)).is_err());
+        }
         // Dropping the repo from the set stops events.
         w.sync(&[]);
         std::fs::write(root.join("c.txt"), "3").unwrap();
