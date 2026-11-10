@@ -66,12 +66,22 @@ fn glob_characters_in_paths_are_literal() {
     let r = TestRepo::new();
     let g = git();
     r.commit_file("seed", "s", "init");
-    r.write("a*.txt", "1\n");
     r.write("abc.txt", "2\n");
-    ops::stage(&g, &r.info, &strs(&["a*.txt"])).unwrap();
-    let t = status::working_tree(&g, &r.info).unwrap();
-    assert_eq!(t.staged.len(), 1);
-    assert_eq!(t.staged[0].path, "a*.txt");
+    // As a glob each name would also match `abc.txt`. Windows does not allow `*` or `?` in a file
+    // name, so only the bracket form runs there.
+    #[cfg(not(windows))]
+    let names = ["a[b]c.txt", "a*.txt", "a?c.txt"];
+    #[cfg(windows)]
+    let names = ["a[b]c.txt"];
+    for name in names {
+        r.write(name, "1\n");
+        ops::stage(&g, &r.info, &strs(&[name])).unwrap();
+        let t = status::working_tree(&g, &r.info).unwrap();
+        assert_eq!(t.staged.len(), 1, "{name}: {:?}", t.staged);
+        assert_eq!(t.staged[0].path, name);
+        ops::unstage(&g, &r.info, &strs(&[name])).unwrap();
+        std::fs::remove_file(r.path().join(name)).unwrap();
+    }
 }
 
 #[test]

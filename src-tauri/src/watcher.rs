@@ -51,6 +51,11 @@ const IGNORED_DIRS: [&str; 12] = [
 /// Called with a repo id once per repo per debounce batch.
 pub type Emit = Arc<dyn Fn(&str) + Send + Sync>;
 
+/// For the tests: every path that made the watcher emit, so a failed assertion can say which
+/// file system event was behind a notification.
+#[cfg(test)]
+static EMIT_CAUSES: Mutex<Vec<PathBuf>> = Mutex::new(Vec::new());
+
 /// Whether `name` is a directory name that is never watched.
 pub fn is_ignored_dir(name: &OsStr) -> bool {
     IGNORED_DIRS.contains(&name.to_string_lossy().as_ref())
@@ -410,6 +415,11 @@ impl WatcherHandle {
                     if let Some(inner) = inner.as_mut() {
                         inner.maintain(&root, path);
                     }
+                    #[cfg(test)]
+                    if relevant {
+                        let mut causes = EMIT_CAUSES.lock().unwrap_or_else(|e| e.into_inner());
+                        causes.push(path.to_path_buf());
+                    }
                     if relevant && !ids.contains(&id.as_str()) {
                         ids.push(id);
                     }
@@ -644,7 +654,7 @@ mod live_tests {
     #[test]
     fn emits_once_per_repo_for_worktree_changes_only() {
         let dir = tempfile::tempdir().unwrap();
-        let root = std::fs::canonicalize(dir.path()).unwrap();
+        let root = gitcore::paths::canonicalize(dir.path()).unwrap();
         std::fs::create_dir_all(root.join(".git/objects")).unwrap();
         let (tx, rx) = mpsc::channel::<String>();
         let tx = std::sync::Mutex::new(tx);
@@ -687,14 +697,37 @@ mod live_tests {
         }
     }
 
+    /// The paths below `root` that made the watcher emit so far, for assertion messages.
+    fn causes(root: &Path) -> Vec<PathBuf> {
+        EMIT_CAUSES
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .iter()
+            .filter(|p| p.starts_with(root))
+            .cloned()
+            .collect()
+    }
+
+    /// Waits until the watcher has been quiet for a second (at most 10 s) and returns how many
+    /// notifications came. Windows reports that a folder changed (a file was made inside it) to
+    /// the watch of the folder above, and it can do so late: after the notification for the file
+    /// itself, and for a change made right before the watch was set up. Such a notification is
+    /// one refresh too many, not a missed one, so the steps below wait for quiet first.
+    fn settle(rx: &mpsc::Receiver<String>) -> usize {
+        let start = std::time::Instant::now();
+        let mut seen = 0;
+        while start.elapsed() < Duration::from_secs(10)
+            && rx.recv_timeout(Duration::from_millis(1000)).is_ok()
+        {
+            seen += 1;
+        }
+        seen
+    }
+
     #[test]
-    // Windows (ReadDirectoryChangesW) reports activity under an ignored tree to the parent
-    // watch, so the "invisible" step fails there; it is a refresh too many, not a missed one.
-    // Not reproduced locally (no Windows machine); CI run 42781615789.
-    #[cfg_attr(windows, ignore)]
     fn watches_new_directories_but_not_ignored_ones() {
         let dir = tempfile::tempdir().unwrap();
-        let root = std::fs::canonicalize(dir.path()).unwrap();
+        let root = gitcore::paths::canonicalize(dir.path()).unwrap();
         std::fs::create_dir_all(root.join(".git/refs/heads")).unwrap();
         std::fs::create_dir_all(root.join("node_modules/pkg")).unwrap();
         let (tx, rx) = mpsc::channel::<String>();
@@ -717,21 +750,41 @@ mod live_tests {
                 .iter()
                 .any(|d| d.starts_with(root.join("node_modules"))));
         }
+        let early = settle(&rx);
+        {
+            // Not through `eprintln!`: the test harness hides that when the test passes, and this
+            // line is the only way to see what a system without a developer machine reports.
+            use std::io::Write;
+            let _ = writeln!(
+                std::io::stderr(),
+                "watcher test: {early} notification(s) right after the watches were set up, for {:?}",
+                causes(&root)
+            );
+        }
         // Activity in an ignored tree is invisible.
         std::fs::write(root.join("node_modules/pkg/x.js"), "x").unwrap();
-        assert!(rx.recv_timeout(Duration::from_millis(1500)).is_err());
+        assert!(
+            rx.recv_timeout(Duration::from_millis(1500)).is_err(),
+            "a change below node_modules was reported; causes so far: {:?}",
+            causes(&root)
+        );
         // A new directory gets watched, and so do files created later inside it.
         std::fs::create_dir_all(root.join("src/inner")).unwrap();
         assert_eq!(rx.recv_timeout(Duration::from_secs(5)).unwrap(), "r1");
-        assert!(rx.recv_timeout(Duration::from_millis(1000)).is_err());
+        settle(&rx);
         assert!(lock(&w.inner).repos[&root]
             .dirs
             .contains(&root.join("src/inner")));
         std::fs::write(root.join("src/inner/f.rs"), "1").unwrap();
         assert_eq!(rx.recv_timeout(Duration::from_secs(5)).unwrap(), "r1");
         // A new ignored directory is not watched.
+        settle(&rx);
         std::fs::create_dir_all(root.join("target/debug")).unwrap();
-        assert!(rx.recv_timeout(Duration::from_millis(1500)).is_err());
+        assert!(
+            rx.recv_timeout(Duration::from_millis(1500)).is_err(),
+            "a new ignored folder was reported; causes so far: {:?}",
+            causes(&root)
+        );
         assert!(!lock(&w.inner).repos[&root]
             .dirs
             .iter()

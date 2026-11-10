@@ -47,7 +47,7 @@ impl Source {
     }
 
     fn file_url(&self) -> String {
-        format!("file://{}", self.path())
+        file_url(&self.bare.path().join("origin.git"))
     }
 }
 
@@ -98,8 +98,12 @@ fn clones_from_a_file_url_with_progress() {
     let path = r.unwrap();
     assert_eq!(
         path,
-        std::fs::canonicalize(parent.path()).unwrap().join("copy")
+        gitcore::paths::canonicalize(parent.path())
+            .unwrap()
+            .join("copy")
     );
+    // git cannot use a verbatim Windows path (`\\?\C:\...`)
+    assert!(!path.to_string_lossy().starts_with(r"\\?\"), "{path:?}");
     assert_eq!(rev_count(&path), "3");
     assert!(path.join("c.txt").exists());
     assert_eq!(
@@ -125,9 +129,10 @@ fn clones_from_a_plain_path() {
     let (r, _) = do_clone(&src.path(), parent.path(), "plain", &CloneOpts::default());
     let path = r.unwrap();
     assert_eq!(rev_count(&path), "3");
+    // On Windows git may print the path with either separator.
     assert_eq!(
-        sh(&path, &["remote", "get-url", "origin"], None),
-        src.path()
+        slashed(&sh(&path, &["remote", "get-url", "origin"], None)),
+        slashed(&src.path())
     );
 }
 
@@ -181,7 +186,7 @@ fn an_unknown_branch_fails_and_leaves_nothing() {
 #[test]
 fn a_missing_repository_fails_and_leaves_nothing() {
     let parent = tempfile::tempdir().unwrap();
-    let url = format!("file://{}/nowhere.git", parent.path().display());
+    let url = file_url(&parent.path().join("nowhere.git"));
     let (r, _) = do_clone(&url, parent.path(), "x", &CloneOpts::default());
     assert!(r.is_err());
     assert!(!parent.path().join("x").exists());

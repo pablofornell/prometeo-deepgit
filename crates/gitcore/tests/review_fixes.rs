@@ -380,14 +380,20 @@ fn f05_hunks_keep_the_exact_bytes_of_non_utf8_files() {
 fn f05_hunks_work_for_paths_with_quotes_tabs_and_leading_dashes() {
     let r = TestRepo::new();
     let g = git();
-    let names = ["-rf x.txt", "ñandú \"q\".txt", "tab\there.txt", "a\\b.txt"];
+    // Windows does not allow `"` or a tab in a file name, and `\\` is its path separator.
+    let unix_only: &[&str] = if cfg!(windows) {
+        &[]
+    } else {
+        &["ñandú \"q\".txt", "tab\there.txt", "a\\b.txt"]
+    };
+    let names = [&["-rf x.txt", "ñandú 'q'.txt", "a b;c&d.txt"], unix_only].concat();
     let body = numbered(20);
-    for n in names {
+    for n in &names {
         r.write(n, &body);
     }
     r.sh(&["add", "-A"]);
     r.sh(&["commit", "-qm", "init"]);
-    for n in names {
+    for n in &names {
         r.write(n, &body.replace("l1\n", "L1\n").replace("l18\n", "L18\n"));
     }
     for n in names {

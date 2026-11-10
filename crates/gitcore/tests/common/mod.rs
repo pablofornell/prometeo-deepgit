@@ -54,6 +54,10 @@ pub fn init_at(dir: &Path) {
         ("core.hooksPath", "/dev/null"),
         ("merge.ff", "true"),
         ("pull.rebase", "false"),
+        // Git for Windows turns `core.autocrlf` on for the whole system: the worktree files of
+        // these repos would then have CRLF line ends. The tests check exact bytes, so the repos
+        // are LF on every system; `tests/autocrlf.rs` covers the CRLF case on purpose.
+        ("core.autocrlf", "false"),
     ] {
         sh(dir, &["config", k, v], None);
     }
@@ -116,6 +120,17 @@ impl TestRepo {
     pub fn head(&self) -> String {
         self.sh(&["rev-parse", "HEAD"])
     }
+}
+
+/// A `file://` URL of a local path that git accepts on every system: `file:///srv/x` on Unix,
+/// `file://C:/Users/x` on Windows (the form git's own tests use there).
+pub fn file_url(path: &Path) -> String {
+    format!("file://{}", path.to_string_lossy().replace('\\', "/"))
+}
+
+/// `path` with `/` separators, to compare a path with what git prints on Windows.
+pub fn slashed(path: &str) -> String {
+    path.replace('\\', "/")
 }
 
 pub fn pb(p: &Path) -> PathBuf {

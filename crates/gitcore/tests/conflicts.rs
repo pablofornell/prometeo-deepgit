@@ -569,6 +569,7 @@ fn paths_are_validated() {
     ));
 }
 
+// Unix only: Windows has no executable bit (git keeps the mode in the index there).
 #[cfg(unix)]
 #[test]
 fn file_mode_is_kept() {
@@ -608,6 +609,7 @@ fn file_mode_is_kept() {
 
 #[test]
 fn a_symlink_in_the_way_is_not_written_through() {
+    // Unix only: making a symlink on Windows needs a privilege that a normal user does not have.
     #[cfg(unix)]
     {
         let r = TestRepo::new();
@@ -695,7 +697,6 @@ fn json_shape_is_what_the_frontend_expects() {
 // ---------------------------------------------------------------- not every conflict in a stopped rebase is the rebase's
 
 /// `git stash pop`, which exits 1 when it conflicts.
-#[cfg(unix)]
 fn pop_stash(r: &TestRepo) {
     let out = std::process::Command::new("git")
         .arg("-C")
@@ -713,7 +714,6 @@ fn pop_stash(r: &TestRepo) {
 /// `topic` has two commits on top of `base` (T1 touches `f`, T2 adds `b.txt`) and `main` changed `f` and
 /// `g` too. Starts `rebase -i main` stopping after T1 is replayed (an `edit` stop: no conflict).
 /// A stash made on `topic` before holds a change of `g`; `other` has a commit that changes `f`.
-#[cfg(unix)]
 fn rebase_stopped_at_edit() -> (TestRepo, String) {
     let r = TestRepo::new();
     r.sh(&["config", "core.autocrlf", "false"]);
@@ -731,9 +731,11 @@ fn rebase_stopped_at_edit() -> (TestRepo, String) {
     r.write("g", "g-HEAD\n");
     r.commit_file("f", "one\nHEAD\nthree\n", "main change of f and g");
     r.sh(&["checkout", "-q", "topic"]);
+    // `-i.bak` is the one spelling of "in place" that GNU sed (Linux, Git for Windows) and BSD
+    // sed (macOS) both take; it leaves a `git-rebase-todo.bak` in the rebase folder.
     r.sh(&[
         "-c",
-        "sequence.editor=sed -i 1s/^pick/edit/",
+        "sequence.editor=sed -i.bak -e 1s/^pick/edit/",
         "rebase",
         "-i",
         "main",
@@ -745,7 +747,6 @@ fn rebase_stopped_at_edit() -> (TestRepo, String) {
     (r, pick)
 }
 
-#[cfg(unix)]
 #[test]
 fn a_cherry_pick_made_while_a_rebase_is_stopped_is_not_swapped() {
     let (r, pick) = rebase_stopped_at_edit();
@@ -775,7 +776,6 @@ fn a_cherry_pick_made_while_a_rebase_is_stopped_is_not_swapped() {
     assert_eq!(r.read("f"), "one\nPICKED\nthree\n");
 }
 
-#[cfg(unix)]
 #[test]
 fn a_revert_made_while_a_rebase_is_stopped_is_not_swapped() {
     let (r, pick) = rebase_stopped_at_edit();
@@ -795,7 +795,6 @@ fn a_revert_made_while_a_rebase_is_stopped_is_not_swapped() {
     );
 }
 
-#[cfg(unix)]
 #[test]
 fn a_stash_pop_while_a_rebase_is_stopped_is_not_swapped() {
     // at an `edit` stop (no REBASE_HEAD) and, below, while a conflict of the rebase is open
@@ -818,7 +817,6 @@ fn a_stash_pop_while_a_rebase_is_stopped_is_not_swapped() {
     assert!(list.iter().all(|c| c.path == "g"));
 }
 
-#[cfg(unix)]
 #[test]
 fn in_a_rebase_conflict_a_stash_pop_is_told_from_the_rebases_own_files() {
     let r = TestRepo::new();
@@ -860,7 +858,6 @@ fn in_a_rebase_conflict_a_stash_pop_is_told_from_the_rebases_own_files() {
 
 /// `sub` is a submodule whose commit diverges: main points at `c2`, feature at `c3` (both children
 /// of `c1`). Merging feature into main conflicts on the gitlink. Returns (repo, c2, c3).
-#[cfg(unix)]
 fn submodule_conflict() -> (TestRepo, String, String) {
     let r = TestRepo::new();
     let lib = tempfile::tempdir().unwrap();
@@ -903,7 +900,6 @@ fn submodule_conflict() -> (TestRepo, String, String) {
     (r, c2, c3)
 }
 
-#[cfg(unix)]
 fn gitlink_oid(r: &TestRepo) -> String {
     r.sh(&["ls-files", "-s", "sub"])
         .split_whitespace()
@@ -912,7 +908,6 @@ fn gitlink_oid(r: &TestRepo) -> String {
         .to_string()
 }
 
-#[cfg(unix)]
 #[test]
 fn accept_theirs_on_a_submodule_conflict_takes_their_commit_and_leaves_the_checkout_alone() {
     let (r, c2, c3) = submodule_conflict();
@@ -929,7 +924,6 @@ fn accept_theirs_on_a_submodule_conflict_takes_their_commit_and_leaves_the_check
     assert_eq!(sh(&r.path().join("sub"), &["rev-parse", "HEAD"], None), c2);
 }
 
-#[cfg(unix)]
 #[test]
 fn accept_yours_on_a_submodule_conflict_records_your_commit() {
     let (r, c2, _) = submodule_conflict();
@@ -938,7 +932,6 @@ fn accept_yours_on_a_submodule_conflict_records_your_commit() {
     assert_eq!(gitlink_oid(&r), c2);
 }
 
-#[cfg(unix)]
 #[test]
 fn deleting_a_submodule_side_keeps_the_submodule_checkout() {
     // main deletes the submodule, feature moves it: Accept Yours = delete, only from the index
@@ -985,6 +978,8 @@ fn deleting_a_submodule_side_keeps_the_submodule_checkout() {
     );
 }
 
+// Unix only: making a symlink on Windows needs a privilege that a normal user does not have, and
+// Git for Windows checks links out as plain files (`core.symlinks=false`).
 #[cfg(unix)]
 #[test]
 fn accepting_a_side_of_a_symlink_conflict_moves_the_link() {

@@ -181,16 +181,42 @@ fn only_network_commands_get_the_auth_environment() {
 #[test]
 fn the_network_command_runs_in_its_own_session_without_a_terminal() {
     let r = repo_with_commit();
-    let out = r.path().join("sid.txt");
-    ext_remote(&r, &format!("ps -o sid= -p $$ > {}\nexit 1", out.display()));
+    // The transport writes its pid and waits (at most 10 s) until the test has looked at it.
+    // `ps -o sid=` would be shorter, but the `ps` of macOS has no session id column.
+    let pid_file = r.path().join("pid.txt");
+    let seen = r.path().join("seen");
+    ext_remote(
+        &r,
+        &format!(
+            "echo $$ > '{pid}.tmp' && mv '{pid}.tmp' '{pid}'\n\
+             i=0\nwhile [ ! -e '{seen}' ] && [ $i -lt 100 ]; do sleep 0.1; i=$((i+1)); done\nexit 1",
+            pid = pid_file.display(),
+            seen = seen.display()
+        ),
+    );
     let g = git().with_auth(Arc::new(Fake::default()));
-    let _ = ops::fetch(&g, &r.info, Some("x"), false);
-    let sid: i32 = env_dump(&out)
+    let info = r.info.clone();
+    let fetch = std::thread::spawn(move || {
+        let _ = ops::fetch(&g, &info, Some("x"), false);
+    });
+    let started = Instant::now();
+    while !pid_file.exists() {
+        assert!(
+            started.elapsed() < Duration::from_secs(10),
+            "the transport did not start"
+        );
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    let pid: i32 = env_dump(&pid_file)
         .trim()
         .parse()
-        .expect("the transport wrote its session id");
-    // SAFETY: getsid(2) of the calling process.
-    let mine = unsafe { libc::getsid(0) };
+        .expect("the transport wrote its pid");
+    // SAFETY: getsid(2) only reads the session id of a process.
+    let (sid, mine) = unsafe { (libc::getsid(pid), libc::getsid(0)) };
+    let errno = std::io::Error::last_os_error();
+    std::fs::write(&seen, "").unwrap();
+    fetch.join().unwrap();
+    assert_ne!(sid, -1, "getsid({pid}): {errno}");
     assert_ne!(
         sid, mine,
         "the command must not share the app's session (and its terminal)"

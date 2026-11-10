@@ -28,7 +28,7 @@ fn finds_nested_repos_and_skips_ignored_dirs() {
     let found = discover::find_repos(r, 4);
     let rels: Vec<String> = found
         .iter()
-        .map(|p| p.strip_prefix(r).unwrap().to_string_lossy().into_owned())
+        .map(|p| slashed(&p.strip_prefix(r).unwrap().to_string_lossy()))
         .collect();
     assert_eq!(rels, vec!["", "apps/web", "libs/core", "sub/mod"]);
 }
@@ -45,7 +45,7 @@ fn make_project_assigns_names_ids_and_colors() {
     }
     let project = discover::make_project(r);
     assert_eq!(project.repos.len(), 10);
-    let root_name = std::fs::canonicalize(r)
+    let root_name = gitcore::paths::canonicalize(r)
         .unwrap()
         .file_name()
         .unwrap()
