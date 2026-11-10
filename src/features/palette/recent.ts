@@ -5,8 +5,8 @@ import type { PaletteItem } from "./sources";
 const KEY = "palette.recent";
 export const MAX_RECENT = 10;
 
-/** Palette-only actions that were removed (the colour actions went with the per-repo colours). */
-export const RETIRED_ACTIONS: ReadonlySet<string> = new Set(["x.repoColor", "x.projectColor"]);
+/** Actions that were removed: the colour actions went with the per-repo colours, "tool.stashes" with the Stashes stripe button. */
+export const RETIRED_ACTIONS: ReadonlySet<string> = new Set(["x.repoColor", "x.projectColor", "tool.stashes"]);
 
 /** Stable identity of an item, used to de-duplicate recents. */
 export const itemKey = (i: PaletteItem): string => `${i.kind}:${i.key}`;

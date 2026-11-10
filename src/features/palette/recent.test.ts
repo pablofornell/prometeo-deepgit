@@ -23,6 +23,11 @@ describe("cleanRecent", () => {
     expect(cleanRecent(stored, exists)).toEqual([fetch, repo, clone]);
   });
 
+  it("drops the retired Stashes tool action even though its key looks valid", () => {
+    const fetch = action("git.fetchAll", "Fetch all repositories");
+    expect(cleanRecent([action("tool.stashes", "Show the sidebar (stashes)"), fetch], exists)).toEqual([fetch]);
+  });
+
   it("drops what is not an item and keeps at most MAX_RECENT", () => {
     expect(cleanRecent("nope", exists)).toEqual([]);
     expect(cleanRecent([null, 3, {}, { kind: "action" }, { kind: "action", key: "git.pull" }], exists)).toEqual([]);
