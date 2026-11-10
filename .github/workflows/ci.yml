@@ -1,0 +1,74 @@
+# CI: lint, tests and a frontend build on Linux, Windows and macOS.
+# Windows and macOS are not tested on the developer machine, so this workflow is
+# the only check for them. The git-backed Rust tests need a real `git` (present on
+# all GitHub runners) and a committer identity.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      CARGO_TERM_COLOR: always
+      GIT_AUTHOR_NAME: CI
+      GIT_AUTHOR_EMAIL: ci@example.com
+      GIT_COMMITTER_NAME: CI
+      GIT_COMMITTER_EMAIL: ci@example.com
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Linux system packages (WebKitGTK for Tauri)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev \
+            libayatana-appindicator3-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: git identity
+        run: |
+          git config --global user.name CI
+          git config --global user.email ci@example.com
+          git config --global init.defaultBranch main
+
+      - name: npm ci
+        run: npm ci
+
+      # The Tauri crate embeds ../dist at compile time, so build the frontend first.
+      - name: Frontend typecheck, tests and build
+        run: |
+          npx tsc --noEmit -p .
+          npx vitest run
+          npm run build
+
+      - name: Rust format
+        if: runner.os == 'Linux'
+        run: cargo fmt --all --check
+
+      - name: Rust clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Rust tests
+        run: cargo test --workspace
