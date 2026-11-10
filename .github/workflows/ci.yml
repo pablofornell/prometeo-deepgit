@@ -22,10 +22,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     env:
       CARGO_TERM_COLOR: always
-      GIT_AUTHOR_NAME: CI
-      GIT_AUTHOR_EMAIL: ci@example.com
-      GIT_COMMITTER_NAME: CI
-      GIT_COMMITTER_EMAIL: ci@example.com
+      # No GIT_AUTHOR_* / GIT_COMMITTER_* here: they override the identity the tests set per repo
+      # (sign-off tests check it). The global identity below is enough.
     steps:
       - uses: actions/checkout@v4
 
