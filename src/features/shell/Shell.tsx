@@ -8,6 +8,7 @@ import { HeaderSlotTarget, Icon, IconButton, Splitter, loadSplitSize, openMenu, 
 import { formatDate } from "../../state/dates";
 import { tip } from "../../components/ui";
 import { ChangesView } from "../changes/ChangesView";
+import { FilesView } from "../files/FilesView";
 import { CommitDetails } from "../details/CommitDetails";
 import { DiffPanel } from "../diff/DiffPanel";
 import { GitConsole } from "../console/GitConsole";
@@ -151,6 +152,7 @@ export function Shell(): JSX.Element {
         <nav class="dg-shell-stripe" aria-label="Tool windows">
           <StripeButton icon="project" label="Project" keys={keyOf("tool.sidebar")} active={sidebarVisible()} onClick={toggleSidebar} />
           <StripeButton icon="changes" label="Local changes" keys={keyOf("tool.changes")} active={mainTab() === "changes"} count={changesScopeCount()} onClick={() => setMainTab(mainTab() === "changes" ? "log" : "changes")} />
+          <StripeButton icon="folder" label="Project files" keys={keyOf("tool.files")} active={mainTab() === "files"} onClick={() => setMainTab(mainTab() === "files" ? "log" : "files")} />
           <StripeButton icon="matrix" label="Branch matrix" keys={keyOf("tool.matrix")} active={bottomTool() === "matrix"} onClick={() => toggleBottomTool("matrix")} />
           <span class="dg-grow" />
           <StripeButton icon="console" label="Git console" keys={keyOf("tool.console")} active={bottomTool() === "console"} onClick={() => toggleBottomTool("console")} />
@@ -185,6 +187,10 @@ export function Shell(): JSX.Element {
                       <span class="dg-shell-tab-sub">{changesScopeCount()}</span>
                     </Show>
                   </button>
+                  <button type="button" role="tab" aria-selected={mainTab() === "files"} class="dg-shell-tab" classList={{ "is-on": mainTab() === "files" }} onClick={() => setMainTab("files")}>
+                    <Icon name="folder" />
+                    Files
+                  </button>
                   <span class="dg-grow" />
                   <HeaderSlotTarget name="main" />
                 </div>
@@ -194,9 +200,13 @@ export function Shell(): JSX.Element {
                 <div class="dg-shell-view" hidden={mainTab() !== "changes"}>
                   <ChangesView />
                 </div>
+                <div class="dg-shell-view" hidden={mainTab() !== "files"}>
+                  <FilesView />
+                </div>
               </section>
-              <Splitter orientation="vertical" reverse size={detailsW()} onSize={resizeDetails} min={MIN_DETAILS} max={() => maxDetails(rowWidth(), SPLIT)} defaultSize={defaultDetails(rowWidth(), SPLIT)} persistKey="details" />
-              <aside class="dg-shell-island dg-shell-details" style={{ width: detailsW() + "px" }} aria-label="Details">
+              {/* Hidden, not unmounted. The Files tab needs the width. The details keep their state. */}
+              <Splitter orientation="vertical" reverse class={mainTab() === "files" ? "dg-shell-off" : undefined} size={detailsW()} onSize={resizeDetails} min={MIN_DETAILS} max={() => maxDetails(rowWidth(), SPLIT)} defaultSize={defaultDetails(rowWidth(), SPLIT)} persistKey="details" />
+              <aside class="dg-shell-island dg-shell-details" style={{ width: detailsW() + "px", display: mainTab() === "files" ? "none" : undefined }} aria-label="Details">
                 <div class="dg-shell-head" role="tablist" aria-label="Details tabs">
                   <button type="button" role="tab" aria-selected={detailsTab() === "files"} class="dg-shell-tab" classList={{ "is-on": detailsTab() === "files" }} onClick={() => setDetailsTab("files")}>
                     Changed files

@@ -25,7 +25,7 @@ export interface SelectedFile {
   oldPath?: string;
 }
 
-export type MainTab = "log" | "changes";
+export type MainTab = "log" | "changes" | "files";
 /** Tabs of the right column: "files" = Changed files (commit details), "diff" = File changes (the diff of the selected file). */
 export type DetailsTab = "files" | "diff";
 

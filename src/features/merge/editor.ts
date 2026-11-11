@@ -107,7 +107,8 @@ function wordsPlugin(getWords: () => readonly WordMark[]): Extension {
   );
 }
 
-function syntaxPlugin(lang: Lang | null): Extension {
+/** Colours the tokens of `lang` with `dg-mg-t-*` classes. The Files editor uses it too. */
+export function syntaxPlugin(lang: Lang | null): Extension {
   if (!lang) return [];
   const build = (view: EditorView): DecorationSet => {
     const doc = view.state.doc;

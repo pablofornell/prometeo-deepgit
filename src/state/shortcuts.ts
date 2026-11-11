@@ -10,6 +10,7 @@ import { register } from "./keymap";
 import { detailsTab, mainTab, setDetailsTab, setMainTab } from "./selection";
 import { toggleTheme } from "./settings";
 import { activeProject, focusedRepo, projectRepos, refreshSummaries } from "./workspace";
+import { inFilesEditor } from "../features/files/focus";
 
 const hasProject = () => !!activeProject();
 /** Focus is inside the "File changes" tab of the right column. */
@@ -18,11 +19,15 @@ const inFileChanges = () => !!(document.activeElement as HTMLElement | null)?.cl
 export function registerGlobalShortcuts(): void {
   // Ctrl chords do not fire in text fields unless `allowInInput`: none of these clash with text editing, so they all opt in.
   const g = (title: string) => ({ title, group: "Global", when: hasProject, allowInInput: true });
+  // These chords also type text (Ctrl+D, Ctrl+G, ...): inside the Files editor the editor keeps them.
+  const outsideEditor = (when: () => boolean) => () => when() && !inFilesEditor();
+  const ge = (title: string) => ({ title, group: "Global", when: outsideEditor(hasProject), allowInInput: true });
   register("tool.sidebar", "Alt+1", toggleSidebar, { title: "Toggle project sidebar", group: "Tool windows" });
   register("tool.changes", "Alt+0", () => setMainTab(mainTab() === "changes" ? "log" : "changes"), { title: "Show local changes", group: "Tool windows", when: hasProject });
   register("tool.matrix", "Alt+2", () => toggleBottomTool("matrix"), { title: "Toggle branch matrix", group: "Tool windows", when: hasProject });
+  register("tool.files", "Alt+3", () => setMainTab(mainTab() === "files" ? "log" : "files"), { title: "Show project files", group: "Tool windows", when: hasProject });
   register("tool.console", "Alt+9", () => toggleBottomTool("console"), { title: "Toggle git console", group: "Tool windows" });
-  register("tool.diff", "Ctrl+D", () => setDetailsTab("diff"), { title: "Show file changes (the diff)", group: "Tool windows", allowInInput: true });
+  register("tool.diff", "Ctrl+D", () => setDetailsTab("diff"), { title: "Show file changes (the diff)", group: "Tool windows", allowInInput: true, when: outsideEditor(() => true) });
   register("tool.changedFiles", [], () => setDetailsTab("files"), { title: "Show changed files (Esc in the diff)", group: "Tool windows" });
   // Esc inside the diff goes back to the file tree. The log's own Esc ("return focus to the log") ignores the diff tab.
   register(
@@ -37,24 +42,24 @@ export function registerGlobalShortcuts(): void {
   );
   register("tool.closeBottom", "Shift+Esc", () => openBottomTool(null), { title: "Hide the bottom tool window", group: "Tool windows" });
 
-  register("git.fetchAll", "Ctrl+T", () => void actions.fetchAll(), g("Fetch all repositories"));
+  register("git.fetchAll", "Ctrl+T", () => void actions.fetchAll(), ge("Fetch all repositories"));
   register("git.pull", "Ctrl+Shift+T", () => {
     const r = focusedRepo();
     if (r) void actions.pull(r.id);
-  }, g("Pull the focused repository"));
-  register("git.pullAll", "Ctrl+Alt+Shift+T", () => void actions.pull(projectRepos().map((r) => r.id)), g("Pull all repositories"));
+  }, ge("Pull the focused repository"));
+  register("git.pullAll", "Ctrl+Alt+Shift+T", () => void actions.pull(projectRepos().map((r) => r.id)), ge("Pull all repositories"));
   register("git.push", "Ctrl+Shift+K", () => {
     const r = focusedRepo();
     if (r) void actions.push(r.id);
-  }, g("Push the focused repository"));
+  }, ge("Push the focused repository"));
   register("git.newBranch", "Ctrl+Alt+N", () => {
     const r = focusedRepo();
     if (r) void actions.createBranch([r.id], "HEAD", { startLabel: "HEAD" });
-  }, g("New branch"));
+  }, ge("New branch"));
   register("git.stash", "Ctrl+Alt+Z", () => {
     const r = focusedRepo();
     if (r) void actions.stashSave([r.id]);
-  }, g("Stash changes"));
+  }, ge("Stash changes"));
   register("view.refresh", "Ctrl+R", () => {
     for (const r of projectRepos()) notifyRepoChanged(r.id);
     void refreshSummaries();

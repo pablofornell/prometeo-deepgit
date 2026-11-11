@@ -1,0 +1,124 @@
+/* Project files tab: tree, tabs, editor and project search. Prefix dg-fe-. Use tokens only. */
+
+.dg-fe { flex: 1; min-height: 0; min-width: 0; display: flex; }
+.dg-fe [hidden] { display: none !important; }
+
+/* ---- left pane: Files / Search */
+.dg-fe-side { flex: none; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.dg-fe-pane { flex: 1; min-height: 0; min-width: 0; display: flex; flex-direction: column; }
+.dg-fe-notice { padding: 4px 12px; color: var(--dg-text-secondary); font-size: var(--dg-font-size-medium); line-height: calc(16 * var(--dg-u)); }
+.dg-fe-notice.is-error { color: var(--dg-text-error); }
+.dg-fe-empty { padding: 8px 16px; color: var(--dg-text-secondary); font-size: var(--dg-font-size-medium); }
+.dg-fe-loading { flex: 1; min-height: 48px; display: grid; place-items: center; }
+.dg-fe-tree { flex: 1; min-height: 0; display: flex; flex-direction: column; padding-top: 2px; }
+.dg-fe-ficon { color: var(--dg-icon-secondary); flex: none; }
+.dg-fe-dname { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.dg-fe-dname.is-repo { font-weight: var(--dg-weight-semibold); }
+.dg-fe-fname { flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+/* In a result row, the file name keeps its width. The folder and the repo chip shrink first. */
+.dg-fe-group .dg-fe-fname { flex: none; max-width: 100%; }
+.dg-fe-group .dg-repochip { flex: 0 1 auto; min-width: 0; overflow: hidden; }
+.dg-fe-fdir { color: var(--dg-text-secondary); font-size: var(--dg-font-size-small); overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 0 1 auto; }
+.dg-fe-grow { flex: 1; min-width: 0; }
+
+/* ---- search pane */
+.dg-fe-search { flex: 1; min-height: 0; min-width: 0; display: flex; flex-direction: column; }
+.dg-fe-search-bar { flex: none; padding: 4px 8px 6px; }
+.dg-fe-search-bar .dg-field { width: 100%; box-sizing: border-box; }
+.dg-fe-toggle {
+  height: calc(18 * var(--dg-u)); min-width: calc(22 * var(--dg-u)); padding: 0 4px; margin-left: 2px; border-radius: 4px; flex: none;
+  color: var(--dg-text-secondary); font-size: var(--dg-font-size-small); font-weight: var(--dg-weight-semibold);
+}
+.dg-fe-toggle:hover { background: var(--dg-hover-bg); color: var(--dg-text); }
+.dg-fe-toggle.is-on { background: var(--dg-toolbar-selected-bg); color: var(--dg-toolbar-selected-fg); box-shadow: inset 0 0 0 1px var(--dg-accent-border); }
+.dg-fe-status { flex: none; padding: 0 12px 4px; font-size: var(--dg-font-size-medium); color: var(--dg-text-secondary); line-height: calc(16 * var(--dg-u)); }
+.dg-fe-status.is-error { color: var(--dg-text-error); }
+.dg-fe-list { flex: 1; min-height: 0; }
+.dg-fe-row {
+  display: flex; align-items: center; gap: var(--dg-tree-icon-gap); height: 100%; min-width: 0; padding: 0 var(--dg-tree-padding-x);
+  border-radius: var(--dg-tree-selection-radius); white-space: nowrap; cursor: default;
+}
+.dg-fe-row:hover { background: var(--dg-row-hover-bg); }
+.dg-fe-row.is-sel { background: var(--dg-selection-inactive-bg); color: var(--dg-selection-fg); }
+.dg-fe-list:focus-within .dg-fe-row.is-sel { background: var(--dg-selection-bg); box-shadow: inset var(--dg-focus-width) 0 0 var(--dg-selection-edge); }
+.dg-fe-list { padding: 0 6px; }
+.dg-fe-list .dg-vlist-row { left: 6px; right: 6px; }
+.dg-fe-hit { padding-left: 28px; }
+.dg-fe-line {
+  flex: none; min-width: 28px; text-align: right; color: var(--dg-text-secondary); font-family: var(--dg-font-mono);
+  font-size: var(--dg-font-size-mono); font-variant-numeric: tabular-nums;
+}
+.dg-fe-text {
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: pre; font-family: var(--dg-font-mono); font-size: var(--dg-font-size-mono);
+  color: var(--dg-text);
+}
+.dg-fe-match { color: var(--dg-match-fg); background: var(--dg-accent-wash); border-radius: 2px; font-weight: var(--dg-weight-semibold); }
+
+/* ---- main column: editor tabs */
+.dg-fe-main { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.dg-fe-tabs { min-width: 0; overflow-x: auto; overflow-y: hidden; }
+.dg-fe-tab { flex: none; max-width: 240px; min-width: 0; padding: 0 4px 0 10px; user-select: none; cursor: default; }
+.dg-fe-tab:focus-visible { outline: 0; box-shadow: inset 0 0 0 var(--dg-focus-width) var(--dg-focus-ring); }
+.dg-fe-tab-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.dg-fe-tab-hint { color: var(--dg-text-secondary); font-size: var(--dg-font-size-medium); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.dg-fe-tab .dg-fe-dot {
+  display: none; flex: none; width: 16px; height: 16px; line-height: 16px; text-align: center; color: var(--dg-dirty-dot); font-size: var(--dg-font-size-small);
+}
+.dg-fe-tab.is-dirty .dg-fe-dot { display: inline-block; }
+.dg-fe-tab.is-dirty:hover .dg-fe-dot { display: none; }
+.dg-fe-tab .dg-fe-close { display: none; flex: none; }
+.dg-fe-tab:hover .dg-fe-close,
+.dg-fe-tab.is-on:not(.is-dirty) .dg-fe-close { display: inline-grid; }
+
+.dg-fe-body { flex: 1; min-height: 0; min-width: 0; display: flex; flex-direction: column; position: relative; }
+
+/* ---- editor surface. Copied from the merge window (`merge.css`). */
+.dg-fe-editor { flex: 1; min-height: 0; min-width: 0; display: flex; flex-direction: column; background: var(--dg-editor-bg); }
+.dg-fe-editor .cm-editor { flex: 1; min-height: 0; background: var(--dg-editor-bg); color: var(--dg-editor-fg); font-family: var(--dg-font-mono); font-size: var(--dg-font-size-mono); outline: 0; }
+.dg-fe-editor .cm-scroller { font-family: inherit; line-height: var(--dg-line-height-code); overflow: auto; overflow-anchor: none; }
+.dg-fe-editor .cm-content { padding: 0; min-height: 100%; caret-color: var(--dg-editor-fg); }
+.dg-fe-editor .cm-line { padding: 0 8px 0 6px; height: var(--dg-line-height-code); white-space: pre; }
+.dg-fe-editor .cm-gutters { background: var(--dg-island-bg); color: var(--dg-editor-line-number); border: 0; border-right: 1px solid var(--dg-island-header-border); font-size: calc(var(--dg-font-size-mono) - 0.5px); }
+.dg-fe-editor .cm-lineNumbers .cm-gutterElement { padding: 0 8px 0 10px; min-width: 36px; line-height: var(--dg-line-height-code); }
+.dg-fe-editor .cm-activeLineGutter { background: transparent; color: var(--dg-editor-line-number-current); }
+.dg-fe-editor .cm-activeLine { background: var(--dg-editor-caret-row); }
+.dg-fe-editor .cm-content ::selection, .dg-fe-editor .cm-line::selection { background: var(--dg-selection-bg); }
+.dg-fe-editor .cm-cursor { border-left-color: var(--dg-editor-fg); }
+.dg-fe-editor .cm-selectionBackground { background: var(--dg-selection-inactive-bg); }
+.dg-fe-editor .cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground { background: var(--dg-selection-bg); }
+.dg-fe-editor .cm-selectionMatch { background: var(--dg-accent-wash-soft); }
+
+/* Syntax colours. They use the same tokens as the diff viewer. The classes come from `syntaxPlugin`. */
+.dg-fe-editor .dg-mg-t-kw { color: var(--dg-editor-keyword); }
+.dg-fe-editor .dg-mg-t-str { color: var(--dg-editor-string); }
+.dg-fe-editor .dg-mg-t-num { color: var(--dg-editor-number); }
+.dg-fe-editor .dg-mg-t-com { color: var(--dg-editor-comment); }
+.dg-fe-editor .dg-mg-t-fn { color: var(--dg-editor-function); }
+.dg-fe-editor .dg-mg-t-type { color: var(--dg-editor-type); }
+.dg-fe-editor .dg-mg-t-field { color: var(--dg-editor-field); }
+.dg-fe-editor .dg-mg-t-meta { color: var(--dg-editor-metadata); }
+
+/* Find panel of the editor (Ctrl+F). It uses the app's inputs and buttons. The replace row is hidden. The editor only finds. */
+.dg-fe-editor .cm-panels { background: var(--dg-island-bg); color: var(--dg-text); }
+.dg-fe-editor .cm-panels-top { border-bottom: 1px solid var(--dg-separator); }
+.dg-fe-editor .cm-panel.cm-search input[name=replace],
+.dg-fe-editor .cm-panel.cm-search button[name=replace],
+.dg-fe-editor .cm-panel.cm-search button[name=replaceAll],
+.dg-fe-editor .cm-panel.cm-search br { display: none; }
+.dg-fe-editor .cm-panel.cm-search { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 30px 6px 8px; font-size: var(--dg-font-size-medium); }
+.dg-fe-editor .cm-panel.cm-search input.cm-textfield {
+  height: var(--dg-control-height); min-width: 200px; box-sizing: border-box; padding: 0 8px; border: 0; border-radius: var(--dg-input-radius);
+  background: var(--dg-input-bg); color: var(--dg-input-fg); box-shadow: inset 0 0 0 1px var(--dg-input-border); outline: 0; font: inherit;
+}
+.dg-fe-editor .cm-panel.cm-search input.cm-textfield:focus { box-shadow: inset 0 0 0 var(--dg-focus-width) var(--dg-input-focus-border); }
+.dg-fe-editor .cm-panel.cm-search input.cm-textfield::placeholder { color: var(--dg-input-placeholder); }
+.dg-fe-editor .cm-panel.cm-search button {
+  height: var(--dg-control-height-small); padding: 0 10px; border: 0; border-radius: var(--dg-input-radius); background: transparent;
+  color: var(--dg-text); box-shadow: inset 0 0 0 1px var(--dg-chip-border); font: inherit; font-size: var(--dg-font-size-medium);
+}
+.dg-fe-editor .cm-panel.cm-search button:hover { background: var(--dg-hover-bg); }
+.dg-fe-editor .cm-panel.cm-search button[name=close] { top: 6px; right: 6px; height: auto; padding: 0 6px; box-shadow: none; font-size: var(--dg-font-size-h4); }
+.dg-fe-editor .cm-panel.cm-search label { display: inline-flex; align-items: center; gap: 4px; color: var(--dg-text-secondary); }
+.dg-fe-editor .cm-panel.cm-search input[type=checkbox] { accent-color: var(--dg-accent-fill); margin: 0; }
+.dg-fe-editor .cm-searchMatch { background: var(--dg-accent-wash); outline: 1px solid var(--dg-accent-border); }
+.dg-fe-editor .cm-searchMatch-selected { background: var(--dg-accent-wash-strong); }
