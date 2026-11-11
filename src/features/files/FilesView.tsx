@@ -80,6 +80,17 @@ function ChangedOnDisk(props: { name: string } & DialogComponentProps<"overwrite
   );
 }
 
+/** True when two loads of one repo hold the same files and the same flags. */
+function sameList(a: RepoData | undefined, b: RepoData): boolean {
+  return (
+    !!a &&
+    a.truncated === b.truncated &&
+    a.error === b.error &&
+    a.files.length === b.files.length &&
+    a.files.every((p, i) => p === b.files[i])
+  );
+}
+
 export function FilesView(): JSX.Element {
   // ---- layout
   const [treeW, setTreeW] = createSignal(loadSplitSize(TREE_KEY, 260));
@@ -104,6 +115,11 @@ export function FilesView(): JSX.Element {
   /** The document as it is on disk. The tab is dirty when its document differs. */
   const saved = new Map<string, Text>();
   const scrolls = new Map<string, number>();
+  /** Tabs with a save in progress. A save request for such a tab runs again after the save ends (see `saveTab`). */
+  const saving = new Set<string>();
+  const saveAgain = new Set<string>();
+  /** Repos that this view saved since the last refresh. Their file lists do not change, so only their status reloads. */
+  const ownSaved = new Set<string>();
   let view: EditorView | undefined;
   let editorEl: HTMLDivElement | undefined;
   let searchApi: SearchApi | undefined;
@@ -144,10 +160,12 @@ export function FilesView(): JSX.Element {
   };
   const statusOf = (repoId: string): RepoStatus => statuses().get(repoId) ?? NO_STATUS;
 
-  /** Runs after each change of the editor on screen. It keeps the state and the dirty flag. */
-  const onUpdate = (u: ViewUpdate): void => {
-    const key = current;
-    if (!key) return;
+  /**
+   * Runs after each change of the editor state of tab `key`. The listener of each state has its own key.
+   * An update of a state that the tab no longer holds does nothing.
+   */
+  const onUpdate = (key: string, u: ViewUpdate): void => {
+    if (states.get(key) !== u.startState) return;
     states.set(key, u.state);
     if (u.docChanged) {
       const d = isDirty(key);
@@ -211,7 +229,7 @@ export function FilesView(): JSX.Element {
       patch(key, { kind: f.tooLarge ? "tooLarge" : "binary", version: "", dirty: false, error: undefined });
       return;
     }
-    const st = createFileState(f.content, t.path, onUpdate, line);
+    const st = createFileState(f.content, t.path, (u) => onUpdate(key, u), line);
     states.set(key, st);
     saved.set(key, st.doc);
     patch(key, { kind: "text", version: f.version, dirty: false, error: undefined });
@@ -259,7 +277,29 @@ export function FilesView(): JSX.Element {
   };
 
   /** Writes the tab to disk. If the file changed on disk, the user chooses: overwrite it, or reload it and drop the edits. */
-  const saveTab = async (key: string, overwrite = false): Promise<void> => {
+  /**
+   * Saves the tab. Only one save runs for a tab at a time. A request during a save marks the tab, and the save runs
+   * again when the first one ends. The second run takes the version that the first one wrote.
+   */
+  const saveTab = async (key: string): Promise<void> => {
+    if (saving.has(key)) {
+      saveAgain.add(key);
+      return;
+    }
+    saving.add(key);
+    try {
+      do {
+        saveAgain.delete(key);
+        await writeTab(key, false);
+      } while (saveAgain.has(key));
+    } finally {
+      saving.delete(key);
+      saveAgain.delete(key);
+    }
+  };
+
+  /** Writes one version of the tab to disk. If the file changed on disk, the user chooses how to go on. */
+  const writeTab = async (key: string, overwrite: boolean): Promise<void> => {
     const t = tabOf(key);
     const st = states.get(key);
     if (!t || !st || t.kind !== "text") return;
@@ -269,6 +309,7 @@ export function FilesView(): JSX.Element {
     const name = splitPath(t.path).name;
     try {
       const version = await api.writeTextFile(t.repoId, t.path, text, overwrite ? null : t.version);
+      ownSaved.add(t.repoId);
       if (!tabOf(key)) return;
       saved.set(key, doc);
       patch(key, { version, dirty: isDirty(key) });
@@ -279,7 +320,7 @@ export function FilesView(): JSX.Element {
         return;
       }
       const choice = await openDialog(ChangedOnDisk, { name });
-      if (choice === "overwrite") await saveTab(key, true);
+      if (choice === "overwrite") await writeTab(key, true);
       else if (choice === "reload") await readInto(key, lineOf(key));
     }
   };
@@ -322,6 +363,8 @@ export function FilesView(): JSX.Element {
     const clean = untrack(tabList).filter((t) => t.kind === "text" && !isDirty(t.key));
     await Promise.all(
       clean.map(async (t) => {
+        // The version before the read. The answer applies only while the tab still shows this version.
+        const before = t.version;
         let f: TextFile;
         try {
           f = await api.readTextFile(t.repoId, t.path);
@@ -329,7 +372,8 @@ export function FilesView(): JSX.Element {
           return; // the file is gone or unreadable: the tab keeps its text
         }
         const now = tabOf(t.key);
-        if (!now || now.kind !== "text" || isDirty(t.key) || now.version === f.version) return;
+        if (!now || now.kind !== "text" || now.version !== before || f.version === before) return;
+        if (saving.has(t.key) || isDirty(t.key)) return;
         applyRead(t.key, f, lineOf(t.key));
       }),
     );
@@ -356,7 +400,11 @@ export function FilesView(): JSX.Element {
   };
 
   let token = 0;
-  const refreshAll = async (): Promise<void> => {
+  /**
+   * Reloads the status of every repo, and the file lists. With `statusOnly`, a repo that this view saved keeps its list:
+   * a save does not add or remove files. A list that did not change keeps its old array, so the tree is not rebuilt.
+   */
+  const refreshAll = async (statusOnly = false): Promise<void> => {
     const my = ++token;
     const repos = untrack(projectRepos);
     if (repos.length === 0) {
@@ -365,12 +413,21 @@ export function FilesView(): JSX.Element {
       setLoaded(true);
       return;
     }
+    const before = untrack(lists);
+    const keep = new Set(statusOnly ? ownSaved : []);
+    ownSaved.clear();
     const [ls, sts] = await Promise.all([
-      Promise.all(repos.map(async (r) => [r.id, await listOne(r.id)] as const)),
+      Promise.all(
+        repos.map(async (r) => {
+          const old = before.get(r.id);
+          return keep.has(r.id) && old ? ([r.id, old] as const) : ([r.id, await listOne(r.id)] as const);
+        }),
+      ),
       Promise.all(repos.map(async (r) => [r.id, await statusOne(r.id)] as const)),
     ]);
     if (my !== token) return;
-    setLists(new Map(ls));
+    const changed = before.size !== ls.length || ls.some(([id, d]) => !sameList(before.get(id), d));
+    if (changed) setLists(new Map(ls));
     setStatuses(new Map(sts));
     setLoaded(true);
     // A project with several repos opens with its repos expanded. This happens once for each set of repos.
@@ -395,7 +452,7 @@ export function FilesView(): JSX.Element {
     shown = true;
     clearTimeout(timer);
     if (first) untrack(() => void refreshAll());
-    else timer = setTimeout(() => void refreshAll(), REFRESH_MS);
+    else timer = setTimeout(() => void refreshAll(true), REFRESH_MS);
   });
   onCleanup(() => clearTimeout(timer));
 

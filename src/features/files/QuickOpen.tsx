@@ -3,7 +3,7 @@
  * It uses the look of Search Everywhere (`features/palette/palette.css`). Enter opens the file.
  * Esc or a click outside the box closes it.
  */
-import { type JSX, For, Show, createEffect, createMemo, createSignal, onMount } from "solid-js";
+import { type JSX, For, Show, createEffect, createMemo, createSignal, onCleanup, onMount } from "solid-js";
 import { Icon, RepoChip, fileIconFor, splitPath } from "../../components/ui";
 import { segments } from "../palette/fuzzy";
 import { rankFiles } from "./model";
@@ -15,6 +15,8 @@ export interface QuickFile {
 }
 
 const MAX_ROWS = 50;
+/** A pause this long after the last key before the list is ranked again. */
+const RANK_DELAY_MS = 80;
 
 /** Renders the text. The matched characters use the match colour. */
 function Hl(props: { text: string; positions: number[] }): JSX.Element {
@@ -26,16 +28,25 @@ function Hl(props: { text: string; positions: number[] }): JSX.Element {
 }
 
 export function QuickOpen(props: { files: () => QuickFile[]; multi: boolean; onPick: (f: QuickFile) => void; onClose: () => void }): JSX.Element {
+  // `query` is the text in the box. `ranked` is the text the list is ranked with: it follows the box after a pause.
   const [query, setQuery] = createSignal("");
+  const [ranked, setRanked] = createSignal("");
   const [sel, setSel] = createSignal(0);
+  let rankTimer: ReturnType<typeof setTimeout> | undefined;
+  onCleanup(() => clearTimeout(rankTimer));
+  const onInput = (text: string): void => {
+    setQuery(text);
+    clearTimeout(rankTimer);
+    rankTimer = setTimeout(() => setRanked(text), RANK_DELAY_MS);
+  };
   let input: HTMLInputElement | undefined;
   let list: HTMLDivElement | undefined;
 
-  const rows = createMemo(() => rankFiles(query(), props.files(), (f) => f.path, MAX_ROWS));
+  const rows = createMemo(() => rankFiles(ranked(), props.files(), (f) => f.path, MAX_ROWS));
 
   // A new query starts at the best row.
   createEffect(() => {
-    query();
+    ranked();
     setSel(0);
     if (list) list.scrollTop = 0;
   });
@@ -100,7 +111,7 @@ export function QuickOpen(props: { files: () => QuickFile[]; multi: boolean; onP
             aria-controls="dg-fe-quick-list"
             placeholder="Type a file name"
             value={query()}
-            onInput={(e) => setQuery(e.currentTarget.value)}
+            onInput={(e) => onInput(e.currentTarget.value)}
           />
         </div>
         <div class="dg-palette-results" id="dg-fe-quick-list" role="listbox" ref={list}>

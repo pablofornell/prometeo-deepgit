@@ -12,6 +12,7 @@ import { EditorSelection, EditorState, type Extension } from "@codemirror/state"
 import { EditorView, type ViewUpdate, drawSelection, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers } from "@codemirror/view";
 import { languageFor } from "../diff/syntax";
 import { syntaxPlugin } from "../merge/editor";
+import { crlfInput } from "./lineEnds";
 import { lineSeparatorOf } from "./model";
 
 /**
@@ -33,7 +34,8 @@ export function createFileState(doc: string, path: string, onUpdate: (u: ViewUpd
     EditorView.updateListener.of(onUpdate),
   ];
   // The CRLF facet keeps the line breaks of the file. `sliceDoc()` then writes them back as they were.
-  if (lineSeparatorOf(doc) === "\r\n") extensions.push(EditorState.lineSeparator.of("\r\n"));
+  // The filter turns LF text (a paste) into CRLF, so that it splits into lines and saves with CRLF.
+  if (lineSeparatorOf(doc) === "\r\n") extensions.push(EditorState.lineSeparator.of("\r\n"), crlfInput);
   const state = EditorState.create({ doc, extensions });
   const n = Math.min(Math.max(1, line), state.doc.lines);
   return state.update({ selection: EditorSelection.cursor(state.doc.line(n).from) }).state;
