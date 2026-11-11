@@ -33,6 +33,7 @@
 .dg-shell-top { flex: 1; min-height: var(--dg-shell-main-min-height); display: flex; min-width: 0; }
 .dg-shell-main-island { flex: 1; min-width: 0; }
 .dg-shell-details { flex: none; }
+.dg-shell-top > .dg-shell-off { display: none; }
 .dg-shell-bottom { flex: none; }
 .dg-shell-slot { display: inline-flex; align-items: center; gap: 2px; }
 .dg-shell-slot[hidden] { display: none; }
