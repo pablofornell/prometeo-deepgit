@@ -31,6 +31,13 @@ export { workspace };
 /** The active project, or undefined when the workspace has none (the app shows `Welcome`). */
 export const activeProject = (): Project | undefined => workspace.projects.find((p) => p.id === workspace.activeProjectId);
 
+/** Orders projects by name: case-insensitive, numbers in numeric order (the same compare as the sidebar), then by path. */
+export const compareProjects = (a: Project, b: Project): number =>
+  a.name.localeCompare(b.name, undefined, { sensitivity: "base", numeric: true }) || a.path.localeCompare(b.path);
+
+/** The projects for every list in the UI (the switcher): sorted by name. `workspace.projects` keeps the order of the workspace file. */
+export const sortedProjects = (): Project[] => [...workspace.projects].sort(compareProjects);
+
 /** Repos of the active project, in sidebar order. */
 export const projectRepos = (): RepoInfo[] => activeProject()?.repos ?? [];
 

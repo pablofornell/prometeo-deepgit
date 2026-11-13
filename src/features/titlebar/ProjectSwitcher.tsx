@@ -4,7 +4,7 @@ import { Icon, initials, openMenu, plural, toast, type MenuItem } from "../../co
 import * as actions from "../../state/actions";
 import { confirmAction } from "../../state/dialogs";
 import { register } from "../../state/keymap";
-import { activeProject, addProject, removeProject, rescanProject, setActiveProject, workspace } from "../../state/workspace";
+import { activeProject, addProject, removeProject, rescanProject, setActiveProject, sortedProjects } from "../../state/workspace";
 import * as api from "../../api/tauri";
 
 export function ProjectSwitcher(): JSX.Element {
@@ -41,7 +41,7 @@ export function ProjectSwitcher(): JSX.Element {
   const items = (): MenuItem[] => {
     const active = activeProject();
     const list: MenuItem[] = [{ label: "Projects", heading: true }];
-    for (const p of workspace.projects) {
+    for (const p of sortedProjects()) {
       list.push({
         label: p.name,
         shortcut: plural(p.repos.length, "repo"),
