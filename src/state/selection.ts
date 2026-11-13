@@ -3,10 +3,11 @@
  * the right column, which tab of that column is open, and which main tab is active.
  *
  *   setSelectedCommit({ repoId, oid });
+ *   jumpToCommit({ repoId, oid });   // select it and pulse its node in the log
  *   selectFile({ repoId, spec: { kind: "commit", oid }, path });
  *   <Show when={selectedFile()}>{(f) => <DiffViewer repoId={f().repoId} spec={f().spec} path={f().path} />}</Show>
  */
-import { createEffect, createRoot, createSignal, on } from "solid-js";
+import { batch, createEffect, createRoot, createSignal, on } from "solid-js";
 import type { DiffSpec, RepoInfo } from "../api/types";
 import { changesCount, changesScope } from "./changesScope";
 import { onActiveProjectChanged, projectRepos, selectedRepoIds, selectedRepos, setFocusedRepoId, summary } from "./workspace";
@@ -25,6 +26,13 @@ export interface SelectedFile {
   oldPath?: string;
 }
 
+/** The commit a jump selected: its graph node pulses. `id` is new for every jump, also to the same commit. */
+export interface CommitJump {
+  repoId: string;
+  oid: string;
+  id: number;
+}
+
 export type MainTab = "log" | "changes" | "files";
 /** Tabs of the right column: "files" = Changed files (commit details), "diff" = File changes (the diff of the selected file). */
 export type DetailsTab = "files" | "diff";
@@ -34,6 +42,8 @@ const [file, setFile] = createSignal<SelectedFile | null>(null);
 const [tab, setTab] = createSignal<MainTab>("log");
 const [changesRepo, setChangesRepo] = createSignal<string | null>(null);
 const [dTab, setDTab] = createSignal<DetailsTab>("files");
+const [target, setTarget] = createSignal<CommitJump | null>(null);
+let jumps = 0;
 
 /** The commit selected in the log (reactive). */
 export const selectedCommit = commit;
@@ -45,6 +55,8 @@ export const mainTab = tab;
 export const changesRepoId = changesRepo;
 /** Active tab of the right column (reactive). */
 export const detailsTab = dTab;
+/** The commit the last jump selected, until the selection moves to another commit (reactive). */
+export const jumpTarget = target;
 
 /**
  * Repos the Local changes view shows (reactive): the single repo picked in the sidebar / the Uncommitted changes row,
@@ -61,6 +73,8 @@ export const changesScopeCount = (): number => changesCount(changesScopeRepos(),
  */
 export function setSelectedCommit(c: SelectedCommit | null): void {
   const prev = commit();
+  const t = target();
+  if (t && !(c && c.repoId === t.repoId && c.oid === t.oid)) setTarget(null);
   if (prev?.repoId === c?.repoId && prev?.oid === c?.oid && prev?.stash?.index === c?.stash?.index) return;
   setCommit(c);
   if (!c && file()?.spec.kind === "commit") {
@@ -68,6 +82,17 @@ export function setSelectedCommit(c: SelectedCommit | null): void {
     setDTab("files");
   }
   if (c) setFocusedRepoId(c.repoId);
+}
+
+/**
+ * Selects a commit like `setSelectedCommit` and marks it as the target of a jump (a branch or tag picked in the
+ * sidebar, `H`): the log scrolls to it and its node pulses. A click or an arrow key in the log does not call this.
+ */
+export function jumpToCommit(c: SelectedCommit): void {
+  batch(() => {
+    setSelectedCommit(c);
+    setTarget({ repoId: c.repoId, oid: c.oid, id: ++jumps });
+  });
 }
 
 /**
@@ -98,6 +123,7 @@ export function setChangesRepoId(repoId: string | null): void {
 /** Clears commit and file selection. */
 export function clearSelection(): void {
   setCommit(null);
+  setTarget(null);
   setFile(null);
   setDTab("files");
 }

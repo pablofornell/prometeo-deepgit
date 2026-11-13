@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 import type { RefLabel } from "../../api/types";
-import { pillBudget, pillWidths, visiblePills } from "./pills";
+import { pillBudget, pillMinWidths, pillSpace, pillWidths, visiblePills } from "./pills";
 
 const local = (name: string, isCurrent = false): RefLabel => ({ kind: "local", name, isCurrent });
 const tag = (name: string): RefLabel => ({ kind: "tag", name, isCurrent: false });
@@ -36,12 +36,52 @@ describe("visiblePills", () => {
     expect(visiblePills([60, 60, 60, 60], 170)).toBe(2);
     expect(visiblePills([150, 150], 50)).toBe(1);
   });
+  it("keeps room for the +N chip (26 px with its gap) and no more", () => {
+    // 60 + 26 fits in 86, not in 85
+    expect(visiblePills([60, 60], 86 - 1)).toBe(1);
+    expect(visiblePills([60, 60, 60], 60 + 4 + 60 + 26)).toBe(2);
+    expect(visiblePills([60, 60, 60], 60 + 4 + 60 + 26 - 1)).toBe(1);
+  });
+  it("shows a pill only when its minimum width fits", () => {
+    // natural 150 + 150 do not fit in 120, but both fit at 40 + 4 + 40 and shrink
+    expect(visiblePills([150, 150], 120, [40, 40])).toBe(2);
+    // three pills: 40 + 4 + 40 + 4 + 40 = 128 > 100: show the pills whose minimum fits with the chip
+    expect(visiblePills([150, 150, 150], 100, [40, 40, 40])).toBe(1);
+    expect(visiblePills([150, 150, 150], 110, [40, 40, 40])).toBe(2);
+  });
+  it("never hides a split HEAD pill that fits at its minimum before a pill behind it", () => {
+    // split HEAD: min 90 (42 + 48). With the chip it needs 116.
+    expect(visiblePills([200, 100, 100], 116, [90, 40, 40])).toBe(1);
+    expect(visiblePills([200, 100, 100], 116 + 44, [90, 40, 40])).toBe(2);
+  });
+});
+
+describe("pillSpace", () => {
+  it("is the budget when the first pill and the chip fit in it", () => {
+    expect(pillSpace(200, [90, 40, 40])).toBe(200);
+  });
+  it("grows to the first pill at its minimum plus the chip when the budget is smaller", () => {
+    expect(pillSpace(60, [90, 40, 40])).toBe(90 + 26);
+    expect(pillSpace(0, [90])).toBe(90);
+    expect(pillSpace(50, [])).toBe(0);
+  });
 });
 
 describe("pillWidths", () => {
   it("merges a local branch with its remote", () => {
     const refs: RefLabel[] = [local("main"), { kind: "remote", name: "origin/main", isCurrent: false }, tag("v1")];
     expect(pillWidths(refs).length).toBe(2);
+  });
+  it("gives the split HEAD pill HEAD + 48 px as minimum and an ordinary pill 40 px", () => {
+    const refs: RefLabel[] = [local("feature/PAY-2318-refunds", true), local("develop"), tag("v1")];
+    expect(pillMinWidths(refs)).toEqual([90, 40, 40]);
+    expect(pillWidths(refs)[0]).toBe(212);
+    expect(pillWidths([local("feature/" + "x".repeat(80), true)])[0]).toBe(220);
+  });
+  it("keeps a plain HEAD pill at its natural width", () => {
+    const refs: RefLabel[] = [{ kind: "head", name: "HEAD", isCurrent: true }, local("develop")];
+    const [w] = pillWidths(refs);
+    expect(pillMinWidths(refs)[0]).toBe(w);
   });
   it("caps long names", () => {
     expect(pillWidths([local("feature/" + "x".repeat(80))])[0]).toBe(150);

@@ -125,10 +125,14 @@
 .dg-log-graph { display: block; overflow: hidden; }
 
 .dg-log-subject { display: flex; align-items: center; gap: 8px; padding-left: 4px !important; }
-.dg-log-subj { overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; min-width: 40px; }
+/* The subject gives way first (large shrink factor), down to 40 px; then the pills shrink. */
+.dg-log-subj { overflow: hidden; text-overflow: ellipsis; flex: 0 1000 auto; min-width: 40px; }
 .dg-log-row.is-head .dg-log-subj { font-weight: var(--dg-weight-semibold); }
 .dg-log-refs { display: inline-flex; flex: 0 1 auto; min-width: 0; overflow: hidden; margin-left: auto; }
-.dg-log-refs .dg-refs, .dg-log-refs .dg-ref:not(.dg-ref-more) { flex: 0 1 auto; min-width: 0; }
+.dg-log-refs .dg-refs { flex: 0 1 auto; min-width: 0; }
+/* Pills shrink with an ellipsis down to 40 px (ITERATION-3 2.2). The plain HEAD pill and "+N" never shrink; the split pill keeps its own rules in ui.css. */
+.dg-log-refs .dg-ref:not(.dg-ref-more):not(.dg-ref-split):not(.dg-ref-head) { flex: 0 1 auto; min-width: calc(40 * var(--dg-u)); }
+.dg-log-refs .dg-ref-split { flex: 0 1 auto; }
 .dg-log-match { background: var(--dg-log-match-bg); color: var(--dg-log-match-fg); border-radius: 2px; }
 .dg-log-repo { display: flex; align-items: center; }
 .dg-log-author { display: flex; align-items: center; gap: 6px; font-size: var(--dg-font-size-medium); color: var(--dg-text-muted); }
@@ -163,6 +167,20 @@
 .dg-log-node.is-normal, .dg-log-node.is-head { stroke: var(--dg-graph-node-stroke); }
 .dg-log-node.is-merge { fill: var(--dg-island-bg); stroke-width: var(--dg-log-edge-width); }
 .dg-log-node-ring { fill: none; stroke-width: var(--dg-log-edge-width); stroke-opacity: 0.35; }
+/* Target of a jump (ITERATION-3 section 3): 4 soft pulses, then a static ring until the selection moves. */
+.dg-log-node-target {
+  fill: none; stroke-width: 2px; transform-box: fill-box; transform-origin: center; stroke-opacity: 0.55; transform: scale(1.15);
+  animation: dg-log-target-pulse var(--dg-dur-pulse) var(--dg-ease-in-out) var(--dg-pulse-cycles) both;
+}
+@keyframes dg-log-target-pulse {
+  0% { stroke-opacity: 0.9; transform: scale(1); }
+  50% { stroke-opacity: 0.2; transform: scale(1.35); }
+  100% { stroke-opacity: 0.9; transform: scale(1); }
+}
+.dg-log-node-target.is-done { animation: none; stroke-opacity: 0.55; transform: scale(1.15); }
+@media (prefers-reduced-motion: reduce) {
+  .dg-log-node-target { animation: none; stroke-opacity: 0.55; transform: scale(1.15); }
+}
 
 /* ---------------------------------------------------------------- loading bar */
 .dg-log-loading { position: absolute; top: 0; left: 0; right: 0; height: 2px; overflow: hidden; z-index: 4; pointer-events: none; }

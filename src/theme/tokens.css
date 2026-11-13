@@ -158,6 +158,8 @@
   --dg-dur-base: 140ms;            /* toast in, banner in, panel collapse */
   --dg-dur-slow: 220ms;            /* palette open, sync matrix cell sweep step */
   --dg-dur-progress-loop: 1200ms;  /* indeterminate progress */
+  --dg-dur-pulse: 2000ms;          /* target node pulse, one cycle */
+  --dg-pulse-cycles: 4;
 }
 
 @media (prefers-reduced-motion: reduce) {
