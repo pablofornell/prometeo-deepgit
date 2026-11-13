@@ -4,8 +4,9 @@ import * as actions from "../../state/actions";
 import { branchColumn } from "../../state/branchTable";
 import { setChangesRepoId, setMainTab } from "../../state/selection";
 import { isRepoFilterActive, projectRepos, repoById, selectAllRepos, selectOnlyRepo, selectedRepoIds, summary, toggleRepo } from "../../state/workspace";
+import { allHidden, hideFolder, showOnly, wouldHideAll } from "./folders";
 import type { SidebarNode } from "./nodes";
-import { stateLabel } from "./nodes";
+import { folderAbsPath, stateLabel } from "./nodes";
 
 type Node<K extends SidebarNode["kind"]> = Extract<SidebarNode, { kind: K }>;
 
@@ -21,6 +22,26 @@ function inAllRepos(name: string): MenuItem[] {
     { separator: true },
     { label: `Checkout ${name} in all ${ids.length} repos that have it`, icon: "matrix", onSelect: () => void actions.checkout(ids, name, { branchOnly: true }) },
     { label: `New branch from ${name} in ${plural(ids.length, "repo")}…`, icon: "newBranch", onSelect: () => void actions.createBranch(ids, name, { startLabel: name }) },
+  ];
+}
+
+/** What the folder menu needs from the sidebar: it owns the collapsed folders. */
+export interface FolderOps {
+  /** Expands (or collapses) the folder and every folder below it. */
+  setAll: (n: Node<"folder">, open: boolean) => void;
+}
+
+function folderMenu(n: Node<"folder">, ops: FolderOps): MenuItem[] {
+  const first = repoById(n.repoIds[0] ?? "");
+  return [
+    { label: `Fetch ${plural(n.repoIds.length, "repository", "repositories")}`, icon: "fetch", onSelect: () => void actions.fetch(n.repoIds) },
+    { label: "Show only these in the log", icon: "eye", onSelect: () => showOnly(n.repoIds) },
+    { label: "Hide from the log", disabled: allHidden(n.repoIds) || wouldHideAll(n.repoIds), onSelect: () => hideFolder(n.repoIds) },
+    { separator: true },
+    { label: "Expand all", icon: "expand", onSelect: () => ops.setAll(n, true) },
+    { label: "Collapse all", icon: "collapse", onSelect: () => ops.setAll(n, false) },
+    { separator: true },
+    { label: "Copy path", icon: "copy", disabled: !first, onSelect: () => first && void copyText(folderAbsPath(n.path, first)) },
   ];
 }
 
@@ -150,8 +171,9 @@ function stashMenu(n: Node<"stash">): MenuItem[] {
 }
 
 /** Menu for a tree node, or an empty list when the node has none. */
-export function nodeMenu(n: SidebarNode): MenuItem[] {
+export function nodeMenu(n: SidebarNode, ops: FolderOps): MenuItem[] {
   switch (n.kind) {
+    case "folder": return folderMenu(n, ops);
     case "repo": return repoMenu(n);
     case "branch": return localBranchMenu(n);
     case "remoteBranch": return remoteBranchMenu(n);
