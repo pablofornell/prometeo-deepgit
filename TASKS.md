@@ -13,14 +13,14 @@
 - [ ] **Open a folder without a Git repo:** No error. Tell the user the folder is not a Git repository and offer to initialize one.
 
 ## 3. Repository tree (sidebar)
-- [ ] **Group by folder:** Repos in the same parent folder show as a nested tree, at all levels.
+- [x] **Group by folder:** Repos in the same parent folder show as a nested tree, at all levels.
 - [x] **Branch context menu:** Add "Copy branch name" to the branch right-click menu in the repository tree.
 - [x] **Double-click on a branch of a different repo:** Switch to that repo and refresh the main commit list.
 - [x] **Pull counters:** After a pull, refresh the per-repo counters in the repository tree.
 
 ## 4. Commit history
-- [ ] **Overlapping chips:** The count chip (`+3`) must not overlap the `HEAD` label.
-- [ ] **Selected commit highlight:** The border of the target commit node pulses slowly (soft glow).
+- [x] **Overlapping chips:** The count chip (`+3`) must not overlap the `HEAD` label.
+- [x] **Selected commit highlight:** The border of the target commit node pulses slowly (soft glow).
 - [x] **Branch dropdown:** After a checkout, the branch dropdown shows the new branch name.
 
 ## 5. Commit view (local changes)
@@ -29,7 +29,7 @@
 
 ## 6. Status bar and notifications
 - [x] **Global pull counter:** Refresh the counter of repos with available pulls after a pull.
-- [ ] **Alert icon:** Alerts are per project, the user can dismiss them, and they expire after a configurable time.
+- [x] **Alert icon:** Alerts are per project, the user can dismiss them, and they expire after a configurable time.
 
 ## 7. Branch matrix
 - [ ] **Bulk push with upstream:** For branches not tracked on the remote, "Push and set upstream" for all selected repos at the same time.
