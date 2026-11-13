@@ -1,12 +1,14 @@
 /**
  * Node model of the sidebar tree (DESIGN.md 5.3) and the pure functions that build and filter it.
- * Repo -> Local / one node per remote / Tags / Stashes / Submodules -> leaves, nested repos after the groups.
+ * Folder -> Repo -> Local / one node per remote / Tags / Stashes / Submodules -> leaves, nested repos after the groups.
  */
 import type { LocalBranch, RemoteBranch, Refs, RepoInfo, RepoSummary, Stash, Submodule, Tag } from "../../api/types";
 
 export type GroupKind = "local" | "tags" | "stashes" | "submodules";
 
 export type SidebarNode =
+  /** Folder of repos (ITERATION-3 1). `path` is relative to the project root; `repoIds` lists every repo below it (all levels). */
+  | { id: string; kind: "folder"; label: string; path: string; repoIds: string[]; children: SidebarNode[] }
   | { id: string; kind: "repo"; repoId: string; label: string; children: SidebarNode[] }
   | { id: string; kind: "group"; repoId: string; label: string; group: GroupKind; count: number; children: SidebarNode[] }
   | { id: string; kind: "remote"; repoId: string; label: string; count: number; children: SidebarNode[] }
@@ -23,6 +25,7 @@ export const LONG_LIST = 8;
 export const HEAD_COUNT = 2;
 
 export const ids = {
+  folder: (path: string) => `dir:${path}`,
   repo: (repoId: string) => `repo:${repoId}`,
   group: (repoId: string, g: GroupKind) => `grp:${repoId}:${g}`,
   remote: (repoId: string, remote: string) => `rem:${repoId}:${remote}`,
@@ -128,6 +131,83 @@ export function nestRepos(repos: readonly RepoInfo[]): { roots: RepoInfo[]; chil
   return { roots, children };
 }
 
+/** A level of the repo tree: a folder that holds 2 or more repos, or a repo (ITERATION-3 1.1). */
+export type RepoGroup =
+  | { kind: "repo"; repo: RepoInfo; label: string }
+  | { kind: "folder"; path: string; label: string; /** top-level repos below, all levels of folders */ count: number; children: RepoGroup[] };
+
+const segments = (name: string) => name.replace(/\\/g, "/").split("/").filter(Boolean);
+/** Case-insensitive, numbers in numeric order. */
+const byName = (a: string, b: string) => a.localeCompare(b, undefined, { sensitivity: "base", numeric: true });
+const groupKey = (g: RepoGroup) => (g.kind === "folder" ? g.path : g.repo.name);
+
+/** Folders first, then repos; each group by name. */
+function sortGroups(list: RepoGroup[]): RepoGroup[] {
+  return list.sort((a, b) => Number(b.kind === "folder") - Number(a.kind === "folder") || byName(a.label, b.label) || byName(groupKey(a), groupKey(b)));
+}
+
+interface Dir {
+  dirs: Map<string, Dir>;
+  repos: RepoInfo[];
+}
+
+/**
+ * Groups repos by their folder, relative to the project root (`RepoInfo.name`). A folder shows only when 2 or more repos
+ * are below it; a folder with one repo gives the repo to its parent. A folder whose only child is a folder merges with it
+ * (`a/b/c`; the id uses the deepest path). Pass the roots of `nestRepos`: nested repos are not grouped.
+ */
+export function groupRepos(roots: readonly RepoInfo[]): RepoGroup[] {
+  const top: Dir = { dirs: new Map(), repos: [] };
+  for (const repo of roots) {
+    const dirs = segments(repo.name).slice(0, -1);
+    let at = top;
+    for (const d of dirs) {
+      let next = at.dirs.get(d);
+      if (!next) at.dirs.set(d, (next = { dirs: new Map(), repos: [] }));
+      at = next;
+    }
+    at.repos.push(repo);
+  }
+
+  const build = (dir: Dir, path: string[]): { items: RepoGroup[]; count: number } => {
+    const items: RepoGroup[] = dir.repos.map((repo) => ({ kind: "repo" as const, repo, label: repoLabel(repo) }));
+    let count = dir.repos.length;
+    for (const [name, sub] of dir.dirs) {
+      const p = [...path, name];
+      const r = build(sub, p);
+      count += r.count;
+      if (r.count < 2) items.push(...r.items);
+      else if (r.items.length === 1 && r.items[0].kind === "folder") items.push({ ...r.items[0], label: `${name}/${r.items[0].label}` });
+      else items.push({ kind: "folder", path: p.join("/"), label: name, count: r.count, children: r.items });
+    }
+    return { items: sortGroups(items), count };
+  };
+  return build(top, []).items;
+}
+
+/** Row label of a repo: its folder name (the last part of the path relative to the project root). */
+export function repoLabel(repo: RepoInfo): string {
+  return segments(repo.name).pop() ?? repo.name;
+}
+
+/** Repos in sidebar order (depth-first, top to bottom). The combined graph orders its lane groups like this. */
+export function sidebarOrder(repos: readonly RepoInfo[]): RepoInfo[] {
+  const { roots, children } = nestRepos(repos);
+  const out: RepoInfo[] = [];
+  const addRepo = (r: RepoInfo) => {
+    out.push(r);
+    for (const c of children.get(r.id) ?? []) addRepo(c);
+  };
+  const walk = (list: readonly RepoGroup[]) => {
+    for (const g of list) {
+      if (g.kind === "folder") walk(g.children);
+      else addRepo(g.repo);
+    }
+  };
+  walk(groupRepos(roots));
+  return out;
+}
+
 /** Builds the tree. Single repo: the repo level is skipped and its groups are the roots. */
 export function buildTree(repos: readonly RepoInfo[], ctx: BuildContext): SidebarNode[] {
   const { roots, children } = nestRepos(repos);
@@ -138,7 +218,13 @@ export function buildTree(repos: readonly RepoInfo[], ctx: BuildContext): Sideba
     const refs = show ? ctx.refsOf(repo.id) : undefined;
     const groups = refs ? buildGroups(repo.id, refs, ctx) : [];
     const kids: SidebarNode[] = refs || nested.length > 0 ? [...groups, ...nested] : [{ id: `loading:${repo.id}`, kind: "loading", repoId: repo.id, label: "Loading…" }];
-    return { id: ids.repo(repo.id), kind: "repo", repoId: repo.id, label: repo.name, children: kids };
+    return { id: ids.repo(repo.id), kind: "repo", repoId: repo.id, label: repoLabel(repo), children: kids };
+  };
+
+  const groupNode = (g: RepoGroup): SidebarNode => {
+    if (g.kind === "repo") return repoNode(g.repo);
+    const kids = g.children.map(groupNode);
+    return { id: ids.folder(g.path), kind: "folder", label: g.label, path: g.path, repoIds: repoIdsBelow(kids), children: kids };
   };
 
   if (repos.length === 1) {
@@ -146,7 +232,52 @@ export function buildTree(repos: readonly RepoInfo[], ctx: BuildContext): Sideba
     const refs = ctx.refsOf(only.id);
     return refs ? buildGroups(only.id, refs, ctx) : [{ id: `loading:${only.id}`, kind: "loading", repoId: only.id, label: "Loading…" }];
   }
-  return roots.map(repoNode);
+  return groupRepos(roots).map(groupNode);
+}
+
+/** Ids of the repos at any level below `nodes` (repo nodes, nested repos too), in tree order. */
+function repoIdsBelow(nodes: readonly SidebarNode[]): string[] {
+  const out: string[] = [];
+  const walk = (list: readonly SidebarNode[]) => {
+    for (const n of list) {
+      if (n.kind === "repo") out.push(n.repoId);
+      if (n.children) walk(n.children);
+    }
+  };
+  walk(nodes);
+  return out;
+}
+
+/** Ids of the folder nodes in `nodes`, at any level, including the nodes themselves. */
+export function folderIds(nodes: readonly SidebarNode[]): string[] {
+  const out: string[] = [];
+  const walk = (list: readonly SidebarNode[]) => {
+    for (const n of list) {
+      if (n.kind === "folder") out.push(n.id);
+      if (n.children) walk(n.children);
+    }
+  };
+  walk(nodes);
+  return out;
+}
+
+/** Absolute path of a folder node, from the path of one repo below it (`repo.name` is relative to the project root). */
+export function folderAbsPath(folderPath: string, repo: RepoInfo): string {
+  const drop = segments(repo.name).length - segments(folderPath).length;
+  const parts = repo.path.split(/[\\/]/);
+  const sep = repo.path.includes("\\") ? "\\" : "/";
+  return parts.slice(0, Math.max(0, parts.length - drop)).join(sep);
+}
+
+/** Worst state of a set of repos: conflict, then dirty, else clean. */
+export function worstDot(repoIds: readonly string[], summaryOf: (repoId: string) => RepoSummary | undefined): RepoDot {
+  let worst: RepoDot = "clean";
+  for (const id of repoIds) {
+    const d = repoDot(summaryOf(id));
+    if (d === "conflict") return d;
+    if (d === "dirty") worst = d;
+  }
+  return worst;
 }
 
 /** Keeps the nodes whose label matches `query` (case-insensitive substring) or that have a matching descendant; only matching descendants stay. */

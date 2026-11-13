@@ -2,11 +2,12 @@
 import { type JSX, Show, createEffect, createMemo, createSignal, on } from "solid-js";
 import {
   AheadBehind, EmptyState, Icon, IconButton, RepoIcon, Tree, createExpanded, initials, openContextMenu, openMenu, plural,
-  type IconName, type MenuItem,
+  type IconName, type MenuItem, type TreeRowInfo,
 } from "../../components/ui";
 import * as actions from "../../state/actions";
 import { formatDate, fullDate } from "../../state/dates";
 import { setSidebarVisible } from "../../state/layout";
+import { loadPersisted, savePersisted } from "../../state/persist";
 import { repoRefs } from "../../state/refs";
 import { changesRepoForNode } from "../../state/changesScope";
 import { selectFile, selectedFile, setChangesRepoId, setDetailsTab, setSelectedCommit } from "../../state/selection";
@@ -14,10 +15,11 @@ import {
   repoById, activeProject, addProject, focusedRepoIdSignal, isRepoFilterActive, projectRepos, rescanProject, selectAllRepos, selectOnlyRepo, selectedRepoIds,
   setFocusedRepoId, summary, toggleRepo,
 } from "../../state/workspace";
+import { allHidden, toggleFolder, showOnly } from "./folders";
 import { nodeMenu } from "./menus";
 import { ProjectNameEditor } from "./ProjectNameEditor";
 import { renamingAfterSwitch } from "./rename";
-import { buildTree, expandableIds, filterTree, ids, repoDot, stateLabel, type SidebarNode } from "./nodes";
+import { buildTree, expandableIds, filterTree, folderIds, ids, repoDot, stateLabel, worstDot, type SidebarNode } from "./nodes";
 import { cssPx } from "../../state/metrics";
 import "./sidebar.css";
 
@@ -64,6 +66,13 @@ export function Sidebar(): JSX.Element {
   const [moreOpen, setMoreOpen] = createSignal<ReadonlySet<string>>(new Set());
   const [selected, setSelected] = createSignal<string | null>(null);
   const [query, setQuery] = createSignal("");
+  /** Folders the user collapsed (ids). Every other folder is open, so a new folder starts open (ITERATION-3 1.4). */
+  const [collapsed, setCollapsedSignal] = createSignal<ReadonlySet<string>>(new Set());
+  const collapsedKey = () => `sidebar.collapsedFolders.${activeProject()?.id ?? "none"}`;
+  const setCollapsed = (next: ReadonlySet<string>) => {
+    setCollapsedSignal(next);
+    savePersisted(collapsedKey(), [...next]);
+  };
 
   const single = () => projectRepos().length === 1;
   const q = () => query().trim().toLowerCase();
@@ -83,6 +92,7 @@ export function Sidebar(): JSX.Element {
         }
         ex.set(open);
         setMoreOpen(new Set<string>());
+        setCollapsedSignal(new Set(loadPersisted<string[]>(collapsedKey(), [])));
         setQuery("");
         setSelected(target ? (repos.length > 1 ? ids.repo(target.id) : null) : null);
       },
@@ -108,10 +118,33 @@ export function Sidebar(): JSX.Element {
     }),
   );
   const roots = createMemo(() => (q() ? filterTree(rawTree(), q()) : rawTree()));
-  const effectiveExpanded = createMemo(() => (q() ? expandableIds(roots()) : expanded()));
+  const allFolderIds = createMemo(() => folderIds(rawTree()));
+  /** The tree gets the open folders next to the open repos and groups. */
+  const effectiveExpanded = createMemo(() => {
+    if (q()) return expandableIds(roots());
+    const open = new Set(expanded());
+    for (const id of allFolderIds()) if (!collapsed().has(id)) open.add(id);
+    return open;
+  });
+
+  /** Opens or closes the folders `fids`; the others keep their state. */
+  const setFoldersOpen = (fids: readonly string[], open: boolean) => {
+    const next = new Set(collapsed());
+    for (const id of fids) {
+      if (open) next.delete(id);
+      else next.add(id);
+    }
+    setCollapsed(next);
+  };
 
   const onExpandedChange = (next: Set<string>) => {
     if (q()) return;
+    // folder ids go to the collapsed set (they stay in the saved list while their folder does not exist)
+    const all = allFolderIds();
+    const nextCollapsed = new Set([...collapsed()].filter((id) => !all.includes(id)));
+    for (const id of all) if (!next.has(id)) nextCollapsed.add(id);
+    if (nextCollapsed.size !== collapsed().size || [...nextCollapsed].some((id) => !collapsed().has(id))) setCollapsed(nextCollapsed);
+    for (const id of all) next.delete(id);
     const cur = expanded();
     for (const id of [...next]) {
       // opening a repo also opens its Local and origin groups
@@ -127,6 +160,8 @@ export function Sidebar(): JSX.Element {
   const select = (n: SidebarNode) => {
     if (n.kind === "loading") return;
     setSelected(n.id);
+    // a folder row only selects: the focused repo stays
+    if (n.kind === "folder") return;
     setFocusedRepoId(n.repoId);
     // Local changes follows a repo row picked here (not its branches, tags or stashes)
     const only = changesRepoForNode(n.kind, n.repoId, projectRepos().length);
@@ -142,6 +177,9 @@ export function Sidebar(): JSX.Element {
 
   const activate = (n: SidebarNode) => {
     switch (n.kind) {
+      case "folder":
+        if (!q()) setFoldersOpen([n.id], collapsed().has(n.id));
+        break;
       case "repo":
         if (projectRepos().length > 1) selectOnlyRepo(n.repoId);
         break;
@@ -231,7 +269,7 @@ export function Sidebar(): JSX.Element {
     const p = activeProject();
     const items: MenuItem[] = [
       { label: "Rename project…", icon: "rename", shortcut: "F2", disabled: !p, onSelect: startRename },
-      { label: "Collapse all", icon: "collapse", onSelect: () => ex.clear() },
+      { label: "Collapse all", icon: "collapse", onSelect: () => { ex.clear(); setFoldersOpen(allFolderIds(), false); } },
       { label: "Show all repositories in the log", icon: "eye", disabled: !isRepoFilterActive(), onSelect: selectAllRepos },
       { separator: true },
       { label: "Rescan project", icon: "refresh", disabled: !p, onSelect: () => p && void rescanProject(p.id) },
@@ -241,8 +279,37 @@ export function Sidebar(): JSX.Element {
     openMenu(anchor, items);
   };
 
-  const renderNode = (n: SidebarNode): JSX.Element => {
+  const renderNode = (n: SidebarNode, info: TreeRowInfo): JSX.Element => {
     switch (n.kind) {
+      case "folder": {
+        const hidden = () => allHidden(n.repoIds);
+        const dot = () => (info.expanded ? "clean" : worstDot(n.repoIds, summary));
+        return (
+          <span class="dg-sidebar-folder" classList={{ "is-filtered": hidden() }}>
+            <button
+              type="button"
+              class="dg-sidebar-sqbtn"
+              tabindex={-1}
+              aria-label={hidden() ? `Show the repositories of ${n.label} in the log` : `Hide the repositories of ${n.label} from the log`}
+              data-tip={hidden() ? "Show in the log (Alt+click: only these repositories)" : "Hide from the log (Alt+click: only these repositories)"}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (e.altKey) showOnly(n.repoIds);
+                else toggleFolder(n.repoIds);
+              }}
+              onDblClick={(e) => e.stopPropagation()}
+            >
+              <Icon name={info.expanded ? "folderOpen" : "folder"} size={14} class="dg-sidebar-icon" />
+            </button>
+            <span class="dg-sidebar-fname" data-tip={n.path}><Hl text={n.label} query={q()} /></span>
+            <span class="dg-sidebar-count">{n.repoIds.length}</span>
+            <span class="dg-grow" />
+            <Show when={dot() !== "clean"}>
+              <span class={`dg-sidebar-dot is-${dot()}`} data-tip={dot() === "conflict" ? "A repository has conflicts or an operation in progress" : "A repository has uncommitted changes"} />
+            </Show>
+          </span>
+        );
+      }
       case "repo": {
         const s = () => summary(n.repoId);
         const hidden = () => !selectedRepoIds().includes(n.repoId);
@@ -265,7 +332,7 @@ export function Sidebar(): JSX.Element {
             >
               <RepoIcon />
             </button>
-            <span class="dg-sidebar-name" data-tip={repo() ? `${n.label}\n${repo()!.path}` : n.label}><Hl text={n.label} query={q()} /></span>
+            <span class="dg-sidebar-name" data-tip={repo() ? `${repo()!.name}\n${repo()!.path}` : n.label}><Hl text={n.label} query={q()} /></span>
             <RepoBranch repoId={n.repoId} query={q()} />
             <AheadBehind ahead={s()?.ahead ?? 0} behind={s()?.behind ?? 0} upstream={s()?.upstream} />
             <span
@@ -427,13 +494,13 @@ export function Sidebar(): JSX.Element {
           onSelect={select}
           onActivate={activate}
           onContextMenu={(n, e) => {
-            const items = nodeMenu(n);
+            const items = nodeMenu(n, { setAll: (f, open) => setFoldersOpen(folderIds([f]), open) });
             if (items.length === 0) return;
             select(n);
             openContextMenu(e, items);
           }}
           ariaLabel="Repositories and branches"
-          renderNode={(n) => renderNode(n)}
+          renderNode={renderNode}
         />
         <Show when={projectRepos().length === 0}>
           <EmptyState icon="repo" title="No repositories">This project has no Git repositories. Rescan it from the menu above.</EmptyState>
