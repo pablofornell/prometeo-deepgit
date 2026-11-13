@@ -795,8 +795,16 @@ export function LogView(): JSX.Element {
             <Show
               when={filtersOn().length > 0}
               fallback={
-                <EmptyState icon="log" title="No commits yet">
-                  {plural(selectedRepoIds().length, "repository", "repositories")} shown. Commits appear here after the first commit.
+                <EmptyState
+                  icon="log"
+                  title="No commits yet"
+                  actions={
+                    <Button variant="primary" shortcut="Alt+0" onClick={() => setMainTab("changes")}>
+                      Open local changes
+                    </Button>
+                  }
+                >
+                  Make the first commit in Local changes.
                 </EmptyState>
               }
             >

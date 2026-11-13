@@ -22,7 +22,7 @@ import type {
   FileChange, FileDiff, GraphRow, LocalBranch, LogQuery, LogSessionInfo, MergeMode, MergeOpts, OpResult, Project, RefLabel, Refs, RepoChanged, RepoInfo,
   RepoSummary, ResetMode, Workspace, WorkingTree,
 } from "./types";
-import { ERR_NO_REPOSITORY, type InitInfo } from "./types";
+import { ERR_BARE_REPOSITORY, ERR_DEEP_REPOSITORY, ERR_INSIDE_GIT_DIR, ERR_NO_REPOSITORY, type InitInfo } from "./types";
 
 type Args = Record<string, unknown>;
 
@@ -129,10 +129,40 @@ const MOCK_DEFAULT_BRANCH = "main";
 /** Folders that `project_init` made repositories. */
 const initializedFolders = new Set<string>();
 /**
- * The mock has no file system: a folder named `empty`, `no-repo*` or `*-docs` (try "IRIS-docs") holds no repository
- * until `project_init` runs on it. Every other path has repositories.
+ * The mock has no file system, so the name of a folder says what it holds:
+ * - `empty`, `no-repo*` or `*-docs` (try "IRIS-docs"): no repository until `project_init` runs on it;
+ * - `*.git`: a bare repository; a path with a `.git` segment: the data folder of a repository;
+ * - `deep-*`: a repository 5 levels down, deeper than the scan looks;
+ * - every other path has repositories.
  */
-const isPlainFolder = (path: string): boolean => !initializedFolders.has(path) && /(^|\/)(empty|no-repo[^/]*|[^/]*-docs)$/i.test(path);
+function folderKind(path: string): "plain" | "bare" | "gitDir" | "deep" | "repo" {
+  if (initializedFolders.has(path)) return "repo";
+  if (/(^|\/)\.git(\/|$)/.test(path)) return "gitDir";
+  if (/\.git$/i.test(path)) return "bare";
+  if (/(^|\/)deep-[^/]*$/i.test(path)) return "deep";
+  if (/(^|\/)(empty|no-repo[^/]*|[^/]*-docs)$/i.test(path)) return "plain";
+  // a folder inside a repository holds no repository of its own (`git init` there makes a nested one)
+  if ([...metas.values()].some((m) => path.startsWith(m.info.path + "/"))) return "plain";
+  return "repo";
+}
+
+const DEEP_MESSAGE = "This folder has Git repositories deeper than DeepGit looks (5 levels). Add the folder that holds them.";
+
+/** The refusals of `check_can_init` in gitcore, in its order (a plain folder passes). */
+function checkCanInit(path: string): void {
+  switch (folderKind(path)) {
+    case "repo":
+      fail(`${path} holds a Git repository already.`);
+    case "bare":
+      failCode(ERR_BARE_REPOSITORY, "This folder is a bare Git repository. DeepGit needs a working folder.");
+    case "gitDir":
+      failCode(ERR_INSIDE_GIT_DIR, "This folder is inside the data folder of a Git repository. DeepGit needs a working folder.");
+    case "deep":
+      failCode(ERR_DEEP_REPOSITORY, DEEP_MESSAGE);
+    case "plain":
+      return;
+  }
+}
 
 const workspace: Workspace = { projects: buildInitialProjects(), activeProjectId: "p-payments", ui: {} };
 
@@ -642,7 +672,9 @@ const handlers: Record<string, Handler> = {
     const name = path.split("/").pop() || "project";
     const existing = workspace.projects.find((p) => p.path === path);
     if (existing) return structuredClone(existing);
-    if (isPlainFolder(path)) failCode(ERR_NO_REPOSITORY, `No Git repository found in ${str(a.path)}`);
+    const kind = folderKind(path);
+    if (kind === "deep") failCode(ERR_DEEP_REPOSITORY, DEEP_MESSAGE);
+    if (kind !== "repo") failCode(ERR_NO_REPOSITORY, `No Git repository found in ${str(a.path)}`);
     const defs: [string, string][] = [[path, name], [`${path}/api`, "api"], [`${path}/web`, "web"]];
     const project: Project = { id: "p-" + hex40(path).slice(0, 8), name: uniqueProjectName(name, workspace.projects), path, repos: [] };
     for (const [p, n] of defs) project.repos.push({ id: repoId(p), name: n, path: p });
@@ -654,6 +686,7 @@ const handlers: Record<string, Handler> = {
   project_init_info: (a) => {
     const path = str(a.path).replace(/\/+$/, "");
     if (!path) fail("Cannot open : No such file or directory (os error 2)");
+    checkCanInit(path);
     // like `git rev-parse --show-toplevel`: the repository that contains the folder, when there is one
     const parent = [...metas.values()].map((m) => m.info.path).filter((p) => path.startsWith(p + "/")).sort((x, y) => y.length - x.length)[0];
     return { path, name: path.split("/").pop() || path, defaultBranch: MOCK_DEFAULT_BRANCH, parentRepo: parent ?? null } satisfies InitInfo;
@@ -661,11 +694,13 @@ const handlers: Record<string, Handler> = {
   project_init: (a, c) => {
     const path = str(a.path).replace(/\/+$/, "");
     const branch = stringArg(a, "branch", "project_init").trim();
-    // the same order of checks as `init_repository` in gitcore
+    // the same order of checks as `init_repository` in gitcore: the folder, then the branch
+    checkCanInit(path);
     if (!branch) fail("Enter a branch name.");
     if (branch.startsWith("-")) fail(`Invalid branch name ${JSON.stringify(branch)}: it cannot start with '-'.`);
-    if (!isPlainFolder(path)) fail(`${str(a.path)} holds a Git repository already.`);
-    if (validateRefName(branch) !== null) fail("This is not a valid branch name.");
+    // eslint-disable-next-line no-control-regex
+    if (/[\u0000\n\r]/.test(branch)) fail(`Invalid branch name ${JSON.stringify(branch)}: it contains a control character.`);
+    if (branch.includes("@{") || branch === "@" || branch === "HEAD" || validateRefName(branch) !== null) fail("This is not a valid branch name.");
     initializedFolders.add(path);
     const info: RepoInfo = { id: repoId(path), name: path.split("/").pop() || "project", path };
     registerRepo(info, { name: info.name, commits: 0, head: branch });

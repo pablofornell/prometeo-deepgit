@@ -112,21 +112,28 @@ export async function removeProject(projectId: string): Promise<void> {
   const sorted = sortedProjects();
   const at = sorted.findIndex((p) => p.id === projectId);
   const next = at < 0 ? undefined : (sorted[at + 1] ?? sorted[at - 1]);
-  await api.projectRemove(projectId);
   const wasActive = workspace.activeProjectId === projectId;
-  setWorkspace(
-    produce((s) => {
-      s.projects = s.projects.filter((p) => p.id !== projectId);
-      if (wasActive) s.activeProjectId = next?.id ?? null;
-    }),
-  );
+  await api.projectRemove(projectId);
+  // The removal is done: the store, the selection and the repo filter follow in one step, before any other await.
+  batch(() => {
+    setWorkspace(
+      produce((s) => {
+        s.projects = s.projects.filter((p) => p.id !== projectId);
+        if (wasActive) s.activeProjectId = next?.id ?? null;
+      }),
+    );
+    if (wasActive) projectSwitched();
+    else restoreRepoFilter();
+  });
   if (wasActive && next) {
-    // the backend chose its own successor and saved it: tell it the sorted one
-    await setActiveProject(next.id);
-    return;
+    // The backend saved its own successor (file order); tell it the sorted one. When this fails the project is removed
+    // all the same and the UI is right, so the failure is not reported as a failed removal.
+    try {
+      await api.projectSetActive(next.id);
+    } catch {
+      /* the next start picks the first project instead */
+    }
   }
-  if (wasActive) projectSwitched();
-  else restoreRepoFilter();
   await refreshSummaries();
 }
 

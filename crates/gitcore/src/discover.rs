@@ -108,6 +108,42 @@ fn walk(
     }
 }
 
+/// How many levels below the folder `find_deep_repo` looks.
+pub const PROBE_DEPTH: usize = 8;
+
+/// `find_deep_repo` stops after this many directory entries, so a huge tree cannot hold it for long.
+const PROBE_MAX_ENTRIES: usize = 20_000;
+
+/// A cheap, bounded search for any `.git` entry below `root`, for a folder where `find_repos` found
+/// nothing: the repository can be deeper than `MAX_DEPTH`, or below a folder the scan skips. It looks
+/// `PROBE_DEPTH` levels down, skips `node_modules` and links, and stops at the first hit. Returns the
+/// levels between `root` and the folder that holds the `.git` entry (1 is a direct subfolder).
+pub fn find_deep_repo(root: &Path) -> Option<usize> {
+    let mut seen = 0;
+    probe(root, 0, &mut seen)
+}
+
+fn probe(dir: &Path, depth: usize, seen: &mut usize) -> Option<usize> {
+    let mut subdirs = Vec::new();
+    for entry in std::fs::read_dir(dir).ok()?.flatten() {
+        *seen += 1;
+        if *seen > PROBE_MAX_ENTRIES {
+            return None;
+        }
+        let name = entry.file_name();
+        if depth > 0 && name == ".git" {
+            return Some(depth);
+        }
+        let Ok(kind) = entry.file_type() else {
+            continue;
+        };
+        if kind.is_dir() && !kind.is_symlink() && name != "node_modules" && depth < PROBE_DEPTH {
+            subdirs.push(entry.path());
+        }
+    }
+    subdirs.iter().find_map(|d| probe(d, depth + 1, seen))
+}
+
 /// Relative path with `/` separators; empty for the root itself.
 fn rel_name(root: &Path, p: &Path) -> String {
     p.strip_prefix(root)

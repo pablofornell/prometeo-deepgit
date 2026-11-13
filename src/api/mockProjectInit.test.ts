@@ -35,6 +35,31 @@ describe("mock commands project_add and project_init on a folder without a repos
     await expect(call("project_add", { path: folder })).rejects.toMatchObject({ code: "noRepository" });
   });
 
+  it("checks the folder before the branch, like init_repository in Rust, and refuses '@{'", async () => {
+    const init = (path: string, branch: unknown) => call("project_init", { path, branch });
+    const ws = await call<Workspace>("workspace_load");
+    // a folder with a repository and an empty branch: the folder error comes first
+    await expect(init(ws.projects[0].path, "")).rejects.toMatchObject({ message: `${ws.projects[0].path} holds a Git repository already.` });
+    await expect(init("/srv/foo.git", "")).rejects.toMatchObject({ code: "bareRepository" });
+    await expect(init(folder, "@{-1}")).rejects.toMatchObject({ message: "This is not a valid branch name." });
+    await expect(init(folder, "a@{b}")).rejects.toMatchObject({ message: "This is not a valid branch name." });
+    await expect(init(folder, "HEAD")).rejects.toMatchObject({ message: "This is not a valid branch name." });
+  });
+
+  it("offers no initialization for a bare repository, a .git folder or a repository that is too deep", async () => {
+    const bare = "Foo.git";
+    await expect(call("project_add", { path: `/srv/${bare}` })).rejects.toMatchObject({ code: "noRepository" });
+    await expect(call("project_init_info", { path: `/srv/${bare}` })).rejects.toMatchObject({
+      code: "bareRepository",
+      message: "This folder is a bare Git repository. DeepGit needs a working folder.",
+    });
+    await expect(call("project_init_info", { path: "/work/app/.git" })).rejects.toMatchObject({ code: "insideGitDir" });
+    const deep = "This folder has Git repositories deeper than DeepGit looks (5 levels). Add the folder that holds them.";
+    await expect(call("project_add", { path: "/work/deep-stuff" })).rejects.toMatchObject({ code: "deepRepository", message: deep });
+    await expect(call("project_init_info", { path: "/work/deep-stuff" })).rejects.toMatchObject({ code: "deepRepository" });
+    await expect(call("project_init", { path: "/work/deep-stuff", branch: "main" })).rejects.toMatchObject({ code: "deepRepository" });
+  });
+
   it("initializes the folder: one empty repository on the branch, and an active project", async () => {
     const before = await call<Workspace>("workspace_load");
     const project = await call<Project>("project_init", { path: folder, branch: " trunk " });

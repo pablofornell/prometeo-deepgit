@@ -139,6 +139,10 @@ impl AppState {
         }
         let project = make_project(&canon);
         if project.repos.is_empty() {
+            // A repository deeper than the scan looks: `git init` here would wrap it, so no offer.
+            if let Some(deep) = gitcore::init::deep_repository_error(&canon) {
+                return Err(deep.into());
+            }
             // The UI offers `git init` for this one (`project_init`), so it tells it by the code.
             return Err(ApiError {
                 code: Some(ERR_NO_REPOSITORY.to_string()),
@@ -157,16 +161,14 @@ impl AppState {
     /// What the "Initialize a Git repository?" dialog shows for the folder at `path`.
     pub fn init_info(&self, path: &str) -> Result<InitInfo, ApiError> {
         let dir = self.folder(path)?;
-        Ok(gitcore::init::init_info(&self.git, &dir))
+        Ok(gitcore::init::init_info(&self.git, &dir)?)
     }
 
     /// Runs `git init` with `branch` in the folder at `path`, then adds the folder as a project (see
-    /// `add_project`). A folder that holds a repository already is refused: nothing is created.
+    /// `add_project`). A folder that holds a repository, is a bare repository or holds one deeper is
+    /// refused, and so is a bad branch: nothing is created (`gitcore::init::init_repository`).
     pub fn init_project(&self, path: &str, branch: &str) -> Result<Project, ApiError> {
         let dir = self.folder(path)?;
-        if !gitcore::discover::find_repos(&dir, gitcore::discover::MAX_DEPTH).is_empty() {
-            return Err(api_error(format!("{path} holds a Git repository already.")));
-        }
         gitcore::init::init_repository(&self.git, &dir, branch)?;
         self.add_project(&dir.to_string_lossy())
     }
@@ -670,6 +672,60 @@ mod tests {
         assert!(st
             .init_info(dir.path().join("nope").to_str().unwrap())
             .is_err());
+    }
+
+    #[test]
+    fn a_folder_with_only_a_deep_or_bare_repository_is_refused_without_an_init_offer() {
+        let dir = tempfile::tempdir().unwrap();
+        let st = state(dir.path());
+
+        // a repository 5 levels down: deeper than the scan looks
+        let deep = dir.path().join("deep");
+        init_repo(&deep.join("a/b/c/d/e"));
+        let err = st.add_project(deep.to_str().unwrap()).unwrap_err();
+        assert_eq!(err.code.as_deref(), Some(gitcore::ERR_DEEP_REPOSITORY));
+        assert_eq!(
+            err.message,
+            "This folder has Git repositories deeper than DeepGit looks (5 levels). Add the folder that holds them."
+        );
+        // no dialog and no `git init` for it either
+        assert_eq!(
+            st.init_info(deep.to_str().unwrap())
+                .unwrap_err()
+                .code
+                .as_deref(),
+            Some(gitcore::ERR_DEEP_REPOSITORY)
+        );
+        assert_eq!(
+            st.init_project(deep.to_str().unwrap(), "main")
+                .unwrap_err()
+                .code
+                .as_deref(),
+            Some(gitcore::ERR_DEEP_REPOSITORY)
+        );
+        assert!(!deep.join(".git").exists());
+        assert!(st.workspace_snapshot().projects.is_empty());
+
+        // a bare repository: `add_project` says "no repository", the dialog is refused
+        let bare = dir.path().join("foo.git");
+        std::fs::create_dir_all(&bare).unwrap();
+        assert!(Command::new("git")
+            .args(["init", "-q", "--bare"])
+            .arg(&bare)
+            .status()
+            .unwrap()
+            .success());
+        let err = st.add_project(bare.to_str().unwrap()).unwrap_err();
+        assert_eq!(err.code.as_deref(), Some(ERR_NO_REPOSITORY));
+        let err = st.init_info(bare.to_str().unwrap()).unwrap_err();
+        assert_eq!(err.code.as_deref(), Some(gitcore::ERR_BARE_REPOSITORY));
+        assert_eq!(
+            err.message,
+            "This folder is a bare Git repository. DeepGit needs a working folder."
+        );
+        let err = st.init_project(bare.to_str().unwrap(), "main").unwrap_err();
+        assert_eq!(err.code.as_deref(), Some(gitcore::ERR_BARE_REPOSITORY));
+        assert!(!bare.join(".git").exists());
     }
 
     #[test]

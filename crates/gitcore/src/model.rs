@@ -602,6 +602,16 @@ pub struct ApiError {
 /// `ApiError::code` of `project_add` when the folder holds no Git repository (not even in a subfolder).
 pub const ERR_NO_REPOSITORY: &str = "noRepository";
 
+/// `ApiError::code` when the folder is a bare repository: it has no working folder to add.
+pub const ERR_BARE_REPOSITORY: &str = "bareRepository";
+
+/// `ApiError::code` when the folder is inside the data folder of a repository (`.git`).
+pub const ERR_INSIDE_GIT_DIR: &str = "insideGitDir";
+
+/// `ApiError::code` when a scan finds no repository in the folder, but there is one deeper (or below
+/// a folder the scan skips). `git init` here would wrap it.
+pub const ERR_DEEP_REPOSITORY: &str = "deepRepository";
+
 /// What the "Initialize a Git repository?" dialog shows about a folder (`project_init_info`).
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
