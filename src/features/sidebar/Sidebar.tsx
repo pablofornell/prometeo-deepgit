@@ -141,6 +141,14 @@ export function Sidebar(): JSX.Element {
   };
 
   const activate = (n: SidebarNode) => {
+    // Double-clicking a ref of another repo also shows that repo in the log.
+    if (
+      (n.kind === "branch" || n.kind === "remoteBranch" || n.kind === "tag" || n.kind === "stash") &&
+      projectRepos().length > 1 &&
+      !(selectedRepoIds().length === 1 && selectedRepoIds()[0] === n.repoId)
+    ) {
+      selectOnlyRepo(n.repoId);
+    }
     switch (n.kind) {
       case "repo":
         if (projectRepos().length > 1) selectOnlyRepo(n.repoId);
