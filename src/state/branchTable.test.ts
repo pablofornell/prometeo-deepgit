@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { Refs } from "../api/types";
 import { buildBranchTable } from "./branchTable";
 
-const b = (name: string, isHead = false, ahead = 0) => ({ name, oid: "a".repeat(40), upstream: null, ahead, behind: 0, isHead, gone: false });
+const b = (name: string, isHead = false, ahead = 0, upstream: string | null = null) => ({ name, oid: "a".repeat(40), upstream, ahead, behind: 0, isHead, gone: false });
 const r = (name: string) => ({ remote: "origin", name, fullName: `origin/${name}`, oid: "a".repeat(40) });
 const refs = (local: Refs["local"], remote: Refs["remote"] = []): Refs => ({ local, remote, tags: [], stashes: [], remotes: [], submodules: [] });
 
@@ -27,6 +27,12 @@ describe("buildBranchTable", () => {
     expect([x.cells.a.state, x.cells.b.state, x.cells.c.state]).toEqual(["current", "remote", "missing"]);
     expect(x.cells.a.ahead).toBe(3);
     expect([x.current, x.local, x.remoteOnly, x.missing]).toEqual([1, 0, 1, 1]);
+  });
+  it("keeps the upstream of local branches and none for the other cells", () => {
+    const t = buildBranchTable(["a", "b"], (id) => ({ a: refs([b("x", false, 0, "origin/x")], [r("x")]), b: refs([b("y", true)], [r("x")]) })[id]);
+    const x = t.find((c) => c.name === "x")!;
+    expect([x.cells.a.upstream, x.cells.b.upstream]).toEqual(["origin/x", null]);
+    expect(t.find((c) => c.name === "y")!.cells.a.upstream).toBeNull();
   });
   it("ignores origin/HEAD and repos without refs", () => {
     const t = buildBranchTable(["a", "z"], (id) => data[id]);

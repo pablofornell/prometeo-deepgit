@@ -22,6 +22,8 @@ export interface BranchCell {
   behind: number;
   /** The upstream was deleted. */
   gone: boolean;
+  /** Upstream of the local branch (`origin/main`); null when it has none, and for cells that are not a local branch. */
+  upstream: string | null;
 }
 
 export interface BranchColumn {
@@ -40,7 +42,8 @@ export interface BranchColumn {
   present: number;
 }
 
-const MISSING: BranchCell = { state: "missing", ahead: 0, behind: 0, gone: false };
+/** The cell of a repo that does not have the branch. */
+export const MISSING_CELL: BranchCell = { state: "missing", ahead: 0, behind: 0, gone: false, upstream: null };
 
 /** Merges the refs of several repos into one column per branch name, most widespread first. */
 export function buildBranchTable(repoIds: readonly string[], refsOf: (repoId: string) => Refs | undefined): BranchColumn[] {
@@ -65,14 +68,14 @@ export function buildBranchTable(repoIds: readonly string[], refsOf: (repoId: st
       const r = perRepo.get(id);
       const b = r?.local.get(name);
       if (b) {
-        cells[id] = { state: b.isHead ? "current" : "local", ahead: b.ahead, behind: b.behind, gone: b.gone };
+        cells[id] = { state: b.isHead ? "current" : "local", ahead: b.ahead, behind: b.behind, gone: b.gone, upstream: b.upstream };
         if (b.isHead) current++;
         else local++;
       } else if (r?.remote.has(name)) {
-        cells[id] = { state: "remote", ahead: 0, behind: 0, gone: false };
+        cells[id] = { state: "remote", ahead: 0, behind: 0, gone: false, upstream: null };
         remoteOnly++;
       } else {
-        cells[id] = MISSING;
+        cells[id] = MISSING_CELL;
         missing++;
       }
     }
