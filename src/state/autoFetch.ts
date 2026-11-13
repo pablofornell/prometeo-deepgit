@@ -3,7 +3,7 @@
  * project in the background, with `--all` and `--prune` (`settings.autoFetchPrune`).
  *
  *   startAutoFetch();                 // once, from App
- *   autoFetchStatus().failing         // repos whose last auto-fetch failed (the status bar shows one quiet indicator)
+ *   autoFetchStatus().failing         // repos whose last auto-fetch failed (the status bar shows them as alerts)
  *
  * Rules (all in `autoFetchCore.ts`, which is pure and tested with fake timers):
  *  - one timer; a project switch or a settings change re-plans it, timers never stack;
@@ -12,10 +12,15 @@
  *  - nothing runs while the window is hidden; on return, overdue repos are fetched at once;
  *  - no toast, no progress activity; the backend tags these fetches `background` in the console entry (hidden unless "Show background commands" is on);
  *  - no login dialog: the backend runs them with `AuthMode::Silent` (`background`), saved credentials only;
- *  - a repo that fails backs off on its own: its interval doubles up to 60 min and resets on its first success.
+ *  - a repo that fails backs off on its own: its interval doubles up to 60 min and resets on its first success;
+ *  - each failed attempt raises one status bar alert in the project of the repo (`state/alerts.ts`); a dismissed alert does not
+ *    come back until the next failed attempt, and the alert goes away by itself when the repo fetches well again;
+ *  - `autoFetchStatus().failing` lists only the repos of the active project.
  */
 import { createEffect, createRoot, createSignal, on, untrack } from "solid-js";
 import * as actions from "./actions";
+import { dismissAutoFetchFor, raiseAlert } from "./alerts";
+import { autoFetchAlertText, newAutoFetchFailures } from "./alertsCore";
 import { type AutoFetchStatus, createAutoFetch } from "./autoFetchCore";
 import { lastFetchAt } from "./fetchAge";
 import { isRepoBusy } from "./repoBusy";
@@ -24,7 +29,7 @@ import { activeProject, projectRepos, repoById } from "./workspace";
 
 // ---------------------------------------------------------------- app wiring
 
-const [autoFetchStatus, setAutoFetchStatus] = createSignal<AutoFetchStatus>({ failing: [], nextAt: null, running: false });
+const [autoFetchStatus, setAutoFetchStatus] = createSignal<AutoFetchStatus>({ failing: [], checked: [], nextAt: null, running: false });
 
 /** State of the auto-fetch for the status bar (reactive). */
 export { autoFetchStatus };
@@ -38,6 +43,18 @@ export function autoFetchLine(): string {
   const first = failing[0];
   const name = repoById(first.repoId)?.name ?? first.repoId;
   return `Auto-fetch failed in ${failing.length === 1 ? name : `${failing.length} repositories`}: ${first.message}`;
+}
+
+/** Failure counts that already have an alert, per repo. */
+let reportedFailures = new Map<string, number>();
+
+function raiseFailureAlerts(status: AutoFetchStatus): void {
+  const r = newAutoFetchFailures(reportedFailures, status.failing, status.checked);
+  reportedFailures = r.reported;
+  // the alert goes to the project of the repo, not to the one that is active when the fetch ends
+  for (const f of r.raise) raiseAlert({ severity: "warning", text: autoFetchAlertText(f.message), repoId: f.repoId, source: "autoFetch" });
+  // a repo that fetches well again no longer needs its alert
+  if (r.recovered.length > 0) dismissAutoFetchFor(r.recovered);
 }
 
 let started = false;
@@ -58,7 +75,10 @@ export function startAutoFetch(): void {
       const r = await actions.fetch(ids, { prune, silent: true, background: true });
       return { ok: r.ok, failed: r.failed.map((f) => ({ repoId: f.repoId, message: f.error.message })) };
     },
-    onStatus: setAutoFetchStatus,
+    onStatus: (status) => {
+      setAutoFetchStatus(status);
+      raiseFailureAlerts(status);
+    },
   });
   createRoot(() => {
     // a new project, a changed interval or a changed repo list plans the timer again

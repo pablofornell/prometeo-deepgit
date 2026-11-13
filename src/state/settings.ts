@@ -19,6 +19,7 @@ import {
   UI_SCALE_DEFAULT, appearanceVars, sanitizeEditorFontSize, sanitizeFontSize, sanitizeUiScale, stepUiScale,
   FONT_SIZE_DEFAULT,
 } from "./appearance";
+import { ALERT_EXPIRY_CHOICES, ALERT_EXPIRY_DEFAULT } from "./alertsCore";
 import type { DateFormat } from "./dateFormat";
 import { bumpAppearance } from "./metrics";
 import { loadPersisted, removePersisted, savePersisted } from "./persist";
@@ -29,6 +30,9 @@ export type DiffMode = "sideBySide" | "unified";
 
 /** Periods the auto-fetch can have, in minutes (0 = off). */
 export const AUTO_FETCH_CHOICES = [0, 5, 15, 30, 60] as const;
+
+/** Hours that a status bar alert can live before it is removed (0 = never), in the order of the Settings control. */
+export { ALERT_EXPIRY_CHOICES };
 
 export interface Settings {
   theme: ThemePref;
@@ -51,6 +55,8 @@ export interface Settings {
   comfortableRows: boolean;
   /** Show background git commands (status, log, ...) in the console. */
   showBackgroundCommands: boolean;
+  /** Status bar alerts are removed after this many hours; 0 = never (`state/alerts.ts`). */
+  alertExpiryHours: number;
   /** UI font size in px, 10..20. All text sizes and the heights that depend on text derive from it. */
   fontSize: number;
   /** Mono font size (diff, console, hashes) in px, 10..20; `null` follows `fontSize`. */
@@ -79,6 +85,7 @@ export const SETTING_DEFAULTS: Readonly<Settings> = {
   showGraph: true,
   comfortableRows: false,
   showBackgroundCommands: false,
+  alertExpiryHours: ALERT_EXPIRY_DEFAULT,
   fontSize: FONT_SIZE_DEFAULT,
   editorFontSize: null,
   uiScale: UI_SCALE_DEFAULT,
@@ -103,6 +110,7 @@ export const SANITIZERS: { [K in keyof Settings]: (v: unknown) => Settings[K] } 
   showGraph: (v) => (typeof v === "boolean" ? v : SETTING_DEFAULTS.showGraph),
   comfortableRows: (v) => (typeof v === "boolean" ? v : SETTING_DEFAULTS.comfortableRows),
   showBackgroundCommands: (v) => (typeof v === "boolean" ? v : SETTING_DEFAULTS.showBackgroundCommands),
+  alertExpiryHours: (v) => ((ALERT_EXPIRY_CHOICES as readonly number[]).includes(v as number) ? (v as number) : SETTING_DEFAULTS.alertExpiryHours),
   fontSize: sanitizeFontSize,
   editorFontSize: sanitizeEditorFontSize,
   uiScale: sanitizeUiScale,

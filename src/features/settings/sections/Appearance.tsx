@@ -1,12 +1,13 @@
-/** Appearance: theme, text and editor sizes, page zoom, row density, date format. */
+/** Appearance: theme, text and editor sizes, page zoom, row density, date format, how long alerts stay. */
 import { type JSX } from "solid-js";
-import { Checkbox, SegmentedControl, THEME_ICONS } from "../../../components/ui";
+import { Checkbox, SegmentedControl, Select, THEME_ICONS } from "../../../components/ui";
 import {
   EDITOR_FONT_SIZE_DEFAULT, FONT_SIZE_MAX, FONT_SIZE_MIN, UI_SCALE_MAX, UI_SCALE_MIN, UI_SCALE_STEP, effectiveEditorFontSize,
 } from "../../../state/appearance";
+import { alertExpiryLabel } from "../../../state/alertsCore";
 import { dateExample, formatDate } from "../../../state/dates";
 import { formatKeys } from "../../../state/keymap";
-import { type DateFormat, type ThemePref, resetSettings, setSetting, settings } from "../../../state/settings";
+import { ALERT_EXPIRY_CHOICES, type DateFormat, type ThemePref, resetSettings, setSetting, settings } from "../../../state/settings";
 import { registerSettingsSection } from "../registry";
 import { type Choice, ChoiceList, Row, Section, SizeControl } from "../widgets";
 
@@ -21,6 +22,7 @@ const DATES: Choice<DateFormat>[] = [
   { value: "absolute", label: "Absolute", example: () => dateExample("absolute") },
   { value: "iso", label: "ISO", example: () => dateExample("iso") },
 ];
+const ALERT_EXPIRIES = ALERT_EXPIRY_CHOICES.map((h) => ({ value: String(h), label: alertExpiryLabel(h) }));
 /** Times of the two preview commits, before now. */
 const PREVIEW_AGO = [4 * 60, 26 * 3600];
 
@@ -104,6 +106,17 @@ function AppearanceSection(): JSX.Element {
           <ChoiceList label="Date format" value={settings.dateFormat} options={DATES} onChange={(v) => setSetting("dateFormat", v)} />
         </Row>
       </Section>
+
+      <Section title="Notifications">
+        <Row label="Remove alerts after" hint="Warnings and errors that wait in the status bar. You can dismiss them at any time.">
+          <Select
+            ariaLabel="Remove alerts after"
+            value={String(settings.alertExpiryHours)}
+            options={ALERT_EXPIRIES}
+            onChange={(v) => setSetting("alertExpiryHours", Number(v))}
+          />
+        </Row>
+      </Section>
     </>
   );
 }
@@ -113,7 +126,7 @@ registerSettingsSection({
   title: "Appearance",
   order: 10,
   icon: "palette",
-  keywords: ["theme", "dark", "light", "font", "size", "zoom", "scale", "text", "editor", "rows", "density", "date", "eyes", "bigger"],
+  keywords: ["theme", "dark", "light", "font", "size", "zoom", "scale", "text", "editor", "rows", "density", "date", "eyes", "bigger", "notifications", "alerts", "expire"],
   component: AppearanceSection,
-  reset: () => resetSettings(["theme", "fontSize", "editorFontSize", "uiScale", "comfortableRows", "dateFormat"]),
+  reset: () => resetSettings(["theme", "fontSize", "editorFontSize", "uiScale", "comfortableRows", "dateFormat", "alertExpiryHours"]),
 });

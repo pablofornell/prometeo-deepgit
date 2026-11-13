@@ -228,6 +228,21 @@ describe("auto-fetch scheduler", () => {
     sched.stop();
   });
 
+  it("lists only the failures of the active project's repos, and brings the others back on return", async () => {
+    const { h, sched } = harness({ repos: ["a", "b"] });
+    h.outcome = (ids) => ({ ok: [], failed: ids.map((repoId) => ({ repoId, message: "auth" })) });
+    sched.reschedule();
+    await advance(START_DELAY_MS);
+    expect(sched.status().failing.map((f) => f.repoId)).toEqual(["a", "b"]);
+    expect(sched.status().checked).toEqual(["a", "b"]);
+    h.repos = ["x"]; // another project
+    expect(sched.status().failing).toEqual([]);
+    expect(sched.status().checked).toEqual(["x"]);
+    h.repos = ["b", "c"];
+    expect(sched.status().failing.map((f) => f.repoId)).toEqual(["b"]);
+    sched.stop();
+  });
+
   it("reports the next run", async () => {
     const { sched } = harness();
     const seen: (number | null)[] = [];

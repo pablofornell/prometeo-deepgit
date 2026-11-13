@@ -137,6 +137,23 @@ describe("settings store", () => {
     expect([settings.autoFetchMinutes, settings.autoFetchPrune, settings.commitSignOff, settings.useCredentialStore]).toEqual([15, true, false, true]);
   });
 
+  it("validates the alert expiry (the choices only, default 24 hours) and 'Reset all' puts it back", async () => {
+    const { settings, setSetting, resetSettings, SETTING_DEFAULTS, ALERT_EXPIRY_CHOICES } = await load();
+    expect(SETTING_DEFAULTS.alertExpiryHours).toBe(24);
+    expect([...ALERT_EXPIRY_CHOICES]).toEqual([1, 4, 24, 72, 168, 0]);
+    setSetting("alertExpiryHours", 168);
+    expect(settings.alertExpiryHours).toBe(168);
+    expect(storage.get("deepgit.ui.alertExpiryHours")).toBe("168");
+    setSetting("alertExpiryHours", 0);
+    expect(settings.alertExpiryHours).toBe(0); // never
+    setSetting("alertExpiryHours", 5 as never);
+    expect(settings.alertExpiryHours).toBe(24);
+    setSetting("alertExpiryHours", 4);
+    resetSettings(["alertExpiryHours"]);
+    expect(settings.alertExpiryHours).toBe(24);
+    expect(storage.has("deepgit.ui.alertExpiryHours")).toBe(false);
+  });
+
   it("uses the webview zoom instead of CSS zoom in the desktop app", async () => {
     vi.stubGlobal("window", { __TAURI_INTERNALS__: {} });
     const { setSetting } = await load();

@@ -20,6 +20,7 @@ import * as api from "../api/tauri";
 import type { CloneOpts, CloneProgress, CloneResult, ConflictSide, ExpectedOids, HunkOpts, OpResult } from "../api/types";
 import { joinNames, plural, toast, type ToastAction } from "../components/ui";
 import { beginActivity } from "./activity";
+import { dismissAutoFetchFor } from "./alerts";
 import { confirmAction, showDialog, type PushResult } from "./dialogs";
 import { notifyRepoChanged } from "./events";
 import { openBottomTool } from "./layout";
@@ -549,6 +550,16 @@ export interface FetchOptions {
 /** Fetches the given repos (all remotes unless `opts.remote`). */
 export function fetch(repoIds: RepoIds, opts: FetchOptions = {}): Promise<BatchResult> {
   const ids = toIds(repoIds);
+  return fetchBatch(ids, opts).then(fetched);
+}
+
+/** A repo that fetched or pulled well has no auto-fetch failure any more: its alert goes away. */
+function fetched(r: BatchResult): BatchResult {
+  dismissAutoFetchFor(r.ok);
+  return r;
+}
+
+function fetchBatch(ids: string[], opts: FetchOptions): Promise<BatchResult> {
   return runBatch({
     verb: "fetch",
     past: "Fetched",
@@ -568,6 +579,10 @@ export function fetchAll(opts: Omit<FetchOptions, "remote"> = {}): Promise<Batch
 
 /** Pulls the current branch of each repo (merge, or rebase with `opts.rebase`). Repos without an upstream are skipped. */
 export function pull(repoIds: RepoIds, opts: { rebase?: boolean } = {}): Promise<BatchResult> {
+  return pullBatch(repoIds, opts).then(fetched);
+}
+
+function pullBatch(repoIds: RepoIds, opts: { rebase?: boolean }): Promise<BatchResult> {
   return runBatch({
     verb: "pull",
     past: "Pulled",

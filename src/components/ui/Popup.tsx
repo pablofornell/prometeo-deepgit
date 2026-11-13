@@ -3,7 +3,7 @@ import { Portal } from "solid-js/web";
 import { trackOverlay } from "../../state/keymap";
 import { closeWhenDialogOpens } from "../../state/overlays";
 
-export type PopupPlacement = "bottom-start" | "bottom-end" | "top-start" | "right-start";
+export type PopupPlacement = "bottom-start" | "bottom-end" | "top-start" | "top-end" | "right-start";
 
 type AnchorLike = HTMLElement | null | undefined;
 
@@ -46,9 +46,9 @@ export function Popup(props: PopupProps): JSX.Element {
     const pr = box.getBoundingClientRect();
     const gap = props.offset ?? 4;
     const placement = props.placement ?? "bottom-start";
-    let left = placement === "bottom-end" ? ar.right - pr.width : placement === "right-start" ? ar.right + gap : ar.left;
-    let top = placement === "top-start" ? ar.top - pr.height - gap : placement === "right-start" ? ar.top : ar.bottom + gap;
-    if (placement !== "top-start" && top + pr.height > window.innerHeight - 6 && ar.top - pr.height - gap > 6) top = ar.top - pr.height - gap;
+    let left = placement === "bottom-end" || placement === "top-end" ? ar.right - pr.width : placement === "right-start" ? ar.right + gap : ar.left;
+    let top = placement === "top-start" || placement === "top-end" ? ar.top - pr.height - gap : placement === "right-start" ? ar.top : ar.bottom + gap;
+    if (placement !== "top-start" && placement !== "top-end" && top + pr.height > window.innerHeight - 6 && ar.top - pr.height - gap > 6) top = ar.top - pr.height - gap;
     left = Math.min(Math.max(6, left), Math.max(6, window.innerWidth - pr.width - 6));
     top = Math.min(Math.max(6, top), Math.max(6, window.innerHeight - pr.height - 6));
     setPos({ left, top, minWidth: props.matchWidth ? ar.width : undefined });
