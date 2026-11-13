@@ -32,7 +32,7 @@ export const AUTO_FETCH_CHOICES = [0, 5, 15, 30, 60] as const;
 
 export interface Settings {
   theme: ThemePref;
-  /** How every date of the UI is written (`state/dates.ts`): "3 h ago", "10 Nov 2026, 14:32" (the user's locale) or "2026-11-10 14:32". */
+  /** How every date of the UI is written (`state/dates.ts`): "3 h ago" or "10-11-2026 14:32" (dd-mm-yyyy). */
   dateFormat: DateFormat;
   diffMode: DiffMode;
   /** Scroll long diff lines by the pointer position near the pane edges (`features/diff/pointerScroll.ts`). */
@@ -68,7 +68,7 @@ export interface Settings {
 
 export const SETTING_DEFAULTS: Readonly<Settings> = {
   theme: "dark",
-  dateFormat: "iso",
+  dateFormat: "absolute",
   diffMode: "sideBySide",
   diffPointerScroll: true,
   // ---- auto-fetch and commit sign-off
@@ -94,7 +94,8 @@ const oneOf =
 /** One validator per key: returns a valid value for any input. */
 export const SANITIZERS: { [K in keyof Settings]: (v: unknown) => Settings[K] } = {
   theme: oneOf<ThemePref>("dark", "light", "system")(SETTING_DEFAULTS.theme),
-  dateFormat: oneOf<DateFormat>("relative", "absolute", "iso")(SETTING_DEFAULTS.dateFormat),
+  // "iso" was a format of an earlier version: it is now the absolute one (dd-mm-yyyy)
+  dateFormat: (v) => oneOf<DateFormat>("relative", "absolute")(SETTING_DEFAULTS.dateFormat)(v === "iso" ? "absolute" : v),
   diffMode: oneOf<DiffMode>("sideBySide", "unified")(SETTING_DEFAULTS.diffMode),
   diffPointerScroll: (v) => (typeof v === "boolean" ? v : SETTING_DEFAULTS.diffPointerScroll),
   autoFetchMinutes: (v) => ((AUTO_FETCH_CHOICES as readonly number[]).includes(v as number) ? (v as number) : SETTING_DEFAULTS.autoFetchMinutes),

@@ -52,7 +52,13 @@ describe("settings store", () => {
     expect(settings.editorFontSize).toBe(10);
     expect(settings.theme).toBe("dark");
     expect(settings.showGraph).toBe(true);
-    expect(settings.dateFormat).toBe("iso");
+    expect(settings.dateFormat).toBe("absolute");
+  });
+
+  it("maps the removed ISO date format to the absolute one", async () => {
+    storage.set("deepgit.ui.dateFormat", '"iso"');
+    const { settings } = await load();
+    expect(settings.dateFormat).toBe("absolute");
   });
 
   it("diff pointer scrolling is on by default, and a stored garbage value falls back to on", async () => {

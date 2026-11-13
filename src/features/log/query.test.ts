@@ -16,6 +16,12 @@ describe("parseTextFilter", () => {
     expect(p.before).toBe(parseDay("2026-11-01"));
   });
 
+  it("reads a day as dd-mm-yyyy or yyyy-mm-dd", () => {
+    expect(parseDay("01-10-2026")).toBe(parseDay("2026-10-01"));
+    expect(parseDay("01-10-2026")).toBe(new Date(2026, 9, 1).getTime() / 1000);
+    expect(parseDay("1/10/2026")).toBeNull();
+  });
+
   it("leaves an invalid date in the text", () => {
     expect(parseTextFilter("after:soon x")).toEqual({ text: "after:soon x" });
   });
@@ -41,7 +47,12 @@ describe("labels", () => {
     expect(presetSince("7d", now)).toBe(now / 1000 - 7 * 86400);
     expect(dateChipLabel(null, null, null)).toBe("Date");
     expect(dateChipLabel("7d", 1, null)).toBe("Last 7 days");
-    expect(dateChipLabel("custom", parseDay("2026-11-03"), parseDay("2026-11-09"))).toBe("3 Nov - 9 Nov");
+    expect(dateChipLabel("custom", parseDay("2026-11-03"), parseDay("2026-11-09"))).toBe("03-11-2026 - 09-11-2026");
+  });
+
+  it("labels an open range", () => {
+    expect(dateChipLabel("custom", parseDay("03-11-2026"), null)).toBe("Since 03-11-2026");
+    expect(dateChipLabel("custom", null, parseDay("09-11-2026"))).toBe("Until 09-11-2026");
   });
 
   it("names the branch chip", () => {

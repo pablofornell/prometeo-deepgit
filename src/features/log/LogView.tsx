@@ -112,7 +112,7 @@ export function LogView(): JSX.Element {
 
   /**
    * Columns that are off: chosen by the user, or dropped (hash, author, date, repository) to keep the subject at 200 px.
-   * An automatic graph first gives up a quarter of its width, so a wider date format ("2026-11-10 14:32") does not
+   * An automatic graph first gives up a quarter of its width, so a wider date format ("10-11-2026 14:32") does not
    * drop the date column for a few pixels.
    */
   const hiddenCols = createMemo(() => {
@@ -165,7 +165,7 @@ export function LogView(): JSX.Element {
 
   const map = createMemo(() => {
     const sc = ctl.scan();
-    // the group names follow the date format ("October 2026" or "2026-10")
+    // the group names follow the date format ("October 2026")
     const format = settings.dateFormat;
     const labels = format === "relative" ? sc.groupLabels : sc.groupKeys.map((k) => dateGroupLabel(k, format));
     return new DisplayMap(ctl.total(), wip() !== null, sc.groupStarts, labels);

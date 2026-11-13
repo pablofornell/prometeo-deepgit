@@ -28,14 +28,14 @@ describe("dateGroupLabel", () => {
     expect(dateGroupLabel("today", "relative", NOW)).toBe("Today");
     expect(dateGroupLabel("2026-9", "relative", NOW)).toBe("October 2026");
   });
-  it("adds the day to Today and Yesterday and writes months in the format", () => {
-    expect(dateGroupLabel("today", "iso", NOW)).toBe("Today, 2026-11-12");
-    expect(dateGroupLabel("yesterday", "absolute", NOW, "en-GB")).toBe("Yesterday, 11 Nov 2026");
-    expect(dateGroupLabel("2026-9", "iso", NOW)).toBe("2026-10");
-    expect(dateGroupLabel("2025-8", "absolute", NOW, "en-GB")).toBe("September 2025");
+  it("adds the day (dd-mm-yyyy) to Today and Yesterday in the absolute format", () => {
+    expect(dateGroupLabel("today", "absolute", NOW)).toBe("Today, 12-11-2026");
+    expect(dateGroupLabel("yesterday", "absolute", NOW)).toBe("Yesterday, 11-11-2026");
+    expect(dateGroupLabel("2026-9", "absolute", NOW)).toBe("October 2026");
+    expect(dateGroupLabel("2025-8", "absolute", NOW)).toBe("September 2025");
   });
   it("keeps the ranges as words", () => {
-    for (const f of ["relative", "absolute", "iso"] as const) {
+    for (const f of ["relative", "absolute"] as const) {
       expect([dateGroupLabel("week", f, NOW), dateGroupLabel("lastweek", f, NOW), dateGroupLabel("month", f, NOW)]).toEqual(["This week", "Last week", "Earlier this month"]);
     }
   });

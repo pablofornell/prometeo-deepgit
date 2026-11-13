@@ -188,10 +188,10 @@ You can type these prefixes in the text box:
 
 - `author:name`
 - `path:src/refunds`
-- `after:2026-10-01`
-- `before:2026-11-01`
+- `after:01-10-2026`
+- `before:01-11-2026`
 
-Dates use the form `YYYY-MM-DD`. Use quotes for values that contain spaces, for example `author:"Lucía Martín"`.
+Dates use the form `DD-MM-YYYY` (`YYYY-MM-DD` also works). Use quotes for values that contain spaces, for example `author:"Lucía Martín"`.
 
 When a filter is on, its chip is highlighted. Click the **x** on a chip to clear it.
 Press `Ctrl+Shift+F` to clear all filters, including the repository filter.
@@ -786,7 +786,7 @@ Every change applies **at once**. There is no OK button. Press `Esc` or click **
 | **Editor font size** | 10 to 20 px. Diff, console and commit hashes. By default it follows the font size. Clear **Follow the font size** to choose a value. |
 | **UI scale** | 80% to 200% in steps of 10%, default 100%. Zooms the whole window. |
 | **Comfortable rows** | Taller rows in the log |
-| **Date format** | Relative (3 h ago), Absolute (10 Nov 2026, 14:32, in the order and words of your language) or ISO (2026-11-10 14:32). Each choice shows the time 3 hours ago in that format. It applies at once to every date: the log and its date groups, the commit details, the stashes, the notifications and the last commit of **Changes**. Hover a date to see the full date and time. |
+| **Date format** | Relative (3 h ago) or Absolute (dd-mm-yyyy, for example 10-11-2026 14:32). Each choice shows the time 3 hours ago in that format. It applies at once to every date: the log and its date groups, the commit details, the stashes, the notifications and the last commit of **Changes**. Hover a date to see the full date and time. |
 
 The preview under **UI scale** shows the sizes you choose.
 

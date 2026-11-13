@@ -34,14 +34,13 @@ export function dateGroup(unixSec: number, nowMs: number = Date.now()): DateGrou
 
 /**
  * Label of a group key in the user's date format (`settings.dateFormat`). The groups are the same in every format;
- * the text follows it: a month is "October 2026" or "2026-10", and the absolute formats add the date to the two
- * groups that are one day ("Today, 10 Nov 2026"). "This week", "Last week" and "Earlier this month" are ranges
- * and stay words.
+ * the absolute format adds the date to the two groups that are one day ("Today, 10-11-2026"). A month is "October 2026".
+ * "This week", "Last week" and "Earlier this month" are ranges and stay words.
  */
-export function dateGroupLabel(key: string, format: DateFormat, nowMs: number = Date.now(), locale?: string): string {
+export function dateGroupLabel(key: string, format: DateFormat, nowMs: number = Date.now()): string {
   const now = new Date(nowMs);
   const dayAt = (back: number) => new Date(now.getFullYear(), now.getMonth(), now.getDate() - back, 12).getTime() / 1000;
-  const withDay = (word: string, back: number) => (format === "relative" ? word : `${word}, ${formatDay(format, dayAt(back), locale)}`);
+  const withDay = (word: string, back: number) => (format === "relative" ? word : `${word}, ${formatDay(dayAt(back))}`);
   switch (key) {
     case "today": return withDay("Today", 0);
     case "yesterday": return withDay("Yesterday", 1);
@@ -50,7 +49,7 @@ export function dateGroupLabel(key: string, format: DateFormat, nowMs: number = 
     case "month": return "Earlier this month";
   }
   const m = /^(\d+)-(\d+)$/.exec(key);
-  return m ? formatMonth(format, Number(m[1]), Number(m[2]), locale) : key;
+  return m ? formatMonth(Number(m[1]), Number(m[2])) : key;
 }
 
 export type DisplayItem =
