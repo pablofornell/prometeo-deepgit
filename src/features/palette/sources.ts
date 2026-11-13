@@ -8,8 +8,8 @@ import type { DiffSpec, FileStatus } from "../../api/types";
 import { type IconName, THEME_ICONS, toast } from "../../components/ui";
 import * as actions from "../../state/actions";
 import { bindings, runBinding } from "../../state/keymap";
-import { repoRefs } from "../../state/refs";
-import { selectFile, selectedCommit, setChangesRepoId, setMainTab, setSelectedCommit } from "../../state/selection";
+import { cachedRefs, repoRefs } from "../../state/refs";
+import { jumpToCommit, selectFile, selectedCommit, setChangesRepoId, setMainTab, setSelectedCommit } from "../../state/selection";
 import { resolvedTheme, settings, setSetting } from "../../state/settings";
 import {
   activeProject, addProject, focusedRepo, projectRepos, rescanProject, selectAllRepos, selectOnlyRepo,
@@ -172,6 +172,16 @@ export function activate(item: PaletteItem): void {
     case "branch": {
       const repos = projectRepos().filter((r) => item.repoIds.includes(r.id));
       if (repos.length === 0) return;
+      // The tip of the branch is selected in the log (focused repo first) and its node pulses.
+      const focused = focusedRepo()?.id;
+      for (const r of [...repos].sort((a, b) => Number(b.id === focused) - Number(a.id === focused))) {
+        const refs = cachedRefs(r.id);
+        const oid = item.remote ? refs?.remote.find((b) => b.fullName === item.name)?.oid : refs?.local.find((b) => b.name === item.name)?.oid;
+        if (oid) {
+          jumpToCommit({ repoId: r.id, oid });
+          break;
+        }
+      }
       if (item.remote) {
         const target = repos.find((r) => r.id === focusedRepo()?.id) ?? repos[0];
         void actions.checkoutRemote(target.id, item.name);
@@ -182,7 +192,7 @@ export function activate(item: PaletteItem): void {
     }
     case "commit":
       if (!selectedRepoIds().includes(item.repoId)) toggleRepo(item.repoId);
-      setSelectedCommit({ repoId: item.repoId, oid: item.oid });
+      jumpToCommit({ repoId: item.repoId, oid: item.oid });
       setMainTab("log");
       return;
     case "file":

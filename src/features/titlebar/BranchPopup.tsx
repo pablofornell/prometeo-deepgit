@@ -10,7 +10,8 @@ import { branchTable, setMatrixBranch, type BranchColumn } from "../../state/bra
 import { showDialog } from "../../state/dialogs";
 import { openBottomTool } from "../../state/layout";
 import { loadPersisted, savePersisted } from "../../state/persist";
-import { repoRefs } from "../../state/refs";
+import { cachedRefs, repoRefs } from "../../state/refs";
+import { jumpToCommit } from "../../state/selection";
 import { activeProject, focusedRepo, projectRepos, repoById } from "../../state/workspace";
 
 type Section = "recent" | "local" | "remote" | "tags";
@@ -196,8 +197,23 @@ function PopupBody(props: { onClose: () => void }): JSX.Element {
     savePersisted(recentKey(), next);
   };
 
+  /** Selects the tip of a branch or tag in the log (and pulses its node): the focused repo when it has it, else the first one. */
+  const jumpToTip = (repoIds: string[], name: string) => {
+    const tip = (id: string): string | undefined => {
+      const refs = cachedRefs(id);
+      return refs?.local.find((b) => b.name === name)?.oid ?? refs?.remote.find((b) => b.fullName === name || b.name === name)?.oid ?? refs?.tags.find((t) => t.name === name)?.oid;
+    };
+    const focused = focusedRepo()?.id;
+    const ordered = focused && repoIds.includes(focused) ? [focused, ...repoIds.filter((id) => id !== focused)] : repoIds;
+    for (const id of ordered) {
+      const oid = tip(id);
+      if (oid) return jumpToCommit({ repoId: id, oid });
+    }
+  };
+
   const checkoutBranch = (col: BranchColumn) => {
     const ids = projectRepos().filter((r) => col.cells[r.id]?.state !== "missing").map((r) => r.id);
+    jumpToTip(ids, col.name);
     remember(col.name);
     props.onClose();
     void actions.checkout(ids, col.name, { branchOnly: true });
@@ -217,11 +233,13 @@ function PopupBody(props: { onClose: () => void }): JSX.Element {
         checkoutBranch(row.col);
         break;
       case "repo":
+        jumpToTip([row.repoId], row.col.name);
         remember(row.col.name);
         props.onClose();
         void actions.checkout(row.repoId, row.col.name, { branchOnly: true });
         break;
       case "tag":
+        jumpToTip(row.repoIds, row.name);
         props.onClose();
         void actions.checkout(row.repoIds, row.name);
         break;

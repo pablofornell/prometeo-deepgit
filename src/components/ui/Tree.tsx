@@ -30,6 +30,8 @@ export interface TreeProps<T> {
   selectedId?: string | null;
   /** Row clicked or selected with the keyboard. */
   onSelect?: (node: T, id: string) => void;
+  /** Primary-button click on a row (after `onSelect`). Not called for keyboard moves or right-click. */
+  onRowClick?: (node: T, id: string) => void;
   /** Double-click or Enter. Without it, Enter / double-click toggles folders. */
   onActivate?: (node: T, id: string) => void;
   onContextMenu?: (node: T, e: MouseEvent) => void;
@@ -165,7 +167,10 @@ export function Tree<T>(props: TreeProps<T>): JSX.Element {
                   aria-expanded={row().hasChildren ? isExpanded() : undefined}
                   aria-selected={selected()}
                   style={{ ...props.rowStyle?.(row().node), "padding-left": 4 + row().depth * indent() + "px" }}
-                  onClick={() => props.onSelect?.(row().node, row().id)}
+                  onClick={() => {
+                    props.onSelect?.(row().node, row().id);
+                    props.onRowClick?.(row().node, row().id);
+                  }}
                   onDblClick={() => (props.onActivate ? props.onActivate(row().node, row().id) : toggle())}
                   onContextMenu={(e) => props.onContextMenu?.(row().node, e)}
                 >

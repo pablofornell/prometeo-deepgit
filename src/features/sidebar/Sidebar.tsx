@@ -132,16 +132,19 @@ export function Sidebar(): JSX.Element {
     const only = changesRepoForNode(n.kind, n.repoId, projectRepos().length);
     if (only) setChangesRepoId(only);
     if (n.kind === "more") setMoreOpen(new Set([...moreOpen(), n.groupId]));
-    // A branch or tag selects its tip commit in the log (and pulses its node).
-    if (n.kind === "branch") jumpToCommit({ repoId: n.repoId, oid: n.branch.oid });
-    else if (n.kind === "remoteBranch") jumpToCommit({ repoId: n.repoId, oid: n.remote.oid });
-    else if (n.kind === "tag") jumpToCommit({ repoId: n.repoId, oid: n.tag.oid });
     if (n.kind === "stash") {
       // The stash shows its files in "Changed files". A commit file open before is dropped.
       setSelectedCommit({ repoId: n.repoId, oid: n.stash.oid, stash: { index: n.stash.index } });
       if (selectedFile()?.spec.kind === "commit") selectFile(null);
       setDetailsTab("files");
     }
+  };
+
+  /** A click on a branch or tag selects its tip commit in the log and pulses its node (not keys, not right-click). */
+  const jump = (n: SidebarNode) => {
+    if (n.kind === "branch") jumpToCommit({ repoId: n.repoId, oid: n.branch.oid });
+    else if (n.kind === "remoteBranch") jumpToCommit({ repoId: n.repoId, oid: n.remote.oid });
+    else if (n.kind === "tag") jumpToCommit({ repoId: n.repoId, oid: n.tag.oid });
   };
 
   const activate = (n: SidebarNode) => {
@@ -429,6 +432,7 @@ export function Sidebar(): JSX.Element {
           onExpandedChange={onExpandedChange}
           selectedId={selected()}
           onSelect={select}
+          onRowClick={jump}
           onActivate={activate}
           onContextMenu={(n, e) => {
             const items = nodeMenu(n);
