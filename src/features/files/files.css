@@ -97,28 +97,3 @@
 .dg-fe-editor .dg-mg-t-type { color: var(--dg-editor-type); }
 .dg-fe-editor .dg-mg-t-field { color: var(--dg-editor-field); }
 .dg-fe-editor .dg-mg-t-meta { color: var(--dg-editor-metadata); }
-
-/* Find panel of the editor (Ctrl+F). It uses the app's inputs and buttons. The replace row is hidden. The editor only finds. */
-.dg-fe-editor .cm-panels { background: var(--dg-island-bg); color: var(--dg-text); }
-.dg-fe-editor .cm-panels-top { border-bottom: 1px solid var(--dg-separator); }
-.dg-fe-editor .cm-panel.cm-search input[name=replace],
-.dg-fe-editor .cm-panel.cm-search button[name=replace],
-.dg-fe-editor .cm-panel.cm-search button[name=replaceAll],
-.dg-fe-editor .cm-panel.cm-search br { display: none; }
-.dg-fe-editor .cm-panel.cm-search { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 30px 6px 8px; font-size: var(--dg-font-size-medium); }
-.dg-fe-editor .cm-panel.cm-search input.cm-textfield {
-  height: var(--dg-control-height); min-width: 200px; box-sizing: border-box; padding: 0 8px; border: 0; border-radius: var(--dg-input-radius);
-  background: var(--dg-input-bg); color: var(--dg-input-fg); box-shadow: inset 0 0 0 1px var(--dg-input-border); outline: 0; font: inherit;
-}
-.dg-fe-editor .cm-panel.cm-search input.cm-textfield:focus { box-shadow: inset 0 0 0 var(--dg-focus-width) var(--dg-input-focus-border); }
-.dg-fe-editor .cm-panel.cm-search input.cm-textfield::placeholder { color: var(--dg-input-placeholder); }
-.dg-fe-editor .cm-panel.cm-search button {
-  height: var(--dg-control-height-small); padding: 0 10px; border: 0; border-radius: var(--dg-input-radius); background: transparent;
-  color: var(--dg-text); box-shadow: inset 0 0 0 1px var(--dg-chip-border); font: inherit; font-size: var(--dg-font-size-medium);
-}
-.dg-fe-editor .cm-panel.cm-search button:hover { background: var(--dg-hover-bg); }
-.dg-fe-editor .cm-panel.cm-search button[name=close] { top: 6px; right: 6px; height: auto; padding: 0 6px; box-shadow: none; font-size: var(--dg-font-size-h4); }
-.dg-fe-editor .cm-panel.cm-search label { display: inline-flex; align-items: center; gap: 4px; color: var(--dg-text-secondary); }
-.dg-fe-editor .cm-panel.cm-search input[type=checkbox] { accent-color: var(--dg-accent-fill); margin: 0; }
-.dg-fe-editor .cm-searchMatch { background: var(--dg-accent-wash); outline: 1px solid var(--dg-accent-border); }
-.dg-fe-editor .cm-searchMatch-selected { background: var(--dg-accent-wash-strong); }

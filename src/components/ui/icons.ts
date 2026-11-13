@@ -71,6 +71,8 @@ const ICONS = {
   search: `<circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3 3"/>`,
   filter: `<path d="M2.5 3.5h11l-4.5 5v4l-2 1v-5Z"/>`,
   close: `<path d="m4 4 8 8M12 4l-8 8"/>`,
+  replace: `<path d="M2.5 5.5h7l-2-2M13.5 10.5h-7l2 2"/>`,
+  replaceAll: `<path d="M2.5 5.5h7l-2-2M13.5 10.5h-7l2 2"/><path d="M12 3v3M10.5 4.5h3"/>`,
   more: `<circle cx="3.5" cy="8" r=".8"/><circle cx="8" cy="8" r=".8"/><circle cx="12.5" cy="8" r=".8"/>`,
   plus: `<path d="M8 3v10M3 8h10"/>`,
   minus: `<path d="M3 8h10"/>`,

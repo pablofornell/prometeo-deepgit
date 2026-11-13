@@ -194,6 +194,12 @@
   --dg-merge-deleted-bg: color-mix(in srgb, var(--dg-neutral) var(--dg-merge-line-a), var(--dg-editor-bg));
   --dg-merge-deleted-marker: var(--dg-neutral);
 
+  /* ---- editor find: amber matches, apart from the blue selection (ITERATION-3 10.6) ---- */
+  --dg-find-match-bg: var(--dg-warning-wash);               /* every match */
+  --dg-find-match-border: var(--dg-warning-border);
+  --dg-find-current-bg: var(--dg-warning-wash-strong);      /* the current match */
+  --dg-find-current-border: var(--dg-warning);
+
   /* ---- log ---- */
   --dg-log-match-bg: var(--dg-warning-wash-strong);          /* text filter match in the subject */
   --dg-log-match-fg: var(--dg-warning-fg);
