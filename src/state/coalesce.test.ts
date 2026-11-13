@@ -72,3 +72,27 @@ describe("createBatchRefresher", () => {
     expect(fetched).toEqual([["a"], ["b"]]);
   });
 });
+
+describe("createBatchRefresher: late callers", () => {
+  it("fetches an id that arrives one microtask after the last fetch", async () => {
+    const calls: string[][] = [];
+    const r = createBatchRefresher(async (ids) => {
+      calls.push(ids);
+    });
+    const first = r.run(["a"]);
+    let late: Promise<void> | undefined;
+    // Schedule calls at several microtask depths after the start.
+    for (let hops = 0; hops < 6; hops++) {
+      let q: Promise<unknown> = Promise.resolve();
+      for (let i = 0; i < hops; i++) q = q.then(() => undefined);
+      void q.then(() => {
+        late = r.run([`b${hops}`]);
+      });
+    }
+    await first;
+    await new Promise((res) => setTimeout(res, 0));
+    await late;
+    const fetched = calls.flat();
+    for (let hops = 0; hops < 6; hops++) expect(fetched).toContain(`b${hops}`);
+  });
+});

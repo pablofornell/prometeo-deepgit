@@ -30,9 +30,17 @@ export function createBatchRefresher(fetch: (ids: string[]) => Promise<void>, on
       if (inflight) return inflight;
       // Nothing queued (another run drained it): do not store a promise that is already settled.
       if (pending.size === 0) return Promise.resolve();
-      const p = loop().finally(() => {
-        if (inflight === p) inflight = null;
-      });
+      // The cleanup runs inside the run (not in a later `.finally` hop), so a call that arrives after the last
+      // fetch never gets a promise that is already settled. The first `await` makes sure that the body cannot
+      // finish before `inflight` is assigned.
+      const p = (async () => {
+        try {
+          await null;
+          await loop();
+        } finally {
+          inflight = null;
+        }
+      })();
       inflight = p;
       return p;
     },
