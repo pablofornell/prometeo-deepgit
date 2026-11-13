@@ -38,7 +38,9 @@ export function parseDay(s: string): number | null {
   const [y, mo, day] = dmy ? [dmy[3], dmy[2], dmy[1]] : ymd ? [ymd[1], ymd[2], ymd[3]] : [];
   if (y === undefined) return null;
   const d = new Date(Number(y), Number(mo) - 1, Number(day));
-  return Number.isNaN(d.getTime()) ? null : Math.floor(d.getTime() / 1000);
+  // `Date` rolls 31-02 over to March: rebuild the parts and refuse a day that is not on the calendar
+  if (d.getFullYear() !== Number(y) || d.getMonth() !== Number(mo) - 1 || d.getDate() !== Number(day)) return null;
+  return Math.floor(d.getTime() / 1000);
 }
 
 /** Extracts the prefixes of the text box. Unknown or invalid prefixes stay in the text. */

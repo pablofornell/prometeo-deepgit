@@ -22,6 +22,12 @@ describe("parseTextFilter", () => {
     expect(parseDay("1/10/2026")).toBeNull();
   });
 
+  it("refuses a day that is not on the calendar", () => {
+    for (const s of ["31-02-2026", "00-00-2026", "99-99-2026", "29-02-2026", "31-04-2026", "2026-02-30", "2026-13-01", "00-10-2026"]) expect(parseDay(s)).toBeNull();
+    expect(parseDay("29-02-2028")).toBe(new Date(2028, 1, 29).getTime() / 1000);
+    expect(parseDay("31-12-2026")).toBe(new Date(2026, 11, 31).getTime() / 1000);
+  });
+
   it("leaves an invalid date in the text", () => {
     expect(parseTextFilter("after:soon x")).toEqual({ text: "after:soon x" });
   });

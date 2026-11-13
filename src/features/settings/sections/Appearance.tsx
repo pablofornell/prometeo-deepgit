@@ -99,7 +99,7 @@ function AppearanceSection(): JSX.Element {
         <Row label="Comfortable rows" hint="Taller rows in the log.">
           <Checkbox checked={settings.comfortableRows} ariaLabel="Comfortable rows" onChange={(v) => setSetting("comfortableRows", v)} />
         </Row>
-        <Row label="Date format" hint="Every date of the app. Absolute is dd-mm-yyyy.Tooltips show the full date.">
+        <Row label="Date format" hint="Every date of the app. Absolute is dd-mm-yyyy. Tooltips show the full date.">
           <ChoiceList label="Date format" value={settings.dateFormat} options={DATES} onChange={(v) => setSetting("dateFormat", v)} />
         </Row>
       </Section>
