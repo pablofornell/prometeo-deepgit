@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { NAV_LIMIT, createNavHistory, sameLocation, type NavLocation } from "./navHistory";
+import { NAV_LIMIT, createNavHistory, createPressDedupe, sameLocation, type NavLocation } from "./navHistory";
 
 const log = (oid?: string, repoId = "r1"): NavLocation => ({ view: "log", commit: oid ? { repoId, oid } : undefined });
 const file = (path: string, repoId = "r1"): NavLocation => ({ view: "files", file: { repoId, path } });
@@ -17,6 +17,27 @@ describe("sameLocation", () => {
     expect(sameLocation({ view: "log", commit: { repoId: "r1", oid: "a", stash: 0 } }, log("a"))).toBe(false);
     expect(sameLocation(null, null)).toBe(true);
     expect(sameLocation(null, log())).toBe(false);
+  });
+});
+
+describe("stash locations", () => {
+  const stash = (oid: string, index: number): NavLocation => ({ view: "log", commit: { repoId: "r1", oid, stash: index } });
+
+  it("a stash is the same place when only its index changed", () => {
+    expect(sameLocation(stash("x", 0), stash("x", 1))).toBe(true);
+    expect(sameLocation(stash("x", 0), stash("y", 0))).toBe(false);
+  });
+
+  it("an index shift does not record a location or drop the forward stack", () => {
+    const h = createNavHistory();
+    h.record(log("a"));
+    h.record(stash("x", 0));
+    h.record(log("b"));
+    h.back();
+    expect(h.current()).toEqual(stash("x", 0));
+    h.record(stash("x", 1));
+    expect(h.canForward()).toBe(true);
+    expect(h.forward()).toEqual(log("b"));
   });
 });
 
@@ -146,5 +167,37 @@ describe("createNavHistory", () => {
     expect(h.current()).toBeNull();
     expect(h.canBack()).toBe(false);
     expect(h.canForward()).toBe(false);
+  });
+});
+
+describe("createPressDedupe", () => {
+  it("drops the second path of one press", () => {
+    const dup = createPressDedupe(300);
+    expect(dup(false, true, 1000)).toBe(false);
+    expect(dup(false, false, 1050)).toBe(true);
+  });
+
+  it("works in either order", () => {
+    const dup = createPressDedupe(300);
+    expect(dup(true, false, 1000)).toBe(false);
+    expect(dup(true, true, 1010)).toBe(true);
+  });
+
+  it("lets the second path through after the window", () => {
+    const dup = createPressDedupe(300);
+    expect(dup(false, true, 1000)).toBe(false);
+    expect(dup(false, false, 1300)).toBe(false);
+  });
+
+  it("does not mix directions", () => {
+    const dup = createPressDedupe(300);
+    expect(dup(false, true, 1000)).toBe(false);
+    expect(dup(true, false, 1010)).toBe(false);
+  });
+
+  it("two clicks by the same path are not duplicates", () => {
+    const dup = createPressDedupe(300);
+    expect(dup(false, false, 1000)).toBe(false);
+    expect(dup(false, false, 1100)).toBe(false);
   });
 });

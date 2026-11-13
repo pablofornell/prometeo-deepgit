@@ -20,6 +20,7 @@ import { DisplayMap, dateGroupLabel } from "./dateGroups";
 import { FilterBar } from "./FilterBar";
 import { activeFilters, clearAllFilters, hasContentFilter, query, text } from "./filters";
 import { appearanceRev } from "../../state/metrics";
+import { navRevealTick } from "../../state/navigation";
 import { autoGraphWidth, cssPx, maxLanesOf, readGraphMetrics } from "./graph";
 import { CommitRowView, DateRowView, type RowCtx, type WipInfo, WipRowView } from "./LogRow";
 import { type PickedCommit, commitMenu, refAtTarget, refMenu } from "./menus";
@@ -319,6 +320,19 @@ export function LogView(): JSX.Element {
       ensureVisible(map().displayOf(ci), isVisible(map().displayOf(ci)) ? "auto" : "center");
     });
   });
+
+  // Back / forward restored a commit: it becomes the only selected row (a multi-selection would keep acting on all of
+  // them) and the list scrolls to it. The effect above finds a commit that is not selected yet.
+  createEffect(on(navRevealTick, () => {
+    const sc = untrack(selectedCommit);
+    if (!sc || sc.stash) return;
+    const picked = untrack(multi).get(keyOf(sc.repoId, sc.oid));
+    if (!picked) return;
+    setMulti(new Map([[keyOf(sc.repoId, sc.oid), picked]]));
+    anchorCi = picked.ci;
+    const d = map().displayOf(picked.ci);
+    ensureVisible(d, isVisible(d) ? "auto" : "center");
+  }, { defer: true }));
 
   async function selectHead(): Promise<void> {
     const ids = selectedRepoIds();

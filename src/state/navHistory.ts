@@ -11,7 +11,7 @@
 export interface NavLocation {
   /** The main view: "log", "changes" or "files". */
   view: string;
-  /** Log view: the selected commit (`stash` is the index when the commit is a stash). */
+  /** Log view: the selected commit (`stash` is the index when the commit is a stash; it is not compared). */
   commit?: { repoId: string; oid: string; stash?: number };
   /** Files view: the file in the active tab. */
   file?: { repoId: string; path: string };
@@ -19,14 +19,15 @@ export interface NavLocation {
 
 export const NAV_LIMIT = 100;
 
-/** True when both locations are the same place. */
+/** True when both locations are the same place. A stash is told by its oid; its index is only a label that changes. */
 export function sameLocation(a: NavLocation | null | undefined, b: NavLocation | null | undefined): boolean {
   if (!a || !b) return a === b;
   return (
     a.view === b.view &&
     a.commit?.repoId === b.commit?.repoId &&
     a.commit?.oid === b.commit?.oid &&
-    a.commit?.stash === b.commit?.stash &&
+    // A stash index shifts when another stash is pushed or dropped: the stash is the same place.
+    (a.commit?.stash === undefined) === (b.commit?.stash === undefined) &&
     a.file?.repoId === b.file?.repoId &&
     a.file?.path === b.file?.path
   );
@@ -91,5 +92,21 @@ export function createNavHistory(limit: number = NAV_LIMIT): NavHistory {
       backStack = [];
       fwdStack = [];
     },
+  };
+}
+
+export const SIDE_BUTTON_DEDUPE_MS = 300;
+
+/**
+ * Tells when a side-button press repeats one that came a moment ago by the other path (the DOM `mouseup` and the
+ * backend event for the same click). The returned function takes the direction, the path and the time in ms; it is true for
+ * the second press. Two presses by the same path are two clicks, never duplicates.
+ */
+export function createPressDedupe(windowMs: number = SIDE_BUTTON_DEDUPE_MS): (forward: boolean, native: boolean, now: number) => boolean {
+  let last: { forward: boolean; native: boolean; at: number } | null = null;
+  return (forward, native, now) => {
+    if (last && last.forward === forward && last.native !== native && now - last.at < windowMs) return true;
+    last = { forward, native, at: now };
+    return false;
   };
 }

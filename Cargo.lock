@@ -744,6 +744,7 @@ version = "0.2.0"
 dependencies = [
  "askpass",
  "gitcore",
+ "gtk",
  "keyring",
  "notify",
  "notify-debouncer-mini",

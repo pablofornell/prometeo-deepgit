@@ -35,6 +35,8 @@ unicode-normalization = "0.1"
 # The system key store for saved credentials (the `askpass` crate only knows a trait).
 [target.'cfg(target_os = "linux")'.dependencies]
 keyring = { version = "3", default-features = false, features = ["sync-secret-service", "crypto-rust"] }
+# Same version tauri / wry already use: the mouse side buttons are read from the GTK widget of the webview (sidebuttons.rs).
+gtk = "0.18"
 [target.'cfg(target_os = "macos")'.dependencies]
 keyring = { version = "3", default-features = false, features = ["apple-native"] }
 [target.'cfg(target_os = "windows")'.dependencies]

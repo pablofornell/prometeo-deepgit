@@ -9,8 +9,9 @@
  * `FilesView`, which tells this module how with `onOpenFile` and what its active file is with `setNavFile`.
  */
 import { createEffect, createRoot, createSignal } from "solid-js";
+import { onNavBack, onNavForward } from "../api/tauri";
 import { isOverlayOpen } from "./keymap";
-import { createNavHistory, type NavLocation } from "./navHistory";
+import { createNavHistory, createPressDedupe, type NavLocation } from "./navHistory";
 import { mainTab, selectedCommit, setMainTab, setSelectedCommit, type MainTab } from "./selection";
 import { onActiveProjectChanged, repoById } from "./workspace";
 
@@ -62,6 +63,13 @@ function isValid(loc: NavLocation): boolean {
 
 let restoring = false;
 
+const [revealTick, setRevealTick] = createSignal(0);
+/**
+ * Counts the commits restored by back / forward. The log reacts to a change: it collapses a multi-selection to the
+ * restored commit and scrolls to it, even when that commit was one of the selected ones.
+ */
+export const navRevealTick = revealTick;
+
 /** Shows a location: the view first, then the commit (the log scrolls to it) or the file. */
 function restore(loc: NavLocation): void {
   restoring = true;
@@ -69,15 +77,16 @@ function restore(loc: NavLocation): void {
     setMainTab(loc.view as MainTab);
     if (loc.view === "log" && loc.commit) {
       setSelectedCommit({ repoId: loc.commit.repoId, oid: loc.commit.oid, stash: loc.commit.stash === undefined ? undefined : { index: loc.commit.stash } });
+      setRevealTick((n) => n + 1);
     } else if (loc.view === "files" && loc.file) {
       openFile?.(loc.file.repoId, loc.file.path);
     }
   } finally {
     restoring = false;
   }
-  // The place shown can differ from the stored one (a location without commit keeps the selection): follow it, so it
-  // does not count as a new location.
-  history.settle(loc.view === "files" ? loc : here());
+  // The place shown can differ from the stored one (a location without commit keeps the selection, a file may not
+  // open): follow what is on screen, so it does not count as a new location.
+  history.settle(here());
 }
 
 /** Goes back one location. Returns false when there is none. */
@@ -103,13 +112,20 @@ export function inTextField(t: EventTarget | null | undefined): boolean {
   return el.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"], .cm-editor') !== null;
 }
 
+/** The same press can reach us twice on Linux: from the DOM and from the backend (`nav-back` / `nav-forward`). */
+const isDuplicatePress = createPressDedupe();
+
+function sidePress(forward: boolean, native: boolean): void {
+  if (isOverlayOpen() || isDuplicatePress(forward, native, performance.now())) return;
+  if (forward) navForward();
+  else navBack();
+}
+
 function onMouse(e: MouseEvent): void {
   if (e.button !== 3 && e.button !== 4) return;
   // The webview would do its own page history on these buttons.
   e.preventDefault();
-  if (e.type !== "mouseup" || isOverlayOpen()) return;
-  if (e.button === 3) navBack();
-  else navForward();
+  if (e.type === "mouseup") sidePress(e.button === 4, false);
 }
 
 /** Starts recording locations and listening to the mouse side buttons. Called once from `App`; returns the stop function. */
@@ -138,8 +154,10 @@ export function startNavigation(): () => void {
   });
   const types = ["mousedown", "mouseup", "auxclick"] as const;
   for (const t of types) window.addEventListener(t, onMouse, true);
+  const native = [onNavBack(() => sidePress(false, true)), onNavForward(() => sidePress(true, true))];
   return () => {
     for (const t of types) window.removeEventListener(t, onMouse, true);
+    for (const off of native) void off.then((f) => f());
     dispose();
   };
 }
