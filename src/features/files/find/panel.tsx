@@ -9,16 +9,23 @@ import {
   SearchQuery, closeSearchPanel, findNext, findPrevious, getSearchQuery, openSearchPanel, replaceAll, replaceNext, search, searchPanelOpen,
   setSearchQuery,
 } from "@codemirror/search";
-import { EditorSelection, type Extension } from "@codemirror/state";
+import { EditorSelection, type EditorState, type Extension } from "@codemirror/state";
 import { type KeyBinding, type Panel, EditorView, type ViewUpdate, runScopeHandlers } from "@codemirror/view";
-import { createMemo, createSignal, Show } from "solid-js";
+import { createMemo, createRoot, createSignal, Show } from "solid-js";
 import { render } from "solid-js/web";
 import { Icon, IconButton, tip } from "../../../components/ui";
-import { type FindOptions, counterText, firstMatchFrom, isErrorState, matchStats, seedText, withQuery } from "./logic";
+import {
+  type FindOptions, type MatchList, NO_MATCHES, collectMatches, counterText, emptyQuery, firstMatchFrom, isErrorState, sameQuery, seedText, statsAt, withQuery,
+} from "./logic";
 import "./find.css";
 
 /** The last query of the session (text, replacement and the three options). A new tab and a new panel start from it. */
-let session: SearchQuery = new SearchQuery({ search: "" });
+let session: SearchQuery = emptyQuery();
+
+/** In a document longer than this, counting and the incremental find wait until typing pauses. */
+const LARGE_DOC = 200_000;
+const SCAN_DELAY_MS = 150;
+const seekTimers = new WeakMap<EditorView, ReturnType<typeof setTimeout>>();
 
 /** What the commands need from the open panel of a view. */
 interface Controller {
@@ -27,16 +34,24 @@ interface Controller {
 }
 const controllers = new WeakMap<EditorView, Controller>();
 
-/** Sets the query of the view and the session. `seek` selects the first match from the cursor, like an incremental find. */
-function commitQuery(view: EditorView, spec: SearchQuery, seek: boolean): void {
-  session = spec;
-  if (!getSearchQuery(view.state).eq(spec)) view.dispatch({ effects: setSearchQuery.of(spec) });
-  if (!seek) return;
+/** Selects the first match from the cursor, like an incremental find. It keeps the focus where it is. */
+function seekMatch(view: EditorView): void {
+  if (!view.dom.isConnected || !searchPanelOpen(view.state)) return;
   const { from, to } = view.state.selection.main;
-  const m = firstMatchFrom(view.state, spec, from);
+  const m = firstMatchFrom(view.state, getSearchQuery(view.state), from);
   if (!m || (m.from === from && m.to === to)) return;
   const range = EditorSelection.range(m.from, m.to);
   view.dispatch({ selection: EditorSelection.create([range]), effects: EditorView.scrollIntoView(range), userEvent: "select.search" });
+}
+
+/** Sets the query of the view and the session. `seek` selects the first match from the cursor (after a pause in a large document). */
+function commitQuery(view: EditorView, spec: SearchQuery, seek: boolean): void {
+  session = spec;
+  if (!sameQuery(getSearchQuery(view.state), spec)) view.dispatch({ effects: setSearchQuery.of(spec) });
+  if (!seek) return;
+  clearTimeout(seekTimers.get(view));
+  if (view.state.doc.length <= LARGE_DOC) seekMatch(view);
+  else seekTimers.set(view, setTimeout(() => seekMatch(view), SCAN_DELAY_MS));
 }
 
 /**
@@ -63,14 +78,28 @@ function toggleOption(key: keyof FindOptions) {
   };
 }
 
+/**
+ * F3 / Shift+F3. With the widget closed the tab may hold an older query, so the session query goes first.
+ * Without a query it opens the widget instead.
+ */
+function stepMatch(forward: boolean): (view: EditorView) => boolean {
+  return (view) => {
+    if (!searchPanelOpen(view.state)) {
+      if (!session.valid) return openFind(view);
+      if (!sameQuery(getSearchQuery(view.state), session)) view.dispatch({ effects: setSearchQuery.of(session) });
+    }
+    return (forward ? findNext : findPrevious)(view);
+  };
+}
+
 const SCOPE = "editor search-panel";
 
 /** Key bindings of the widget. They replace `Mod-f`, `F3` and `Escape` of the default `searchKeymap`. */
 export const findKeymap: KeyBinding[] = [
   { key: "Mod-f", run: (v) => openFind(v, false), scope: SCOPE, preventDefault: true },
   { key: "Mod-h", run: (v) => openFind(v, true), scope: SCOPE, preventDefault: true },
-  { key: "F3", run: findNext, shift: findPrevious, scope: SCOPE, preventDefault: true },
-  { key: "Mod-g", run: findNext, shift: findPrevious, scope: SCOPE, preventDefault: true },
+  { key: "F3", run: stepMatch(true), shift: stepMatch(false), scope: SCOPE, preventDefault: true },
+  { key: "Mod-g", run: stepMatch(true), shift: stepMatch(false), scope: SCOPE, preventDefault: true },
   { key: "Escape", run: closeSearchPanel, scope: SCOPE },
   { key: "Alt-c", run: toggleOption("caseSensitive"), scope: SCOPE, preventDefault: true },
   { key: "Alt-w", run: toggleOption("wholeWord"), scope: SCOPE, preventDefault: true },
@@ -80,20 +109,43 @@ export const findKeymap: KeyBinding[] = [
 
 /** The search engine of the editor, with the widget as its panel. Add `findKeymap` to the key bindings as well. */
 export function findExtension(): Extension {
-  return search({ createPanel: createFindPanel });
+  return search({ createPanel: createFindPanel, literal: true });
 }
 
 function createFindPanel(view: EditorView): Panel {
   const dom = document.createElement("div");
   dom.className = "dg-fe-find-host";
 
-  const [spec, setSpec] = createSignal(getSearchQuery(view.state), { equals: (a, b) => a.eq(b) });
-  const [stats, setStats] = createSignal(matchStats(view.state, spec()));
-  const [expanded, setExpanded] = createSignal(false);
-  const [readOnly, setReadOnly] = createSignal(view.state.readOnly);
-  const text = createMemo(() => counterText(stats()));
-  const bad = createMemo(() => isErrorState(stats()));
-  const canReplace = () => !readOnly() && stats().kind === "some";
+  // The signals and memos live in their own root, so the panel owns them and not the effect that was running when CodeMirror made it.
+  const ui = createRoot((disposeRoot) => {
+    const [spec, setSpec] = createSignal(getSearchQuery(view.state), { equals: sameQuery });
+    const [stats, setStats] = createSignal(statsAt(NO_MATCHES, 0, 0));
+    const [expanded, setExpanded] = createSignal(false);
+    const [readOnly, setReadOnly] = createSignal(view.state.readOnly);
+    const text = createMemo(() => counterText(stats()));
+    const bad = createMemo(() => isErrorState(stats()));
+    const canReplace = createMemo(() => !readOnly() && stats().kind === "some");
+    return { disposeRoot, spec, setSpec, stats, setStats, expanded, setExpanded, readOnly, setReadOnly, text, bad, canReplace };
+  });
+  const { spec, setSpec, setStats, expanded, setExpanded, readOnly, setReadOnly, text, bad, canReplace } = ui;
+
+  // The matches are counted when the document or the query changes. A cursor move only looks up the current one in the list.
+  // A large document is counted after a pause in the changes. A query with no text or a bad regex needs no scan.
+  let list: MatchList = NO_MATCHES;
+  let pending: ReturnType<typeof setTimeout> | undefined;
+  const recount = (state: EditorState): void => {
+    pending = undefined;
+    list = collectMatches(state, getSearchQuery(state));
+    const { from, to } = state.selection.main;
+    setStats(statsAt(list, from, to));
+  };
+  const scheduleCount = (state: EditorState): void => {
+    clearTimeout(pending);
+    pending = undefined;
+    if (state.doc.length <= LARGE_DOC || !getSearchQuery(state).valid) recount(state);
+    else pending = setTimeout(() => recount(view.state), SCAN_DELAY_MS);
+  };
+  scheduleCount(view.state);
   let findInput!: HTMLInputElement;
   let replaceInput: HTMLInputElement | undefined;
 
@@ -212,7 +264,7 @@ function createFindPanel(view: EditorView): Panel {
 
   // A tab that was swapped in may hold an older query: the session query wins. It cannot dispatch while the view updates.
   queueMicrotask(() => {
-    if (controllers.get(view) === controller && !session.eq(getSearchQuery(view.state))) {
+    if (controllers.get(view) === controller && !sameQuery(session, getSearchQuery(view.state))) {
       view.dispatch({ effects: setSearchQuery.of(session) });
     }
   });
@@ -222,17 +274,21 @@ function createFindPanel(view: EditorView): Panel {
     top: true,
     update(u: ViewUpdate) {
       const q = getSearchQuery(u.state);
-      const changed = !q.eq(getSearchQuery(u.startState));
+      const changed = !sameQuery(q, getSearchQuery(u.startState));
       if (changed) {
         session = q;
         setSpec(q);
       }
-      if (changed || u.docChanged || u.selectionSet) setStats(matchStats(u.state, q));
+      if (changed || u.docChanged) scheduleCount(u.state);
+      else if (u.selectionSet && pending === undefined) setStats(statsAt(list, u.state.selection.main.from, u.state.selection.main.to));
       setReadOnly(u.state.readOnly);
     },
     destroy() {
       if (controllers.get(view) === controller) controllers.delete(view);
+      clearTimeout(pending);
+      clearTimeout(seekTimers.get(view));
       dispose();
+      ui.disposeRoot();
     },
   };
 }
