@@ -28,22 +28,66 @@ function messageOf(e: unknown): string {
   return String(e);
 }
 
-/** DeepGit mark: the logo of `src-tauri/icons/logo.svg`, with its colours taken from the theme tokens. */
+/** Colour of a part of the mark, as a theme token name: `--dg-<name>`. */
+type LogoColour = "accent" | "lane-1" | "lane-2" | "lane-5" | "lane-7";
+
+/** Edges of the mark: path, stroke width, colour. Same numbers as the small variant of `scripts/gen-logo.mjs`. */
+const LOGO_EDGES: [d: string, width: number, colour: LogoColour][] = [
+  ["M512 880 V640", 96, "accent"],
+  ["M512 640 C512 550 434.7 564.6 383.1 514.3", 72, "lane-1"],
+  ["M512 640 C512 550 589.3 564.6 640.9 514.3", 72, "lane-2"],
+  ["M383.1 514.3 C329 461.5 289.1 552.5 232.7 530.4", 56, "lane-5"],
+  ["M383.1 514.3 C329 461.5 419 419.3 395.5 363.6", 56, "lane-1"],
+  ["M640.9 514.3 C695 461.5 605 419.3 628.5 363.6", 56, "lane-2"],
+  ["M640.9 514.3 C695 461.5 734.9 552.5 791.3 530.4", 56, "lane-7"],
+  ["M232.7 530.4 C180.2 509.8 172.4 580.1 127.9 572.3", 44, "lane-5"],
+  ["M232.7 530.4 C180.2 509.8 222.3 452.9 184.4 428.4", 44, "lane-5"],
+  ["M395.5 363.6 C373.5 311.6 317.7 355.1 292.3 317.8", 44, "lane-1"],
+  ["M395.5 363.6 C373.5 311.6 443.7 302 434.7 257.7", 44, "lane-1"],
+  ["M628.5 363.6 C650.5 311.6 580.3 302 589.3 257.7", 44, "lane-2"],
+  ["M628.5 363.6 C650.5 311.6 706.3 355.1 731.7 317.8", 44, "lane-2"],
+  ["M791.3 530.4 C843.8 509.8 801.7 452.9 839.6 428.4", 44, "lane-7"],
+  ["M791.3 530.4 C843.8 509.8 851.6 580.1 896.1 572.3", 44, "lane-7"],
+];
+
+/** Nodes of the mark: centre, radius, outline width, colour. Same numbers as the small variant of `scripts/gen-logo.mjs`. */
+const LOGO_NODES: [x: number, y: number, r: number, outline: number, colour: LogoColour][] = [
+  [512, 880, 92, 28, "accent"],
+  [512, 640, 92, 28, "accent"],
+  [383.1, 514.3, 66, 20, "lane-1"],
+  [640.9, 514.3, 66, 20, "lane-2"],
+  [232.7, 530.4, 54, 16, "lane-5"],
+  [395.5, 363.6, 54, 16, "lane-1"],
+  [628.5, 363.6, 54, 16, "lane-2"],
+  [791.3, 530.4, 54, 16, "lane-7"],
+  [127.9, 572.3, 46, 14, "lane-5"],
+  [184.4, 428.4, 46, 14, "lane-5"],
+  [292.3, 317.8, 46, 14, "lane-1"],
+  [434.7, 257.7, 46, 14, "lane-1"],
+  [589.3, 257.7, 46, 14, "lane-2"],
+  [731.7, 317.8, 46, 14, "lane-2"],
+  [839.6, 428.4, 46, 14, "lane-7"],
+  [896.1, 572.3, 46, 14, "lane-7"],
+];
+
+/** DeepGit mark: the small variant of `src-tauri/icons/logo-small.svg`, with its colours taken from the theme tokens. */
 function Logo(): JSX.Element {
   return (
     <svg class="dg-welcome-logo" width="48" height="48" viewBox="0 0 1024 1024" aria-hidden="true">
       <rect class="dg-welcome-logo-tile" width="1024" height="1024" rx="224" ry="224" />
-      <g fill="none" stroke-width="96" stroke-linecap="round" stroke-linejoin="round">
-        <path class="dg-welcome-logo-main" d="M512 820 V204" stroke="currentColor" />
-        <path class="dg-welcome-logo-left" d="M512 512 C430 512 232 460 232 340" stroke="currentColor" />
-        <path class="dg-welcome-logo-right" d="M512 512 C594 512 792 460 792 340" stroke="currentColor" />
+      <g fill="none" stroke-linecap="round">
+        <For each={LOGO_EDGES}>
+          {([d, width, colour]) => (
+            <path d={d} stroke-width={width} stroke="currentColor" style={{ color: `var(--dg-${colour})` }} />
+          )}
+        </For>
       </g>
-      <g class="dg-welcome-logo-ring" stroke-width="24">
-        <circle class="dg-welcome-logo-main" cx="512" cy="820" r="96" fill="currentColor" />
-        <circle class="dg-welcome-logo-main" cx="512" cy="512" r="96" fill="currentColor" />
-        <circle class="dg-welcome-logo-main" cx="512" cy="204" r="96" fill="currentColor" />
-        <circle class="dg-welcome-logo-left" cx="232" cy="340" r="96" fill="currentColor" />
-        <circle class="dg-welcome-logo-right" cx="792" cy="340" r="96" fill="currentColor" />
+      <g class="dg-welcome-logo-ring">
+        <For each={LOGO_NODES}>
+          {([x, y, r, outline, colour]) => (
+            <circle cx={x} cy={y} r={r} stroke-width={outline} fill="currentColor" style={{ color: `var(--dg-${colour})` }} />
+          )}
+        </For>
       </g>
     </svg>
   );
