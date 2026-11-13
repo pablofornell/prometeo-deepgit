@@ -617,6 +617,36 @@ pub struct ApiError {
     pub message: String,
     /// stderr
     pub detail: Option<String>,
+    /// Machine-readable kind for the errors the UI handles itself (`ERR_NO_REPOSITORY`); `None` for the rest.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub code: Option<String>,
+}
+
+/// `ApiError::code` of `project_add` when the folder holds no Git repository (not even in a subfolder).
+pub const ERR_NO_REPOSITORY: &str = "noRepository";
+
+/// `ApiError::code` when the folder is a bare repository: it has no working folder to add.
+pub const ERR_BARE_REPOSITORY: &str = "bareRepository";
+
+/// `ApiError::code` when the folder is inside the data folder of a repository (`.git`).
+pub const ERR_INSIDE_GIT_DIR: &str = "insideGitDir";
+
+/// `ApiError::code` when a scan finds no repository in the folder, but there is one deeper (or below
+/// a folder the scan skips). `git init` here would wrap it.
+pub const ERR_DEEP_REPOSITORY: &str = "deepRepository";
+
+/// What the "Initialize a Git repository?" dialog shows about a folder (`project_init_info`).
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct InitInfo {
+    /// Canonical absolute path of the folder.
+    pub path: String,
+    /// The folder name.
+    pub name: String,
+    /// `git config --global init.defaultBranch`, or `main` when it is not set.
+    pub default_branch: String,
+    /// Root of the repository that contains the folder, when there is one (the new repository would be nested).
+    pub parent_repo: Option<String>,
 }
 
 /// Status of one side of a conflicted file (versus the common ancestor).

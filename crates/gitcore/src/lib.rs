@@ -9,6 +9,7 @@ pub mod discover;
 pub mod error;
 pub mod files;
 pub mod graph;
+pub mod init;
 pub mod log;
 pub mod model;
 pub mod ops;

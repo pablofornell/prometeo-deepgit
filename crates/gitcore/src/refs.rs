@@ -415,7 +415,8 @@ pub fn unpushed_count(git: &Git, repo: &RepoInfo, branch: &str) -> Result<u32, G
         &["rev-list", "--count", &full, "--not", "--remotes"],
         false,
     )?;
-    out.stdout.trim().parse().map_err(|_| {
-        GitError::Invalid(format!("Unexpected output of rev-list: {:?}", out.stdout))
-    })
+    out.stdout
+        .trim()
+        .parse()
+        .map_err(|_| GitError::Invalid(format!("Unexpected output of rev-list: {:?}", out.stdout)))
 }

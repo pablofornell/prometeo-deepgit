@@ -31,6 +31,10 @@ pub enum GitError {
     /// The requested operation does not apply in the current repository state.
     #[error("{0}")]
     Invalid(String),
+    /// Refused for a reason the UI shows in its own way: `code` is one of the `ERR_*` constants of
+    /// `model`, and it reaches the frontend as `ApiError::code`.
+    #[error("{message}")]
+    Refused { code: &'static str, message: String },
 }
 
 /// Rejects a user-supplied ref, branch, tag, remote name or revision that git would read as an
@@ -133,11 +137,18 @@ impl From<GitError> for ApiError {
                     } else {
                         Some(stderr)
                     },
+                    code: None,
                 }
             }
+            GitError::Refused { code, message } => ApiError {
+                message,
+                detail: None,
+                code: Some(code.to_string()),
+            },
             other => ApiError {
                 message: other.to_string(),
                 detail: None,
+                code: None,
             },
         }
     }

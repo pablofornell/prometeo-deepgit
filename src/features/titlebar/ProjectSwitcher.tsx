@@ -4,7 +4,7 @@ import { Icon, initials, openMenu, plural, toast, type MenuItem } from "../../co
 import * as actions from "../../state/actions";
 import { confirmAction } from "../../state/dialogs";
 import { register } from "../../state/keymap";
-import { activeProject, addProject, removeProject, rescanProject, setActiveProject, workspace } from "../../state/workspace";
+import { activeProject, addProject, removeProject, rescanProject, setActiveProject, sortedProjects } from "../../state/workspace";
 import * as api from "../../api/tauri";
 
 export function ProjectSwitcher(): JSX.Element {
@@ -30,18 +30,23 @@ export function ProjectSwitcher(): JSX.Element {
 
   const remove = async (id: string, name: string) => {
     const r = await confirmAction({
-      title: "Remove project",
-      message: `Remove ${name} from DeepGit? The repositories stay on disk.`,
-      confirmLabel: "Remove project",
-      danger: true,
+      title: "Remove project from the list",
+      message: [`Remove "${name}" from DeepGit?`, "DeepGit forgets this project. It does not delete files. The folder and its repositories stay on disk."],
+      confirmLabel: "Remove from list",
     });
-    if (r) await removeProject(id);
+    if (!r) return;
+    try {
+      await removeProject(id);
+      toast({ kind: "info", title: `Removed ${name} from the list` });
+    } catch (e) {
+      toast({ kind: "error", title: api.toApiError(e).message || `Could not remove ${name}` });
+    }
   };
 
   const items = (): MenuItem[] => {
     const active = activeProject();
     const list: MenuItem[] = [{ label: "Projects", heading: true }];
-    for (const p of workspace.projects) {
+    for (const p of sortedProjects()) {
       list.push({
         label: p.name,
         shortcut: plural(p.repos.length, "repo"),
@@ -49,6 +54,7 @@ export function ProjectSwitcher(): JSX.Element {
         tooltip: `${p.name}\n${p.path}`,
         onSelect: () => void setActiveProject(p.id),
         onRename: () => void actions.renameProject(p.id),
+        trailingAction: { icon: "delete", label: "Remove from list", onSelect: () => void remove(p.id, p.name) },
       });
     }
     list.push(

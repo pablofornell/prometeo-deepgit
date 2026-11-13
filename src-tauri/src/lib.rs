@@ -90,6 +90,8 @@ pub fn run() {
             commands::workspace_load,
             commands::workspace_save_ui,
             commands::project_add,
+            commands::project_init_info,
+            commands::project_init,
             commands::project_remove,
             commands::project_rescan,
             commands::project_set_active,

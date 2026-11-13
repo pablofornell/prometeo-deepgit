@@ -14,7 +14,7 @@
  */
 import type {
   ApiErrorShape, AuthNotice, AuthPrompt, CloneOpts, CloneProgress, CloneResult, CloneTarget, CommitDetails, ConflictEntry, ConflictSide, ConflictVersions,
-  ConsoleEntry, DiffSpec, ExpectedOids, FileDiff, FileList, IgnoreFile, IgnoreTarget, LogQuery, LogSessionInfo, MergeOpts, OpResult, Project, CommitRow, HunkOpts, RepoChanged, RepoSummary, Refs,
+  ConsoleEntry, DiffSpec, ExpectedOids, FileDiff, FileList, IgnoreFile, IgnoreTarget, InitInfo, LogQuery, LogSessionInfo, MergeOpts, OpResult, Project, CommitRow, HunkOpts, RepoChanged, RepoSummary, Refs,
   ResetMode, SearchResult, StashUntracked, TextFile, Workspace, WorkingTree,
 } from "./types";
 
@@ -24,10 +24,13 @@ export const isTauri = (): boolean => typeof window !== "undefined" && "__TAURI_
 /** Error thrown by every wrapper. `message` is user-presentable; `detail` is git's stderr. */
 export class ApiError extends Error implements ApiErrorShape {
   readonly detail?: string;
-  constructor(message: string, detail?: string) {
+  /** Kind of the errors the UI handles itself (`ERR_NO_REPOSITORY`). */
+  readonly code?: string;
+  constructor(message: string, detail?: string, code?: string) {
     super(message);
     this.name = "ApiError";
     this.detail = detail;
+    this.code = code;
   }
 }
 
@@ -37,9 +40,9 @@ export function toApiError(e: unknown): ApiError {
   if (typeof e === "string") return new ApiError(e);
   if (e instanceof Error) return new ApiError(e.message);
   if (typeof e === "object" && e !== null) {
-    const o = e as { message?: unknown; detail?: unknown };
+    const o = e as { message?: unknown; detail?: unknown; code?: unknown };
     const message = typeof o.message === "string" ? o.message : JSON.stringify(e);
-    return new ApiError(message, typeof o.detail === "string" ? o.detail : undefined);
+    return new ApiError(message, typeof o.detail === "string" ? o.detail : undefined, typeof o.code === "string" ? o.code : undefined);
   }
   return new ApiError(String(e));
 }
@@ -63,8 +66,12 @@ async function invoke<T>(cmd: string, args?: Args): Promise<T> {
 
 export const workspaceLoad = () => invoke<Workspace>("workspace_load");
 export const workspaceSaveUi = (ui: unknown) => invoke<void>("workspace_save_ui", { ui });
-/** Adds a folder as a project; the backend discovers its repositories. */
+/** Adds a folder as a project; the backend discovers its repositories. Rejects with `code: ERR_NO_REPOSITORY` when it finds none. */
 export const projectAdd = (path: string) => invoke<Project>("project_add", { path });
+/** What the "Initialize a Git repository?" dialog shows about a folder: its name, the default branch, the repository it is inside. */
+export const projectInitInfo = (path: string) => invoke<InitInfo>("project_init_info", { path });
+/** Runs `git init` with `branch` in a folder that holds no repository, then adds the folder as a project (the `project_add` result). */
+export const projectInit = (path: string, branch: string) => invoke<Project>("project_init", { path, branch });
 export const projectRemove = (projectId: string) => invoke<void>("project_remove", { projectId });
 export const projectRescan = (projectId: string) => invoke<Project>("project_rescan", { projectId });
 export const projectSetActive = (projectId: string) => invoke<void>("project_set_active", { projectId });

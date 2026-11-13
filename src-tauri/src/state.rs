@@ -7,7 +7,8 @@ use std::time::{Duration, Instant};
 
 use gitcore::discover::{make_project, not_found_reason, repo_id};
 use gitcore::{
-    ApiError, CancelToken, CloneResult, CloneTarget, Git, GitError, Project, RepoInfo, Workspace,
+    ApiError, CancelToken, CloneResult, CloneTarget, Git, GitError, InitInfo, Project, RepoInfo,
+    Workspace, ERR_NO_REPOSITORY,
 };
 
 use crate::logsession::LogSessions;
@@ -24,6 +25,7 @@ pub fn api_error(message: impl Into<String>) -> ApiError {
     ApiError {
         message: message.into(),
         detail: None,
+        code: None,
     }
 }
 
@@ -137,7 +139,15 @@ impl AppState {
         }
         let project = make_project(&canon);
         if project.repos.is_empty() {
-            return Err(api_error(format!("No Git repository found in {path}")));
+            // A repository deeper than the scan looks: `git init` here would wrap it, so no offer.
+            if let Some(deep) = gitcore::init::deep_repository_error(&canon) {
+                return Err(deep.into());
+            }
+            // The UI offers `git init` for this one (`project_init`), so it tells it by the code.
+            return Err(ApiError {
+                code: Some(ERR_NO_REPOSITORY.to_string()),
+                ..api_error(format!("No Git repository found in {path}"))
+            });
         }
         let (added, saved) = {
             let mut ws = lock(&self.workspace);
@@ -146,6 +156,31 @@ impl AppState {
         };
         self.refresh_repos();
         saved.map(|()| added)
+    }
+
+    /// What the "Initialize a Git repository?" dialog shows for the folder at `path`.
+    pub fn init_info(&self, path: &str) -> Result<InitInfo, ApiError> {
+        let dir = self.folder(path)?;
+        Ok(gitcore::init::init_info(&self.git, &dir)?)
+    }
+
+    /// Runs `git init` with `branch` in the folder at `path`, then adds the folder as a project (see
+    /// `add_project`). A folder that holds a repository, is a bare repository or holds one deeper is
+    /// refused, and so is a bad branch: nothing is created (`gitcore::init::init_repository`).
+    pub fn init_project(&self, path: &str, branch: &str) -> Result<Project, ApiError> {
+        let dir = self.folder(path)?;
+        gitcore::init::init_repository(&self.git, &dir, branch)?;
+        self.add_project(&dir.to_string_lossy())
+    }
+
+    /// The canonical path of the existing folder `path`.
+    fn folder(&self, path: &str) -> Result<PathBuf, ApiError> {
+        let canon = gitcore::paths::canonicalize(Path::new(path))
+            .map_err(|e| api_error(format!("Cannot open {path}: {e}")))?;
+        if !canon.is_dir() {
+            return Err(api_error(format!("{path} is not a folder")));
+        }
+        Ok(canon)
     }
 
     pub fn remove_project(&self, id: &str) -> Result<(), ApiError> {
@@ -545,6 +580,13 @@ mod tests {
             "{}",
             err.message
         );
+        // the UI tells this error by its code, not by its text
+        assert_eq!(err.code.as_deref(), Some(ERR_NO_REPOSITORY));
+        // other failures have no code
+        let err = st
+            .add_project(dir.path().join("nope").to_str().unwrap())
+            .unwrap_err();
+        assert_eq!(err.code, None);
 
         // missing folder
         assert!(st
@@ -584,6 +626,106 @@ mod tests {
         st.remove_project(&added.id).unwrap();
         assert!(st.repo(&added.repos[0].id).is_err());
         assert!(st.remove_project(&added.id).is_err());
+    }
+
+    #[test]
+    fn a_folder_without_a_repository_can_be_initialized_and_added() {
+        let dir = tempfile::tempdir().unwrap();
+        let st = state(dir.path());
+        let folder = dir.path().join("IRIS-docs");
+        std::fs::create_dir_all(&folder).unwrap();
+        let path = folder.to_str().unwrap();
+
+        let info = st.init_info(path).unwrap();
+        assert_eq!(info.name, "IRIS-docs");
+        assert!(!info.default_branch.is_empty());
+        assert_eq!(info.parent_repo, None);
+
+        // a bad branch fails and creates nothing
+        let err = st.init_project(path, "a b").unwrap_err();
+        assert_eq!(err.message, "This is not a valid branch name.");
+        assert!(!folder.join(".git").exists());
+        assert!(st.workspace_snapshot().projects.is_empty());
+
+        // the project is added and active, with one repo on the branch
+        let project = st.init_project(path, "trunk").unwrap();
+        assert_eq!(project.name, "IRIS-docs");
+        assert_eq!(project.repos.len(), 1);
+        assert!(folder.join(".git").is_dir());
+        let head = Command::new("git")
+            .arg("-C")
+            .arg(&folder)
+            .args(["symbolic-ref", "--short", "HEAD"])
+            .output()
+            .unwrap();
+        assert_eq!(String::from_utf8_lossy(&head.stdout).trim(), "trunk");
+        assert_eq!(
+            st.workspace_snapshot().active_project_id.as_deref(),
+            Some(project.id.as_str())
+        );
+        assert!(st.repo(&project.repos[0].id).is_ok());
+
+        // a folder that has a repository is not initialized again
+        let err = st.init_project(path, "main").unwrap_err();
+        assert!(err.message.contains("already"), "{}", err.message);
+        // a missing folder is an error without a code
+        assert!(st
+            .init_info(dir.path().join("nope").to_str().unwrap())
+            .is_err());
+    }
+
+    #[test]
+    fn a_folder_with_only_a_deep_or_bare_repository_is_refused_without_an_init_offer() {
+        let dir = tempfile::tempdir().unwrap();
+        let st = state(dir.path());
+
+        // a repository 5 levels down: deeper than the scan looks
+        let deep = dir.path().join("deep");
+        init_repo(&deep.join("a/b/c/d/e"));
+        let err = st.add_project(deep.to_str().unwrap()).unwrap_err();
+        assert_eq!(err.code.as_deref(), Some(gitcore::ERR_DEEP_REPOSITORY));
+        assert_eq!(
+            err.message,
+            "This folder has Git repositories deeper than DeepGit looks (5 levels). Add the folder that holds them."
+        );
+        // no dialog and no `git init` for it either
+        assert_eq!(
+            st.init_info(deep.to_str().unwrap())
+                .unwrap_err()
+                .code
+                .as_deref(),
+            Some(gitcore::ERR_DEEP_REPOSITORY)
+        );
+        assert_eq!(
+            st.init_project(deep.to_str().unwrap(), "main")
+                .unwrap_err()
+                .code
+                .as_deref(),
+            Some(gitcore::ERR_DEEP_REPOSITORY)
+        );
+        assert!(!deep.join(".git").exists());
+        assert!(st.workspace_snapshot().projects.is_empty());
+
+        // a bare repository: `add_project` says "no repository", the dialog is refused
+        let bare = dir.path().join("foo.git");
+        std::fs::create_dir_all(&bare).unwrap();
+        assert!(Command::new("git")
+            .args(["init", "-q", "--bare"])
+            .arg(&bare)
+            .status()
+            .unwrap()
+            .success());
+        let err = st.add_project(bare.to_str().unwrap()).unwrap_err();
+        assert_eq!(err.code.as_deref(), Some(ERR_NO_REPOSITORY));
+        let err = st.init_info(bare.to_str().unwrap()).unwrap_err();
+        assert_eq!(err.code.as_deref(), Some(gitcore::ERR_BARE_REPOSITORY));
+        assert_eq!(
+            err.message,
+            "This folder is a bare Git repository. DeepGit needs a working folder."
+        );
+        let err = st.init_project(bare.to_str().unwrap(), "main").unwrap_err();
+        assert_eq!(err.code.as_deref(), Some(gitcore::ERR_BARE_REPOSITORY));
+        assert!(!bare.join(".git").exists());
     }
 
     #[test]

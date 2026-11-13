@@ -12,7 +12,7 @@ import { batch, createMemo, createRoot, createSignal } from "solid-js";
 import { createStore, produce, reconcile } from "solid-js/store";
 import * as api from "../api/tauri";
 import { validateProjectName } from "../api/projectName";
-import type { CloneResult, Project, RepoInfo, RepoSummary } from "../api/types";
+import { ERR_NO_REPOSITORY, type CloneResult, type Project, type RepoInfo, type RepoSummary } from "../api/types";
 import { clearProjectAlerts } from "./alerts";
 import { dirtyCount } from "./changesScope";
 import { createBatchRefresher } from "./coalesce";
@@ -33,6 +33,13 @@ export { workspace };
 
 /** The active project, or undefined when the workspace has none (the app shows `Welcome`). */
 export const activeProject = (): Project | undefined => workspace.projects.find((p) => p.id === workspace.activeProjectId);
+
+/** Orders projects by name: case-insensitive, numbers in numeric order (the same compare as the sidebar), then by path. */
+export const compareProjects = (a: Project, b: Project): number =>
+  a.name.localeCompare(b.name, undefined, { sensitivity: "base", numeric: true }) || a.path.localeCompare(b.path);
+
+/** The projects for every list in the UI (the switcher): sorted by name. `workspace.projects` keeps the order of the workspace file. */
+export const sortedProjects = (): Project[] => [...workspace.projects].sort(compareProjects);
 
 /** Repos of the active project, in sidebar order (folders first, then names; ITERATION-3 1.1). The combined graph orders its lanes the same way. */
 export const projectRepos: () => RepoInfo[] = createRoot(() => createMemo(() => sidebarOrder(activeProject()?.repos ?? [])));
@@ -59,11 +66,28 @@ export async function loadWorkspace(): Promise<void> {
   await refreshSummaries();
 }
 
-/** Opens the folder picker (or uses `path`) and adds the folder as a project. Resolves to the project, or null when cancelled. */
+/**
+ * Opens the folder picker (or uses `path`) and adds the folder as a project. Resolves to the project, or null when cancelled.
+ * A folder with no repository is not an error: the user is asked whether to initialize one (`InitRepositoryDialog`), and
+ * Cancel adds nothing. Every "add a project" entry point (Welcome, switcher, sidebar, palette) goes through here.
+ */
 export async function addProject(path?: string): Promise<Project | null> {
   const chosen = path ?? (await (await import("../api/dialog")).pickFolder("Add project folder"));
   if (!chosen) return null;
-  const project = await api.projectAdd(chosen);
+  let project: Project;
+  let initialized: { folder: string; branch: string } | null = null;
+  try {
+    project = await api.projectAdd(chosen);
+  } catch (e) {
+    if (api.toApiError(e).code !== ERR_NO_REPOSITORY) throw e;
+    const info = await api.projectInitInfo(chosen);
+    // loaded here: the dialog and toast modules pull in the UI components, which state modules (and their tests) do not need
+    const { showDialog } = await import("./dialogs");
+    const answer = await showDialog("initRepository", { info });
+    if (!answer) return null;
+    project = answer.project;
+    initialized = { folder: info.name, branch: answer.branch };
+  }
   setWorkspace(
     produce((s) => {
       const i = s.projects.findIndex((p) => p.id === project.id);
@@ -72,6 +96,7 @@ export async function addProject(path?: string): Promise<Project | null> {
     }),
   );
   await setActiveProject(project.id);
+  if (initialized) (await import("../components/ui/Toast")).toast({ kind: "success", title: `Initialized a repository in ${initialized.folder}`, body: `Branch ${initialized.branch}.` });
   return project;
 }
 
@@ -82,18 +107,37 @@ export async function setActiveProject(projectId: string): Promise<void> {
   await refreshSummaries();
 }
 
+/**
+ * Removes a project from the list (the folder and its repositories stay on disk). When it was the active project, the next
+ * one in the sorted list opens (the previous one when it was the last); with none left the shell shows `Welcome`.
+ */
 export async function removeProject(projectId: string): Promise<void> {
+  const sorted = sortedProjects();
+  const at = sorted.findIndex((p) => p.id === projectId);
+  const next = at < 0 ? undefined : (sorted[at + 1] ?? sorted[at - 1]);
+  const wasActive = workspace.activeProjectId === projectId;
   await api.projectRemove(projectId);
   clearProjectAlerts(projectId);
-  const wasActive = workspace.activeProjectId === projectId;
-  setWorkspace(
-    produce((s) => {
-      s.projects = s.projects.filter((p) => p.id !== projectId);
-      if (s.activeProjectId === projectId) s.activeProjectId = s.projects[0]?.id ?? null;
-    }),
-  );
-  if (wasActive) projectSwitched();
-  else restoreRepoFilter();
+  // The removal is done: the store, the selection and the repo filter follow in one step, before any other await.
+  batch(() => {
+    setWorkspace(
+      produce((s) => {
+        s.projects = s.projects.filter((p) => p.id !== projectId);
+        if (wasActive) s.activeProjectId = next?.id ?? null;
+      }),
+    );
+    if (wasActive) projectSwitched();
+    else restoreRepoFilter();
+  });
+  if (wasActive && next) {
+    // The backend saved its own successor (file order); tell it the sorted one. When this fails the project is removed
+    // all the same and the UI is right, so the failure is not reported as a failed removal.
+    try {
+      await api.projectSetActive(next.id);
+    } catch {
+      /* the next start picks the first project instead */
+    }
+  }
   await refreshSummaries();
 }
 

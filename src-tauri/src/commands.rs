@@ -8,9 +8,9 @@ use gitcore::{
     clone as gitclone, conflicts as gitconflicts, diff, files as gitfiles, log, ops,
     refs as gitrefs, status, ApiError, CloneOpts, CloneProgress, CloneResult, CloneTarget,
     CommitDetails, CommitRow, ConflictEntry, ConflictSide, ConflictVersions, DiffSpec, FileDiff,
-    FileList, Git, HunkRef, IgnoreFile, IgnoreTarget, LogQuery, LogSessionInfo, MergeOpts,
-    OpResult, Project, Refs, RepoChanged, RepoInfo, RepoSummary, ResetMode, SearchResult,
-    StashUntracked, TextFile, WorkingTree, Workspace,
+    FileList, Git, HunkRef, IgnoreFile, IgnoreTarget, InitInfo, LogQuery, LogSessionInfo,
+    MergeOpts, OpResult, Project, Refs, RepoChanged, RepoInfo, RepoSummary, ResetMode,
+    SearchResult, StashUntracked, TextFile, WorkingTree, Workspace,
 };
 use gitcore::{AuthMode, GitError};
 use tauri::{AppHandle, Emitter, State};
@@ -78,6 +78,18 @@ pub async fn workspace_save_ui(state: St<'_>, ui: serde_json::Value) -> Res<()> 
 pub async fn project_add(state: St<'_>, path: String) -> Res<Project> {
     let st = state.inner().clone();
     blocking(move || st.add_project(&path)).await
+}
+
+#[tauri::command]
+pub async fn project_init_info(state: St<'_>, path: String) -> Res<InitInfo> {
+    let st = state.inner().clone();
+    blocking(move || st.init_info(&path)).await
+}
+
+#[tauri::command]
+pub async fn project_init(state: St<'_>, path: String, branch: String) -> Res<Project> {
+    let st = state.inner().clone();
+    blocking(move || st.init_project(&path, &branch)).await
 }
 
 #[tauri::command]
