@@ -1,6 +1,6 @@
-# CI: lint, tests and a frontend build on Linux, Windows and macOS.
-# Windows and macOS are not tested on the developer machine, so this workflow is
-# the only check for them. The git-backed Rust tests need a real `git` (present on
+# CI: lint, tests and a frontend build on Linux and Windows. macOS is not supported.
+# Windows is not tested on the developer machine, so this workflow is
+# the only check for it. The git-backed Rust tests need a real `git` (present on
 # all GitHub runners) and a committer identity.
 name: CI
 
@@ -18,7 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, windows-latest, macos-latest]
+        os: [ubuntu-24.04, windows-latest]
     runs-on: ${{ matrix.os }}
     env:
       CARGO_TERM_COLOR: always

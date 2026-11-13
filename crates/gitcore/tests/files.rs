@@ -574,8 +574,7 @@ fn ignore_file_says_whether_the_repo_ignores_case() {
     let repo = TestRepo::new();
     let g = git();
     let read = |t| files::read_ignore_file(&g, &repo.info, t).expect("read");
-    // Unset (the default on Linux) and false: case matters.
-    assert!(!read(IgnoreTarget::Gitignore).ignore_case);
+    // False: case matters. (Git on Windows writes `true` at init, so set it first.)
     repo.sh(&["config", "core.ignorecase", "false"]);
     assert!(!read(IgnoreTarget::Gitignore).ignore_case);
     // True, also in the spellings that git reads as true.
@@ -584,4 +583,7 @@ fn ignore_file_says_whether_the_repo_ignores_case() {
     assert!(read(IgnoreTarget::Exclude).ignore_case);
     repo.sh(&["config", "core.ignorecase", "yes"]);
     assert!(read(IgnoreTarget::Gitignore).ignore_case);
+    // Unset: case matters.
+    repo.sh(&["config", "--unset", "core.ignorecase"]);
+    assert!(!read(IgnoreTarget::Gitignore).ignore_case);
 }

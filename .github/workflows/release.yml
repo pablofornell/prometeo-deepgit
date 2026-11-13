@@ -5,7 +5,7 @@
 # Assets per platform (Tauri bundler):
 #   Windows: DeepGit_<ver>_x64-setup.exe (NSIS installer) and DeepGit_<ver>_x64_en-US.msi
 #   Linux:   .AppImage, .deb, .rpm (built on Ubuntu 22.04 for an older glibc)
-# macOS is not released (no expected users); the CI workflow still tests on macOS.
+# macOS is not supported, so it is not built or tested.
 # The installers are not code-signed: Windows SmartScreen warns at the first start.
 name: Release
 
