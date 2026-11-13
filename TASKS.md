@@ -1,0 +1,44 @@
+# DeepGit: next iteration — tasks
+
+## 1. Global
+- [ ] **Context menu (right-click):** Disable the default webview context menu in all of the application. Show only custom context menus.
+- [ ] **Date format:** All dates use `dd-mm-yyyy`. Remove the ISO format.
+- [ ] **Mouse side buttons:** Mouse back/forward buttons do back/forward navigation.
+- [ ] **Remove Git command hints:** Remove all "equivalent Git command" hints.
+- [ ] **App icon (tree):** Make the tree icon much denser as the distance from the trunk increases.
+
+## 2. Projects
+- [ ] **Sort order:** Sort the project list alphabetically.
+- [ ] **Delete projects:** Delete a project without opening it first.
+- [ ] **Open a folder without a Git repo:** No error. Tell the user the folder is not a Git repository and offer to initialize one.
+
+## 3. Repository tree (sidebar)
+- [ ] **Group by folder:** Repos in the same parent folder show as a nested tree, at all levels.
+- [ ] **Branch context menu:** Add "Copy branch name" to the branch right-click menu in the repository tree.
+- [ ] **Double-click on a branch of a different repo:** Switch to that repo and refresh the main commit list.
+- [ ] **Pull counters:** After a pull, refresh the per-repo counters in the repository tree.
+
+## 4. Commit history
+- [ ] **Overlapping chips:** The count chip (`+3`) must not overlap the `HEAD` label.
+- [ ] **Selected commit highlight:** The border of the target commit node pulses slowly (soft glow).
+- [ ] **Branch dropdown:** After a checkout, the branch dropdown shows the new branch name.
+
+## 5. Commit view (local changes)
+- [ ] **Commit fails with "Nothing to commit":** Find the root cause and fix it.
+- [ ] **External changes:** Commits made outside the app refresh the change counter and tab label (watch `.git` / index).
+
+## 6. Status bar and notifications
+- [ ] **Global pull counter:** Refresh the counter of repos with available pulls after a pull.
+- [ ] **Alert icon:** Alerts are per project, the user can dismiss them, and they expire after a configurable time.
+
+## 7. Branch matrix
+- [ ] **Bulk push with upstream:** For branches not tracked on the remote, "Push and set upstream" for all selected repos at the same time.
+
+## 8. File view (mini editor)
+- [ ] **File tree position:** Move the file tree column to the right side of the editor.
+- [ ] **Git status colors:** Color file and folder names by Git status (modified, added, untracked, ignored, conflicted).
+- [ ] **Tab context menu:** Close, Close Others, Close All, Close Tabs to the Left/Right, Copy Path, Reveal in File Tree.
+- [ ] **Find / Find and Replace:** VS Code style floating widget (match case, whole word, regex, match count, replace / replace all).
+
+## 9. Smart .gitignore
+- [ ] **Smart .gitignore:** Add ignore rules from the UI (right-click a file or folder → "Add to .gitignore", with pattern suggestions). Only edit `.gitignore`, no commit.
