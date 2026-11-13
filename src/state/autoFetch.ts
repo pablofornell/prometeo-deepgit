@@ -3,7 +3,7 @@
  * project in the background, with `--all` and `--prune` (`settings.autoFetchPrune`).
  *
  *   startAutoFetch();                 // once, from App
- *   autoFetchStatus().failing         // repos whose last auto-fetch failed (the status bar shows one quiet indicator)
+ *   autoFetchStatus().failing         // repos whose last auto-fetch failed (the status bar shows them as alerts)
  *
  * Rules (all in `autoFetchCore.ts`, which is pure and tested with fake timers):
  *  - one timer; a project switch or a settings change re-plans it, timers never stack;
@@ -12,10 +12,14 @@
  *  - nothing runs while the window is hidden; on return, overdue repos are fetched at once;
  *  - no toast, no progress activity; the backend tags these fetches `background` in the console entry (hidden unless "Show background commands" is on);
  *  - no login dialog: the backend runs them with `AuthMode::Silent` (`background`), saved credentials only;
- *  - a repo that fails backs off on its own: its interval doubles up to 60 min and resets on its first success.
+ *  - a repo that fails backs off on its own: its interval doubles up to 60 min and resets on its first success;
+ *  - each failed attempt raises one status bar alert of the active project (`state/alerts.ts`); a dismissed alert does not
+ *    come back until the next failed attempt.
  */
 import { createEffect, createRoot, createSignal, on, untrack } from "solid-js";
 import * as actions from "./actions";
+import { raiseAlert } from "./alerts";
+import { autoFetchAlertText, newAutoFetchFailures } from "./alertsCore";
 import { type AutoFetchStatus, createAutoFetch } from "./autoFetchCore";
 import { lastFetchAt } from "./fetchAge";
 import { isRepoBusy } from "./repoBusy";
@@ -40,6 +44,17 @@ export function autoFetchLine(): string {
   return `Auto-fetch failed in ${failing.length === 1 ? name : `${failing.length} repositories`}: ${first.message}`;
 }
 
+/** Failure counts that already have an alert, per repo. */
+let reportedFailures = new Map<string, number>();
+
+function raiseFailureAlerts(status: AutoFetchStatus): void {
+  const r = newAutoFetchFailures(reportedFailures, status.failing);
+  reportedFailures = r.reported;
+  for (const f of r.raise) {
+    raiseAlert({ severity: "warning", text: autoFetchAlertText(f.message), repoName: repoById(f.repoId)?.name });
+  }
+}
+
 let started = false;
 
 /** Starts the scheduler: follows the settings, the active project and the window visibility. Safe to call twice. */
@@ -58,7 +73,10 @@ export function startAutoFetch(): void {
       const r = await actions.fetch(ids, { prune, silent: true, background: true });
       return { ok: r.ok, failed: r.failed.map((f) => ({ repoId: f.repoId, message: f.error.message })) };
     },
-    onStatus: setAutoFetchStatus,
+    onStatus: (status) => {
+      setAutoFetchStatus(status);
+      raiseFailureAlerts(status);
+    },
   });
   createRoot(() => {
     // a new project, a changed interval or a changed repo list plans the timer again

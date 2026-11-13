@@ -9,11 +9,14 @@
  * shown, older ones collapse into "N more notifications". Every toast is also kept in `notifications()`
  * for the Notifications tool window; `unreadCount()` drives the dot on the bell.
  * The host docks above the status bar at the bottom-left; the shell sets `--dg-toast-width`.
+ * A warning or an error toast also becomes a status bar alert of the active project (`state/alerts.ts`, through
+ * `setToastAlertSink`); `repoName` says which repository it is about.
  */
 import { For, type JSX, Show, createSignal, onCleanup } from "solid-js";
 import { Icon } from "./Icon";
 import type { IconName } from "./icons";
 import { IconButton } from "./Button";
+import { alertText } from "../../state/alertsCore";
 
 export type ToastKind = "success" | "info" | "warning" | "error";
 
@@ -31,6 +34,15 @@ export interface ToastOptions {
   actions?: ToastAction[];
   /** Override auto-close in ms; 0 = never. */
   timeout?: number;
+  /** Repository the toast is about; shown in the alert that a warning or an error creates. */
+  repoName?: string;
+}
+
+/** What a warning or an error toast hands to the alerts. */
+export interface ToastAlert {
+  severity: "error" | "warning";
+  text: string;
+  repoName?: string;
 }
 
 export interface Notification extends ToastOptions {
@@ -54,9 +66,16 @@ export function clearNotifications(): void {
   setHistory([]);
 }
 
+let alertSink: ((a: ToastAlert) => void) | undefined;
+/** `state/alerts.ts` sets this once: every warning and error toast calls it. */
+export function setToastAlertSink(sink: ((a: ToastAlert) => void) | undefined): void {
+  alertSink = sink;
+}
+
 /** Shows a toast and records it as a notification. Returns its id. */
 export function toast(opts: ToastOptions): number {
   const n: Notification = { ...opts, id: ++seq, time: Date.now(), read: false };
+  if (opts.kind === "warning" || opts.kind === "error") alertSink?.({ severity: opts.kind, text: alertText(opts.title, opts.body), repoName: opts.repoName });
   setToasts((t) => [...t, n]);
   setHistory((h) => [n, ...h].slice(0, 100));
   return n.id;

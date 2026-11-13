@@ -1,15 +1,17 @@
-/** Status bar (DESIGN.md 5.19): command ticker (11.3), progress area (5.17), focused repo, branch, fetch age, theme. */
+/** Status bar (DESIGN.md 5.19): command ticker (11.3), progress area (5.17), focused repo, branch, alerts (ITERATION-3.md 6), fetch age, theme. */
 import { For, type JSX, Show, createMemo, createSignal } from "solid-js";
 import { AheadBehind, Icon, Popup, ProgressBar, RepoIcon, Spinner, THEME_ICONS } from "../../components/ui";
 import * as actions from "../../state/actions";
 import { activities } from "../../state/activity";
-import { autoFetchLine, autoFetchStatus } from "../../state/autoFetch";
+import { startAlerts } from "../../state/alerts";
+import { autoFetchLine } from "../../state/autoFetch";
 import { consoleEntries, formatCommand, isBackgroundEntry, lastUserEntry } from "../../state/console";
 import { fetchAge } from "../../state/fetchAge";
 import { openBottomTool, setSidebarVisible } from "../../state/layout";
 import { runBinding } from "../../state/keymap";
 import { resolvedTheme, settings, toggleTheme } from "../../state/settings";
 import { focusedRepo, repoById, summary } from "../../state/workspace";
+import { AlertsWidget } from "./AlertsWidget";
 import { middleTruncate } from "./format";
 import "./statusbar.css";
 
@@ -19,6 +21,7 @@ const MAX_COMMAND_CHARS = 72;
 const SAME_BATCH_MS = 10_000;
 
 export function StatusBar(): JSX.Element {
+  startAlerts();
   let progressBtn: HTMLButtonElement | undefined;
   const [progressOpen, setProgressOpen] = createSignal(false);
 
@@ -125,17 +128,7 @@ export function StatusBar(): JSX.Element {
           </>
         )}
       </Show>
-      <Show when={autoFetchStatus().failing.length > 0}>
-        <button
-          type="button"
-          class="dg-statusbar-widget dg-statusbar-autofetch"
-          data-tip={`${autoFetchLine()}\nIt tries again later. Open the Git console to see the command.`}
-          aria-label={autoFetchLine()}
-          onClick={() => openBottomTool("console")}
-        >
-          <Icon name="warning" size={14} class="dg-statusbar-bad" />
-        </button>
-      </Show>
+      <AlertsWidget />
       <button
         type="button"
         class="dg-statusbar-widget dg-statusbar-fetch"
