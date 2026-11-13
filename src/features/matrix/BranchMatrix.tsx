@@ -97,7 +97,6 @@ export function BranchMatrix(): JSX.Element {
           ...(dirty > 0 ? [`${plural(dirty, "repo")} ha${dirty === 1 ? "s" : "ve"} uncommitted changes. Git keeps them unless they conflict with the branch.`] : []),
         ],
         confirmLabel: `Checkout in ${plural(ids.length, "repo")}`,
-        command: ids.map((id) => (col.cells[id].state === "remote" ? `git -C ${name(id)} checkout -b ${col.name} --track origin/${col.name}` : `git -C ${name(id)} checkout ${col.name}`)),
       });
       if (!ok) return;
     }
@@ -112,7 +111,6 @@ export function BranchMatrix(): JSX.Element {
       title: `Create ${col.name}`,
       message: `Create ${col.name} in ${plural(ids.length, "repo")} that ${ids.length === 1 ? "does" : "do"} not have it. The branches are created but not checked out.`,
       confirmLabel: `Create in ${plural(ids.length, "repo")}`,
-      command: ids.map((id) => `git -C ${name(id)} branch ${col.name} ${baseOf(id)}`),
     });
     if (!ok) return;
     await run(col.name, async () => {

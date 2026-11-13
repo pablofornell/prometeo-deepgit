@@ -62,3 +62,12 @@ export function secretLabel(p: AuthPrompt): string {
       return p.prompt.replace(/[:\s]+$/, "") || "Secret";
   }
 }
+
+const VERBS = new Set(["fetch", "pull", "push", "clone"]);
+
+/** `git fetch` -> `fetch`: the plain verb of the operation that asks, or "" for any other command. */
+export function commandVerb(command: string): string {
+  const m = /^git\s+([a-z-]+)/i.exec(command.trim());
+  const sub = m?.[1].toLowerCase() ?? "";
+  return VERBS.has(sub) ? sub : "";
+}

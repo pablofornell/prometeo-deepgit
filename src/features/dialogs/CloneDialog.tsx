@@ -14,7 +14,6 @@ import * as actions from "../../state/actions";
 import type { CloneDialogResult, CloneProps } from "../../state/dialogs";
 import { loadPersisted, savePersisted } from "../../state/persist";
 import { activeProject } from "../../state/workspace";
-import { shellQuote } from "./command";
 import { Field, Note, RadioGroup } from "./parts";
 
 const PARENT_KEY = "cloneParentDir";
@@ -77,15 +76,6 @@ export function CloneDialog(props: CloneProps & DialogComponentProps<CloneDialog
   const target = (): "current" | "new" => (addTo() === "current" && canAddToCurrent() ? "current" : "new");
 
   const targetPath = () => (parentDir().trim() !== "" && dirName().trim() !== "" ? joinPath(trimSep(parentDir().trim()), dirName().trim()) : "<folder>");
-  const command = () => {
-    const i = input();
-    const parts = ["git", "clone", "--progress"];
-    if (i.branch) parts.push("--branch", shellQuote(i.branch));
-    if (i.depth !== null && !Number.isNaN(i.depth)) parts.push("--depth", String(i.depth));
-    if (submodules()) parts.push("--recurse-submodules");
-    parts.push("--", url().trim() === "" ? "<url>" : shellQuote(url().trim()), shellQuote(targetPath()));
-    return parts.join(" ");
-  };
 
   const canClone = () => !running() && inputError() === null;
 
@@ -150,7 +140,6 @@ export function CloneDialog(props: CloneProps & DialogComponentProps<CloneDialog
       width="wide"
       onClose={close}
       cancelLabel={running() ? "Cancel clone" : "Cancel"}
-      command={command()}
       primary={{ label: running() ? "Cloning…" : "Clone", disabled: !canClone(), onClick: start }}
     >
       <Field label="Repository URL" error={urlError()}>

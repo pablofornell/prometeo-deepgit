@@ -3,7 +3,6 @@ import { type JSX, Show, createSignal } from "solid-js";
 import { Dialog, type DialogComponentProps, TextField, joinNames, shortOid } from "../../components/ui";
 import type { TagProps, TagResult } from "../../state/dialogs";
 import { repoRefs } from "../../state/refs";
-import { gitCmd, perRepo } from "./command";
 import { Field, Note, ReadOnly, TextArea, repoNames } from "./parts";
 import { validateRefName } from "./refname";
 
@@ -27,17 +26,10 @@ export function TagDialog(props: TagProps & DialogComponentProps<TagResult>): JS
   };
   const canSubmit = () => trimmed() !== "" && error() === null;
 
-  // mirrors the backend: `tag -a <name> -m <message> <target>` or `tag <name> <target>`
-  const command = () => {
-    const n = trimmed() || "<name>";
-    return perRepo(repoNames(props.repoIds), (repo) => gitCmd(repo, msg() ? ["tag", "-a", n, "-m", msg(), props.target] : ["tag", n, props.target]));
-  };
-
   return (
     <Dialog
       title="New tag"
       onClose={() => props.close()}
-      command={command()}
       primary={{ label: "Create tag", disabled: !canSubmit(), onClick: () => props.close({ name: trimmed(), message: msg() || null }) }}
     >
       <Field label="Name" error={error()}>

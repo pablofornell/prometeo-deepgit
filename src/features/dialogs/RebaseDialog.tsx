@@ -4,12 +4,10 @@ import { Dialog, type DialogComponentProps, Select, type SelectOption, joinNames
 import type { RebaseProps, RebaseResult } from "../../state/dialogs";
 import { repoRefs } from "../../state/refs";
 import { summary } from "../../state/workspace";
-import { gitCmd, perRepo } from "./command";
 import { Field, Note, ReadOnly, repoNames } from "./parts";
 
 export function RebaseDialog(props: RebaseProps & DialogComponentProps<RebaseResult>): JSX.Element {
   const [onto, setOnto] = createSignal(props.onto);
-  const names = () => repoNames(props.repoIds);
 
   const remoteNames = createMemo(() => new Set(props.repoIds.flatMap((id) => repoRefs(id)()?.remote.map((b) => b.fullName) ?? [])));
 
@@ -41,14 +39,10 @@ export function RebaseDialog(props: RebaseProps & DialogComponentProps<RebaseRes
     return !!up && up !== onto();
   });
 
-  const command = () =>
-    perRepo(names(), (repo) => gitCmd(repo, ["rebase", "--autostash", onto()]));
-
   return (
     <Dialog
       title={`Rebase ${props.branch}`}
       onClose={() => props.close()}
-      command={command()}
       primary={{ label: "Rebase", disabled: onto() === "", onClick: () => props.close({ onto: onto() }) }}
     >
       <Field label="Rebase">

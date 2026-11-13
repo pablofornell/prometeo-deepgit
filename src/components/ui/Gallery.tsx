@@ -25,7 +25,6 @@ function DemoDialog(props: { value: string } & DialogComponentProps<string>): JS
       title="New branch"
       onClose={() => props.close()}
       primary={{ label: "Create branch", disabled: !v().trim(), onClick: () => props.close(v().trim()) }}
-      command={`git -C api-gateway checkout -b ${v() || "<name>"} main`}
       footerLeft={<Checkbox checked label="Check out" onChange={() => {}} />}
     >
       <TextField value={v()} onInput={setV} placeholder="Branch name" />

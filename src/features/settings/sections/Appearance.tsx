@@ -20,7 +20,6 @@ const THEMES: { value: ThemePref; label: string; icon: (typeof THEME_ICONS)[Them
 const DATES: Choice<DateFormat>[] = [
   { value: "relative", label: "Relative", example: () => dateExample("relative") },
   { value: "absolute", label: "Absolute", example: () => dateExample("absolute") },
-  { value: "iso", label: "ISO", example: () => dateExample("iso") },
 ];
 const ALERT_EXPIRIES = ALERT_EXPIRY_CHOICES.map((h) => ({ value: String(h), label: alertExpiryLabel(h) }));
 /** Times of the two preview commits, before now. */
@@ -102,7 +101,7 @@ function AppearanceSection(): JSX.Element {
         <Row label="Comfortable rows" hint="Taller rows in the log.">
           <Checkbox checked={settings.comfortableRows} ariaLabel="Comfortable rows" onChange={(v) => setSetting("comfortableRows", v)} />
         </Row>
-        <Row label="Date format" hint="Every date of the app. Absolute follows your language. Tooltips show the full date.">
+        <Row label="Date format" hint="Every date of the app. Absolute is dd-mm-yyyy. Tooltips show the full date.">
           <ChoiceList label="Date format" value={settings.dateFormat} options={DATES} onChange={(v) => setSetting("dateFormat", v)} />
         </Row>
       </Section>

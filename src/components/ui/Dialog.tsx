@@ -6,8 +6,7 @@
  *     const [name, setName] = createSignal(props.oldName);
  *     return (
  *       <Dialog title="Rename branch" onClose={() => props.close()}
- *         primary={{ label: "Rename", disabled: !name().trim(), onClick: () => props.close(name().trim()) }}
- *         command={`git branch -m ${props.oldName} ${name()}`}>
+ *         primary={{ label: "Rename", disabled: !name().trim(), onClick: () => props.close(name().trim()) }}>
  *         <TextField value={name()} onInput={setName} />
  *       </Dialog>
  *     );
@@ -23,9 +22,8 @@ import { type Component, For, type JSX, Show, createSignal, onCleanup, onMount }
 import { Dynamic, Portal } from "solid-js/web";
 import { trackOverlay } from "../../state/keymap";
 import { setDialogDepth } from "../../state/overlays";
-import { Button, IconButton } from "./Button";
+import { Button } from "./Button";
 import { type Offset, clampDialogOffset } from "./dialogGeometry";
-import { copyText } from "./util";
 
 /** Props every dialog body component receives in addition to its own. */
 export interface DialogComponentProps<T> {
@@ -109,8 +107,6 @@ export interface DialogProps {
   cancelLabel?: string;
   /** 480 px (default), 640 px, or "large" (Settings: up to 1040 x 700 px, the body fills the frame). */
   width?: "normal" | "wide" | "large";
-  /** The git command(s) this dialog will run: shown in a mono strip (DESIGN.md 11.7). Update it as options change. */
-  command?: string | string[];
   /** Content at the left of the footer (e.g. a checkbox). */
   footerLeft?: JSX.Element;
   children: JSX.Element;
@@ -118,12 +114,11 @@ export interface DialogProps {
 
 const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-/** Dialog frame: title, body, optional command preview, footer buttons. See the file header. */
+/** Dialog frame: title, body, footer buttons. See the file header. */
 export function Dialog(props: DialogProps): JSX.Element {
   let box: HTMLDivElement | undefined;
   const previous = document.activeElement as HTMLElement | null;
   trackOverlay(() => true);
-  const commands = () => (props.command === undefined ? [] : Array.isArray(props.command) ? props.command : [props.command]);
 
   onMount(() => {
     const first = box?.querySelector<HTMLElement>("input:not([disabled]), textarea, select") ?? box?.querySelector<HTMLElement>(FOCUSABLE);
@@ -177,14 +172,6 @@ export function Dialog(props: DialogProps): JSX.Element {
       >
         <h2 class="dg-dialog-title">{props.title}</h2>
         <div class="dg-dialog-body">{props.children}</div>
-        <Show when={commands().length > 0}>
-          <div class="dg-command dg-selectable">
-            <div class="dg-command-lines">
-              <For each={commands()}>{(c) => <div class="dg-command-line">{c.startsWith("$") ? c : "$ " + c}</div>}</For>
-            </div>
-            <IconButton icon="copy" label="Copy command" size="small" iconSize={12} onClick={() => void copyText(commands().join("\n"))} />
-          </div>
-        </Show>
         <div class="dg-dialog-footer">
           <div class="dg-dialog-footer-left">{props.footerLeft}</div>
           <Button onClick={props.onClose}>{props.cancelLabel ?? "Cancel"}</Button>

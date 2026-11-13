@@ -101,8 +101,6 @@
   --dg-toggle-on-bg: var(--dg-accent-fill);
   --dg-progress-fg: var(--dg-accent);
   --dg-progress-fg-end: var(--dg-info);                     /* progress bars run from electric blue to cyan */
-  --dg-command-bg: var(--dg-info-wash);                     /* git command preview of a dialog */
-  --dg-command-border: var(--dg-info-border);
   --dg-badge-bg: var(--dg-neutral-wash);                    /* neutral counter, repo chip */
 
   /* ---- banners (inside an island) and toasts (floating, so opaque) ---- */
@@ -371,8 +369,7 @@
 .dg-matrix-bar,
 .dg-dialogs-note,
 .dg-dialogs-radio.is-on,
-.dg-toast,
-.dg-command {
+.dg-toast {
   --dg-text-muted: var(--dg-text-muted-on-wash);
   --dg-text-secondary: var(--dg-text-muted-on-wash);
   --dg-log-hash-fg: var(--dg-text-muted-on-wash);

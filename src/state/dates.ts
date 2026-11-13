@@ -24,7 +24,7 @@ export function nowMs(): number {
   return clock();
 }
 
-/** A date in the user's format: "3 h ago", "10 Nov 2026, 14:32" or "2026-11-10 14:32". */
+/** A date in the user's format: "3 h ago" or "10-11-2026 14:32". */
 export function formatDate(unixSec: number): string {
   const format = settings.dateFormat;
   return formatDateAs(format, unixSec, format === "relative" ? nowMs() : 0);
@@ -32,7 +32,7 @@ export function formatDate(unixSec: number): string {
 
 /** The full absolute date, for a tooltip (never relative). */
 export function fullDate(unixSec: number): string {
-  return formatFullDate(settings.dateFormat, unixSec);
+  return formatFullDate(unixSec);
 }
 
 /** The other view of the date, for places with room for both: the exact date when the format is relative, else the age. */

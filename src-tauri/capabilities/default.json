@@ -16,6 +16,8 @@
     "core:window:allow-set-title",
     "core:webview:allow-set-webview-zoom",
     "dialog:allow-open",
+    "clipboard-manager:allow-read-text",
+    "clipboard-manager:allow-write-text",
     "opener:default"
   ]
 }

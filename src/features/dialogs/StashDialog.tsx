@@ -3,8 +3,7 @@ import { type JSX, Show, createSignal } from "solid-js";
 import { Checkbox, Dialog, type DialogComponentProps, TextField } from "../../components/ui";
 import type { StashProps, StashResult } from "../../state/dialogs";
 import { summary } from "../../state/workspace";
-import { gitCmd, perRepo } from "./command";
-import { Field, Note, RepoRows, repoNames } from "./parts";
+import { Field, Note, RepoRows } from "./parts";
 
 export function StashDialog(props: StashProps & DialogComponentProps<StashResult>): JSX.Element {
   const [message, setMessage] = createSignal("");
@@ -29,14 +28,10 @@ export function StashDialog(props: StashProps & DialogComponentProps<StashResult
     return parts.length > 0 ? parts.join(", ") : "no changes";
   };
 
-  const command = () =>
-    perRepo(repoNames(props.repoIds), (repo) => gitCmd(repo, ["stash", "push", includeUntracked() && "-u", keepIndex() && "--keep-index", message().trim() && "-m", message().trim()]));
-
   return (
     <Dialog
       title="Stash changes"
       onClose={() => props.close()}
-      command={command()}
       primary={{
         label: "Stash",
         disabled: nothing(),

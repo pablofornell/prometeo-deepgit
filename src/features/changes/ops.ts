@@ -68,7 +68,6 @@ export async function discardItems(items: readonly FileItem[]): Promise<void> {
     ],
     confirmLabel: `Discard ${plural(todo.length, "file")}`,
     danger: true,
-    command: [...groups].map(([id]) => `git -C ${repoById(id)?.name ?? id} restore --worktree -- …`),
   });
   if (!r) return;
   await Promise.all([...groups].map(([repoId, list]) => actions.discard(repoId, pathsOf(list, false), { confirm: false, untracked: untracked(list) })));

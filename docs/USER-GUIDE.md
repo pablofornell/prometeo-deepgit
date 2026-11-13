@@ -188,10 +188,10 @@ You can type these prefixes in the text box:
 
 - `author:name`
 - `path:src/refunds`
-- `after:2026-10-01`
-- `before:2026-11-01`
+- `after:01-10-2026`
+- `before:01-11-2026`
 
-Dates use the form `YYYY-MM-DD`. Use quotes for values that contain spaces, for example `author:"Lucía Martín"`.
+Dates use the form `DD-MM-YYYY` (`YYYY-MM-DD` also works). Use quotes for values that contain spaces, for example `author:"Lucía Martín"`.
 
 When a filter is on, its chip is highlighted. Click the **x** on a chip to clear it.
 Press `Ctrl+Shift+F` to clear all filters, including the repository filter.
@@ -488,14 +488,11 @@ DeepGit skips a repository when the operation does not apply to it. A skip is no
 
 Double-click a cell to check out the branch in that repository only.
 
-### Dialogs and command preview
+### Dialogs
 
 ![New branch dialog](screenshots/dialog.png)
 
 Every operation that needs a choice opens a dialog.
-Each dialog shows the exact `git` commands at the bottom.
-The preview changes when you change an option.
-Click the copy icon to copy the commands.
 Press `Enter` to run the main action. Press `Esc` to cancel.
 
 | Dialog | Options |
@@ -504,7 +501,7 @@ Press `Enter` to run the main action. Press `Esc` to cancel.
 | **Check out remote branch** | Name of the new local branch. It tracks the remote branch. |
 | **Rename branch** | New name. **Also rename `<remote>/<branch>`** shows the full name of the remote branch that is renamed (see the delete rule below). |
 | **Merge** | Fast-forward when possible, always create a merge commit, or squash. |
-| **Rebase** | Target branch. The command preview shows `--autostash`. A warning appears when the branch has an upstream, because rebase rewrites commits. |
+| **Rebase** | Target branch. A warning appears when the branch has an upstream, because rebase rewrites commits. |
 | **Reset** | Soft, Mixed, Hard or Keep. A red warning shows for Hard. |
 | **Push** | Remote, the commits to push, **Set upstream**, **Push tags**, **Force with lease**. |
 | **Stash** | Message, **Include untracked files**, **Keep index**. |
@@ -679,7 +676,7 @@ The current change is the one under the cursor in the Result, or the one you wen
 A stash saves your local changes and cleans the working tree.
 
 - To stash, press `Ctrl+Alt+Z`, click **Stash changes** in the **Local changes** tab, or use **Stash changes…** in a repository menu.
-- The dialog has **Include untracked files** and **Keep index**. It shows the command.
+- The dialog has **Include untracked files** and **Keep index**.
 - In multi-repo projects, the palette action **Stash changes in all repositories…** stashes all repositories.
 - Stashes appear in the sidebar under **Stashes** in each repository. The **Local changes** tab shows the number of stashes.
 
@@ -796,7 +793,7 @@ Every change applies **at once**. There is no OK button. Press `Esc` or click **
 | **Editor font size** | 10 to 20 px. Diff, console and commit hashes. By default it follows the font size. Clear **Follow the font size** to choose a value. |
 | **UI scale** | 80% to 200% in steps of 10%, default 100%. Zooms the whole window. |
 | **Comfortable rows** | Taller rows in the log |
-| **Date format** | Relative (3 h ago), Absolute (10 Nov 2026, 14:32, in the order and words of your language) or ISO (2026-11-10 14:32). Each choice shows the time 3 hours ago in that format. It applies at once to every date: the log and its date groups, the commit details, the stashes, the notifications and the last commit of **Changes**. Hover a date to see the full date and time. |
+| **Date format** | Relative (3 h ago) or Absolute (dd-mm-yyyy, for example 10-11-2026 14:32). Each choice shows the time 3 hours ago in that format. It applies at once to every date: the log and its date groups, the commit details, the stashes, the notifications and the last commit of **Changes**. Hover a date to see the full date and time. |
 
 The preview under **UI scale** shows the sizes you choose.
 

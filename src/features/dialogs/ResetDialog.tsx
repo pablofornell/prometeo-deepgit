@@ -4,7 +4,6 @@ import { Dialog, type DialogComponentProps, joinNames, plural, shortOid } from "
 import type { ResetMode } from "../../api/types";
 import type { ResetProps, ResetResult } from "../../state/dialogs";
 import { summary } from "../../state/workspace";
-import { gitCmd, perRepo } from "./command";
 import { Field, Note, RadioGroup, ReadOnly, repoNames } from "./parts";
 
 export function ResetDialog(props: ResetProps & DialogComponentProps<ResetResult>): JSX.Element {
@@ -13,13 +12,10 @@ export function ResetDialog(props: ResetProps & DialogComponentProps<ResetResult
   const target = () => props.targetLabel ?? (/^[0-9a-f]{7,40}$/.test(props.target) ? shortOid(props.target) : props.target);
   const branches = () => [...new Set(props.repoIds.map((id) => summary(id)?.branch).filter((b): b is string => !!b))];
 
-  const command = () => perRepo(names(), (repo) => gitCmd(repo, ["reset", `--${mode()}`, props.target]));
-
   return (
     <Dialog
       title="Reset current branch"
       onClose={() => props.close()}
-      command={command()}
       primary={{ label: "Reset", danger: mode() === "hard", onClick: () => props.close({ mode: mode() }) }}
     >
       <p class="dg-dialogs-text dg-selectable">

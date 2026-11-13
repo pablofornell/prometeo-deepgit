@@ -3,6 +3,7 @@
  * `before:` and `after:` prefixes of the text box, the date presets and the labels of the chips.
  */
 import type { LogQuery } from "../../api/types";
+import { formatDay } from "../../state/dateFormat";
 
 export interface FilterValues {
   /** Raw content of the text box (may hold prefixes). */
@@ -29,12 +30,17 @@ export interface ParsedText {
 
 const PREFIX = /(^|\s)(author|path|before|after):("[^"]*"|\S+)/gi;
 
-/** Local midnight of `YYYY-MM-DD` as unix seconds, or null. */
+/** Local midnight of `DD-MM-YYYY` (or `YYYY-MM-DD`, which the date inputs give) as unix seconds, or null. */
 export function parseDay(s: string): number | null {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s.trim());
-  if (!m) return null;
-  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-  return Number.isNaN(d.getTime()) ? null : Math.floor(d.getTime() / 1000);
+  const t = s.trim();
+  const dmy = /^(\d{2})-(\d{2})-(\d{4})$/.exec(t);
+  const ymd = /^(\d{4})-(\d{2})-(\d{2})$/.exec(t);
+  const [y, mo, day] = dmy ? [dmy[3], dmy[2], dmy[1]] : ymd ? [ymd[1], ymd[2], ymd[3]] : [];
+  if (y === undefined) return null;
+  const d = new Date(Number(y), Number(mo) - 1, Number(day));
+  // `Date` rolls 31-02 over to March: rebuild the parts and refuse a day that is not on the calendar
+  if (d.getFullYear() !== Number(y) || d.getMonth() !== Number(mo) - 1 || d.getDate() !== Number(day)) return null;
+  return Math.floor(d.getTime() / 1000);
 }
 
 /** Extracts the prefixes of the text box. Unknown or invalid prefixes stay in the text. */
@@ -97,20 +103,14 @@ export function presetSince(id: Exclude<DatePreset, "custom">, nowMs: number): n
   return Math.floor(nowMs / 1000) - (p?.seconds ?? 0);
 }
 
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const shortDay = (unix: number): string => {
-  const d = new Date(unix * 1000);
-  return `${d.getDate()} ${MONTHS[d.getMonth()]}`;
-};
-
-/** Chip label of the date filter: "Date", "Last 7 days", "3 Nov - 9 Nov". */
+/** Chip label of the date filter: "Date", "Last 7 days", "03-11-2026 - 09-11-2026". */
 export function dateChipLabel(preset: DatePreset | null, since: number | null, until: number | null): string {
   if (since === null && until === null) return "Date";
   const p = DATE_PRESETS.find((x) => x.id === preset);
   if (p) return p.label;
-  if (since !== null && until !== null) return `${shortDay(since)} - ${shortDay(until)}`;
-  if (since !== null) return `Since ${shortDay(since)}`;
-  return `Until ${shortDay(until as number)}`;
+  if (since !== null && until !== null) return `${formatDay(since)} - ${formatDay(until)}`;
+  if (since !== null) return `Since ${formatDay(since)}`;
+  return `Until ${formatDay(until as number)}`;
 }
 
 /** Chip label of the branch filter: "Branch: all", "Branch: HEAD", "Branch: main", "Branch: main +2". */

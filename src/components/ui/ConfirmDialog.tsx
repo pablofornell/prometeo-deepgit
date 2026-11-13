@@ -17,8 +17,6 @@ export interface ConfirmProps {
   /** Red primary button for destructive actions. */
   danger?: boolean;
   checkboxes?: ConfirmCheckbox[];
-  /** git command(s) shown in the preview strip. */
-  command?: string | string[];
   cancelLabel?: string;
 }
 
@@ -36,7 +34,6 @@ export function ConfirmDialog(props: ConfirmProps & DialogComponentProps<Confirm
       title={props.title}
       onClose={() => props.close()}
       cancelLabel={props.cancelLabel}
-      command={props.command}
       primary={{ label: props.confirmLabel, danger: props.danger, onClick: () => props.close({ checked: checked() }) }}
     >
       <For each={paragraphs()}>{(p) => <p class="dg-selectable" style={{ "line-height": "18px" }}>{p}</p>}</For>
