@@ -16,6 +16,7 @@ import type { CloneResult, Project, RepoInfo, RepoSummary } from "../api/types";
 import { dirtyCount } from "./changesScope";
 import { subscribeRepoChanged } from "./events";
 import { loadPersisted, savePersisted } from "./persist";
+import { sidebarOrder } from "./repoTree";
 
 // ---------------------------------------------------------------- projects
 
@@ -31,8 +32,8 @@ export { workspace };
 /** The active project, or undefined when the workspace has none (the app shows `Welcome`). */
 export const activeProject = (): Project | undefined => workspace.projects.find((p) => p.id === workspace.activeProjectId);
 
-/** Repos of the active project, in sidebar order. */
-export const projectRepos = (): RepoInfo[] => activeProject()?.repos ?? [];
+/** Repos of the active project, in sidebar order (folders first, then names; ITERATION-3 1.1). The combined graph orders its lanes the same way. */
+export const projectRepos: () => RepoInfo[] = createRoot(() => createMemo(() => sidebarOrder(activeProject()?.repos ?? [])));
 
 /** True when the active project has more than one repo. */
 export const isMultiRepo = (): boolean => projectRepos().length > 1;
@@ -175,7 +176,7 @@ function filterKey(): string {
 function restoreRepoFilter(): void {
   const all = projectRepos().map((r) => r.id);
   const saved = loadPersisted<string[] | null>(filterKey(), null);
-  const valid = saved ? saved.filter((id) => all.includes(id)) : [];
+  const valid = saved ? all.filter((id) => saved.includes(id)) : [];
   setSelectedIds(valid.length > 0 ? valid : all);
   setFocusedRepoIdRaw(all.includes(focusedRepoId() ?? "") ? focusedRepoId() : all[0] ?? null);
 }
@@ -186,7 +187,7 @@ export const selectedRepoIds = (): string[] => selectedIds();
 /** Replaces the repo filter. An empty list means "all". */
 export function setSelectedRepoIds(ids: string[]): void {
   const all = projectRepos().map((r) => r.id);
-  const next = ids.filter((id) => all.includes(id));
+  const next = all.filter((id) => ids.includes(id)); // sidebar order, whatever the order of `ids`
   const value = next.length > 0 ? next : all;
   setSelectedIds(value);
   savePersisted(filterKey(), value);

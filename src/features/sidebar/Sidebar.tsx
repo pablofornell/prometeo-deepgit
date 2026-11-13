@@ -1,5 +1,5 @@
 /** Sidebar island (DESIGN.md 5.3): project header and card, repository tree with branches, tags, stashes and submodules. */
-import { type JSX, Show, createEffect, createMemo, createSignal, on } from "solid-js";
+import { type JSX, Show, createEffect, createMemo, createSignal, on, untrack } from "solid-js";
 import {
   AheadBehind, EmptyState, Icon, IconButton, RepoIcon, Tree, createExpanded, initials, openContextMenu, openMenu, plural,
   type IconName, type MenuItem, type TreeRowInfo,
@@ -119,6 +119,15 @@ export function Sidebar(): JSX.Element {
   );
   const roots = createMemo(() => (q() ? filterTree(rawTree(), q()) : rawTree()));
   const allFolderIds = createMemo(() => folderIds(rawTree()));
+  // a folder that is gone (repo removed, folders merged or split) loses its saved collapsed state
+  createEffect(
+    on(allFolderIds, (all) => {
+      if (q() || all.length === 0) return;
+      const cur = untrack(collapsed);
+      const keep = [...cur].filter((id) => all.includes(id));
+      if (keep.length !== cur.size) setCollapsed(new Set(keep));
+    }),
+  );
   /** The tree gets the open folders next to the open repos and groups. */
   const effectiveExpanded = createMemo(() => {
     if (q()) return expandableIds(roots());
@@ -139,9 +148,9 @@ export function Sidebar(): JSX.Element {
 
   const onExpandedChange = (next: Set<string>) => {
     if (q()) return;
-    // folder ids go to the collapsed set (they stay in the saved list while their folder does not exist)
+    // folder ids go to the collapsed set
     const all = allFolderIds();
-    const nextCollapsed = new Set([...collapsed()].filter((id) => !all.includes(id)));
+    const nextCollapsed = new Set([...collapsed()].filter((id) => all.includes(id)));
     for (const id of all) if (!next.has(id)) nextCollapsed.add(id);
     if (nextCollapsed.size !== collapsed().size || [...nextCollapsed].some((id) => !collapsed().has(id))) setCollapsed(nextCollapsed);
     for (const id of all) next.delete(id);
