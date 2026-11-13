@@ -307,8 +307,8 @@
 .dg-ref-stash { background: var(--dg-ref-stash-bg); color: var(--dg-ref-stash-fg); box-shadow: inset 0 0 0 1px var(--dg-ref-stash-border); }
 .dg-ref-more { background: var(--dg-ref-overflow-bg); color: var(--dg-ref-overflow-fg); flex: none; font-weight: var(--dg-weight-semibold); font-variant-numeric: tabular-nums; }
 .dg-ref .dg-ref-sync { opacity: 0.7; margin-left: 1px; }
-/* The HEAD segment never shrinks; only the branch segment does (ITERATION-3 2.2). Overflow stays hidden so nothing paints outside the pill. */
-.dg-ref-split { padding: 0; gap: 0; max-width: 220px; min-width: calc(var(--dg-ref-head-w, calc(38 * var(--dg-u))) + 48 * var(--dg-u)); }
+/* The HEAD segment never shrinks (`--dg-ref-head-w`, extra.css); only the branch segment does (ITERATION-3 2.2). Overflow stays hidden so nothing paints outside the pill. */
+.dg-ref-split { padding: 0; gap: 0; max-width: 220px; min-width: calc(var(--dg-ref-head-w) + 48 * var(--dg-u)); }
 .dg-ref-split > span { display: inline-flex; align-items: center; gap: 3px; height: 100%; padding: 0 5px; min-width: 0; }
 .dg-ref-split > .dg-ref-head { border-radius: 4px 0 0 4px; flex: none; }
 .dg-ref-split > .dg-ref-cur { min-width: calc(48 * var(--dg-u)); flex: 1 1 auto; overflow: hidden; border-radius: 0 4px 4px 0; background: var(--dg-ref-local-current-bg); color: var(--dg-ref-local-fg); box-shadow: inset 0 0 0 1px var(--dg-ref-local-border); font-weight: var(--dg-weight-semibold); }

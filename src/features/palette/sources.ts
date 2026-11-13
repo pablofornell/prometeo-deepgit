@@ -183,7 +183,8 @@ export function activate(item: PaletteItem): void {
         }
       }
       if (item.remote) {
-        const target = repos.find((r) => r.id === focusedRepo()?.id) ?? repos[0];
+        // `focused` was read before the jump moved the focused repo to the branch tip.
+        const target = repos.find((r) => r.id === focused) ?? repos[0];
         void actions.checkoutRemote(target.id, item.name);
       } else {
         void actions.checkout(repos.map((r) => r.id), item.name, { branchOnly: true });

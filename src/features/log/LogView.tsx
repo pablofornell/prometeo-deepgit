@@ -350,7 +350,12 @@ export function LogView(): JSX.Element {
     if (untrack(multi).has(keyOf(sc.repoId, sc.oid))) return;
     const token = ++adoptToken;
     void ctl.find(sc.oid, sc.repoId).then((ci) => {
-      if (token !== adoptToken || ci === null) return;
+      if (token !== adoptToken) return;
+      if (ci === null) {
+        // Not in the loaded log (filtered out, or not loaded): no row may keep the highlight of the previous commit.
+        if (untrack(multi).size > 0) setMulti(new Map());
+        return;
+      }
       setMulti(new Map([[keyOf(sc.repoId, sc.oid), { repoId: sc.repoId, oid: sc.oid, ci }]]));
       anchorCi = ci;
       ensureVisible(map().displayOf(ci), isVisible(map().displayOf(ci)) ? "auto" : "center");

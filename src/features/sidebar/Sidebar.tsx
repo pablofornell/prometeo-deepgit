@@ -140,11 +140,12 @@ export function Sidebar(): JSX.Element {
     }
   };
 
-  /** A click on a branch or tag selects its tip commit in the log and pulses its node (not keys, not right-click). */
+  /** A click on a branch, tag or stash selects its tip commit in the log and pulses its node (not keys, not right-click). */
   const jump = (n: SidebarNode) => {
     if (n.kind === "branch") jumpToCommit({ repoId: n.repoId, oid: n.branch.oid });
     else if (n.kind === "remoteBranch") jumpToCommit({ repoId: n.repoId, oid: n.remote.oid });
     else if (n.kind === "tag") jumpToCommit({ repoId: n.repoId, oid: n.tag.oid });
+    else if (n.kind === "stash") jumpToCommit({ repoId: n.repoId, oid: n.stash.oid, stash: { index: n.stash.index } });
   };
 
   const activate = (n: SidebarNode) => {

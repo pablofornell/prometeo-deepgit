@@ -13,7 +13,7 @@ const GAP = 4;
 const PAD = 12;
 const ICON = 14;
 const CHAR = 6;
-const HEAD_LABEL = 38;
+const HEAD_LABEL = 42;
 /** The "+N" chip (about 22 px) and the gap in front of it. */
 const MORE = 26;
 const MAX_PILL = 150;

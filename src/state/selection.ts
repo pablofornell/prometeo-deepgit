@@ -88,9 +88,9 @@ export function setSelectedCommit(c: SelectedCommit | null): void {
  * Selects a commit like `setSelectedCommit` and marks it as the target of a jump (a branch or tag picked in the
  * sidebar, `H`): the log scrolls to it and its node pulses. A click or an arrow key in the log does not call this.
  */
-export function jumpToCommit(c: { repoId: string; oid: string }): void {
+export function jumpToCommit(c: SelectedCommit): void {
   batch(() => {
-    setSelectedCommit({ repoId: c.repoId, oid: c.oid });
+    setSelectedCommit(c);
     setTarget({ repoId: c.repoId, oid: c.oid, id: ++jumps });
   });
 }

@@ -50,19 +50,19 @@ describe("visiblePills", () => {
     expect(visiblePills([150, 150, 150], 110, [40, 40, 40])).toBe(2);
   });
   it("never hides a split HEAD pill that fits at its minimum before a pill behind it", () => {
-    // split HEAD: min 86 (38 + 48). With the chip it needs 112.
-    expect(visiblePills([200, 100, 100], 112, [86, 40, 40])).toBe(1);
-    expect(visiblePills([200, 100, 100], 112 + 44, [86, 40, 40])).toBe(2);
+    // split HEAD: min 90 (42 + 48). With the chip it needs 116.
+    expect(visiblePills([200, 100, 100], 116, [90, 40, 40])).toBe(1);
+    expect(visiblePills([200, 100, 100], 116 + 44, [90, 40, 40])).toBe(2);
   });
 });
 
 describe("pillSpace", () => {
   it("is the budget when the first pill and the chip fit in it", () => {
-    expect(pillSpace(200, [86, 40, 40])).toBe(200);
+    expect(pillSpace(200, [90, 40, 40])).toBe(200);
   });
   it("grows to the first pill at its minimum plus the chip when the budget is smaller", () => {
-    expect(pillSpace(60, [86, 40, 40])).toBe(86 + 26);
-    expect(pillSpace(0, [86])).toBe(86);
+    expect(pillSpace(60, [90, 40, 40])).toBe(90 + 26);
+    expect(pillSpace(0, [90])).toBe(90);
     expect(pillSpace(50, [])).toBe(0);
   });
 });
@@ -74,8 +74,8 @@ describe("pillWidths", () => {
   });
   it("gives the split HEAD pill HEAD + 48 px as minimum and an ordinary pill 40 px", () => {
     const refs: RefLabel[] = [local("feature/PAY-2318-refunds", true), local("develop"), tag("v1")];
-    expect(pillMinWidths(refs)).toEqual([86, 40, 40]);
-    expect(pillWidths(refs)[0]).toBe(208);
+    expect(pillMinWidths(refs)).toEqual([90, 40, 40]);
+    expect(pillWidths(refs)[0]).toBe(212);
     expect(pillWidths([local("feature/" + "x".repeat(80), true)])[0]).toBe(220);
   });
   it("keeps a plain HEAD pill at its natural width", () => {
