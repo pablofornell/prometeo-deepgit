@@ -38,7 +38,7 @@
 - [ ] **File tree position:** Move the file tree column to the right side of the editor.
 - [ ] **Git status colors:** Color file and folder names by Git status (modified, added, untracked, ignored, conflicted).
 - [ ] **Tab context menu:** Close, Close Others, Close All, Close Tabs to the Left/Right, Copy Path, Reveal in File Tree.
-- [ ] **Find / Find and Replace:** VS Code style floating widget (match case, whole word, regex, match count, replace / replace all).
+- [x] **Find / Find and Replace:** VS Code style floating widget (match case, whole word, regex, match count, replace / replace all).
 
 ## 9. Smart .gitignore
 - [ ] **Smart .gitignore:** Add ignore rules from the UI (right-click a file or folder → "Add to .gitignore", with pattern suggestions). Only edit `.gitignore`, no commit.
