@@ -11,7 +11,7 @@ import type { AuthProps } from "../../state/dialogs";
 import { settings } from "../../state/settings";
 import { repoById } from "../../state/workspace";
 import type { AuthDialogResult } from "../../state/authQueue";
-import { canRememberKind, dialogTitle, fingerprintText, hostName, isSecretKind, secretLabel } from "./authText";
+import { canRememberKind, commandVerb, dialogTitle, fingerprintText, hostName, isSecretKind, secretLabel } from "./authText";
 import { Field, Note, ReadOnly } from "./parts";
 
 /** A masked field with a show / hide toggle. */
@@ -44,6 +44,8 @@ export function AuthDialog(props: AuthProps & DialogComponentProps<AuthDialogRes
   });
 
   const repoName = () => (p().repoId ? repoById(p().repoId as string)?.name : undefined);
+  /** The operation that asks, as a plain verb ("fetch"), or "". */
+  const verb = () => commandVerb(p().command);
   const secretKind = () => isSecretKind(p().kind);
   const offerRemember = () => p().canRemember && canRememberKind(p().kind);
   // the user wants saving (setting on) but the key store does not work
@@ -86,9 +88,13 @@ export function AuthDialog(props: AuthProps & DialogComponentProps<AuthDialogRes
       <Show when={repoName()}>
         {(name) => (
           <div class="dg-dialogs-text">
-            Needed by <strong>{name()}</strong>.
+            Needed by <strong>{name()}</strong>
+            <Show when={verb()}> to {verb()}</Show>.
           </div>
         )}
+      </Show>
+      <Show when={!repoName() && verb()}>
+        <div class="dg-dialogs-text">Needed to {verb()}.</div>
       </Show>
       <Show when={p().retry}>
         <Note kind="error">The previous answer was rejected. Try again.</Note>

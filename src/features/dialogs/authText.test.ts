@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 import type { AuthPrompt } from "../../api/types";
-import { canRememberKind, dialogTitle, fingerprintText, hostName, secretLabel, tildePath } from "./authText";
+import { canRememberKind, commandVerb, dialogTitle, fingerprintText, hostName, secretLabel, tildePath } from "./authText";
 
 const prompt = (o: Partial<AuthPrompt>): AuthPrompt => ({
   id: 1, kind: "unknown", prompt: "", command: "git push", withPassword: false, canRemember: true, retry: false, ...o,
@@ -58,5 +58,14 @@ describe("kinds", () => {
     expect(secretLabel(prompt({ kind: "password", host: "alice@host" }))).toBe("Password");
     expect(secretLabel(prompt({ kind: "passphrase" }))).toBe("Passphrase");
     expect(secretLabel(prompt({ kind: "unknown", prompt: "Verification code: " }))).toBe("Verification code");
+  });
+});
+
+describe("commandVerb", () => {
+  it("turns the git command into a plain verb", () => {
+    expect(["git fetch", "git pull", "git push", "git clone", "git  Push"].map(commandVerb)).toEqual(["fetch", "pull", "push", "clone", "push"]);
+  });
+  it("says nothing for any other command", () => {
+    expect(["git ls-remote", "git", "", "ssh host"].map(commandVerb)).toEqual(["", "", "", ""]);
   });
 });
