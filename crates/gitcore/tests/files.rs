@@ -44,10 +44,59 @@ fn list_has_tracked_and_untracked_files_and_leaves_out_ignored_and_deleted() {
 }
 
 #[test]
+fn list_reports_ignored_entries_and_a_whole_ignored_folder_as_one() {
+    let repo = TestRepo::new();
+    repo.commit_file("kept.log", "tracked although it matches\n", "kept");
+    repo.commit_file(
+        ".gitignore",
+        "*.log\nnode_modules/\ntarget/\n",
+        "ignore rules",
+    );
+    repo.commit_file("src/main.rs", "fn main() {}\n", "main");
+    repo.write("build.log", "ignored\n");
+    repo.write("src/debug.log", "ignored\n");
+    repo.write("node_modules/pkg/deep/index.js", "ignored\n");
+    repo.write("node_modules/pkg/package.json", "ignored\n");
+    repo.write("target/debug/app", "ignored\n");
+    repo.write("src/new.rs", "untracked, not ignored\n");
+
+    let list = files::list_files(&git(), &repo.info).expect("list");
+    assert_eq!(
+        list.ignored,
+        vec!["build.log", "node_modules/", "src/debug.log", "target/"]
+    );
+    // An ignored entry is not a file of the list. A tracked file that matches a rule stays a file.
+    assert_eq!(
+        list.files,
+        vec![".gitignore", "kept.log", "src/main.rs", "src/new.rs"]
+    );
+}
+
+#[test]
+fn list_reports_a_folder_that_a_file_rule_ignores_as_one_entry() {
+    let repo = TestRepo::new();
+    repo.commit_file(".gitignore", "*.o\n", "ignore rules");
+    repo.commit_file("src/main.c", "int main() {}\n", "main");
+    for i in 0..30 {
+        repo.write(&format!("out/deep/{i}.o"), "obj\n");
+    }
+    repo.write("out/top.o", "obj\n");
+    // A folder with a file that is not ignored lists its ignored files one by one.
+    repo.write("src/main.o", "obj\n");
+    repo.write("mixed/keep.txt", "text\n");
+    repo.write("mixed/a.o", "obj\n");
+
+    let list = files::list_files(&git(), &repo.info).expect("list");
+    assert_eq!(list.ignored, vec!["mixed/a.o", "out/", "src/main.o"]);
+    assert!(!list.truncated);
+}
+
+#[test]
 fn list_of_an_empty_repo_is_empty() {
     let repo = TestRepo::new();
     let list = files::list_files(&git(), &repo.info).expect("list");
     assert!(list.files.is_empty());
+    assert!(list.ignored.is_empty());
     assert!(!list.truncated);
 }
 

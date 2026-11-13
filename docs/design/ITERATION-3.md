@@ -489,12 +489,12 @@ Open it with a right-click on a tab. Use `openMenu`. The clicked tab is "this ta
 | 6 | `Copy path` | — | always |
 | 7 | `Copy absolute path` | — | always |
 | — | separator | | |
-| 8 | `Reveal in file tree` | `Alt+F1` | always |
+| 8 | `Reveal in file tree` | `Ctrl+Shift+E` | always |
 
 1. `Copy path` copies the path relative to the repository root. `Copy absolute path` copies the full path. These are the labels of the Local changes menu, so the two menus agree.
 2. Each close item uses the current close flow. A tab with unsaved changes asks first. One dialog per dirty tab, in tab order. `Cancel` stops the rest of the batch.
 3. `Reveal in file tree`: show the `Files` tab of the side panel, expand the parent folders, select the file row, scroll it to the centre, and focus the tree.
-4. The shortcuts `Ctrl+W`, `Ctrl+Shift+W` and `Alt+F1` work on the Files tab only (same scope as `Ctrl+S`). `Ctrl+W` and `Alt+F1` act on the active tab.
+4. The shortcuts `Ctrl+W`, `Ctrl+Shift+W` and `Ctrl+Shift+E` work on the Files tab only (same scope as `Ctrl+S`). `Ctrl+W` and `Ctrl+Shift+E` act on the active tab.
 5. Also add `Ctrl+F4` as a second key for `Close`.
 
 ---

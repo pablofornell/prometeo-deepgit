@@ -1,8 +1,8 @@
 //! Project files: list, read, write and search the files of the worktree. Every path is relative
-//! to the repo root. The list and the search skip ignored files. Read and write still accept a
-//! path to an ignored file.
+//! to the repo root. The search skips ignored files, and the list keeps them apart in `ignored`.
+//! Read and write still accept a path to an ignored file.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashSet};
 use std::io::Read;
 use std::path::{Component, Path};
 
@@ -23,7 +23,9 @@ pub const MAX_HIT_CHARS: usize = 400;
 const BINARY_SCAN_BYTES: usize = 8000;
 
 /// List the tracked and untracked files that are not ignored, sorted by path. Leave out a tracked
-/// file that is gone from the disk, and a submodule folder.
+/// file that is gone from the disk, and a submodule folder. `ignored` lists the ignored entries: a
+/// folder that is ignored as a whole is one entry that ends with "/", and the entries inside it are
+/// left out. `truncated` is also set when the ignored list had to stop at `MAX_LISTED_FILES`.
 pub fn list_files(git: &Git, repo: &RepoInfo) -> Result<FileList, GitError> {
     let root = Path::new(&repo.path);
     let args = [
@@ -40,15 +42,98 @@ pub fn list_files(git: &Git, repo: &RepoInfo) -> Result<FileList, GitError> {
         .filter(|p| !p.is_empty() && is_on_disk(root, p))
         .map(str::to_string)
         .collect();
-    Ok(cap_list(found, MAX_LISTED_FILES))
+    // `--directory` shows an untracked folder as one entry only when a folder rule ignores it. With a
+    // file rule (`*.o`) git also lists every file inside. The records are read one by one, so a
+    // build folder with a million files does not fill the memory: the entries inside a listed
+    // folder are dropped at once, and the read stops at the cap.
+    let args = [
+        "ls-files",
+        "-z",
+        "--others",
+        "--ignored",
+        "--exclude-standard",
+        "--directory",
+    ];
+    let mut ignored = IgnoredEntries::new(MAX_LISTED_FILES);
+    git.run_records(root, Some(&repo.id), &args, |p| ignored.push(p))?;
+    let (ignored, ignored_truncated) = ignored.finish();
+    Ok(cap_list(
+        found,
+        ignored,
+        ignored_truncated,
+        MAX_LISTED_FILES,
+    ))
 }
 
-/// The first `max` paths. `truncated` says that there were more.
-fn cap_list(found: BTreeSet<String>, max: usize) -> FileList {
-    let truncated = found.len() > max;
+/// The first `max` files. `truncated` says that there were more files, or that the ignored list stopped.
+fn cap_list(
+    found: BTreeSet<String>,
+    ignored: BTreeSet<String>,
+    ignored_truncated: bool,
+    max: usize,
+) -> FileList {
+    let truncated = found.len() > max || ignored_truncated;
     FileList {
         files: found.into_iter().take(max).collect(),
+        ignored: ignored.into_iter().take(max).collect(),
         truncated,
+    }
+}
+
+/// Collects the ignored entries that git prints. An entry inside an ignored folder that is
+/// already in the list is dropped. Stops at `max` entries.
+struct IgnoredEntries {
+    max: usize,
+    kept: BTreeSet<String>,
+    /// The folder entries (they end with "/") that are in `kept`.
+    dirs: HashSet<String>,
+    truncated: bool,
+}
+
+impl IgnoredEntries {
+    fn new(max: usize) -> Self {
+        IgnoredEntries {
+            max,
+            kept: BTreeSet::new(),
+            dirs: HashSet::new(),
+            truncated: false,
+        }
+    }
+
+    /// Takes one entry. Returns false when the list is full: the caller stops reading.
+    fn push(&mut self, path: &str) -> bool {
+        let inside = path
+            .match_indices('/')
+            .any(|(i, _)| i + 1 < path.len() && self.dirs.contains(&path[..=i]));
+        if inside {
+            return true;
+        }
+        if self.kept.len() >= self.max {
+            self.truncated = true;
+            return false;
+        }
+        if path.ends_with('/') {
+            self.dirs.insert(path.to_string());
+        }
+        self.kept.insert(path.to_string());
+        true
+    }
+
+    /// The entries and the truncation flag. Git can print a folder after some of its entries, so
+    /// this drops what lies inside a folder entry once more, on the sorted list.
+    fn finish(self) -> (BTreeSet<String>, bool) {
+        let mut out = BTreeSet::new();
+        let mut last_dir: Option<&str> = None;
+        for p in &self.kept {
+            if last_dir.is_some_and(|d| p.starts_with(d)) {
+                continue;
+            }
+            if p.ends_with('/') {
+                last_dir = Some(p);
+            }
+            out.insert(p.clone());
+        }
+        (out, self.truncated)
     }
 }
 
@@ -260,12 +345,62 @@ mod tests {
 
     #[test]
     fn cap_keeps_the_first_paths_and_flags_the_rest() {
-        let list = cap_list(set(&["a", "b", "c"]), 2);
+        let list = cap_list(set(&["a", "b", "c"]), set(&["x/", "y", "z"]), false, 2);
         assert_eq!(list.files, vec!["a", "b"]);
+        assert_eq!(list.ignored, vec!["x/", "y"]);
         assert!(list.truncated);
-        let all = cap_list(set(&["a", "b"]), 2);
+        let all = cap_list(set(&["a", "b"]), set(&[]), false, 2);
         assert_eq!(all.files.len(), 2);
         assert!(!all.truncated);
+        // A cut ignored list says so too.
+        assert!(cap_list(set(&["a"]), set(&["x"]), true, 2).truncated);
+    }
+
+    fn collect(max: usize, records: &[&str]) -> (Vec<String>, bool, usize) {
+        let mut c = IgnoredEntries::new(max);
+        let mut read = 0;
+        for r in records {
+            read += 1;
+            if !c.push(r) {
+                break;
+            }
+        }
+        let (kept, truncated) = c.finish();
+        (kept.into_iter().collect(), truncated, read)
+    }
+
+    #[test]
+    fn ignored_entries_inside_a_listed_folder_are_dropped() {
+        let (kept, truncated, _) = collect(
+            100,
+            &[
+                "out/",
+                "out/deep/",
+                "out/deep/a.o",
+                "out/b.o",
+                "x.log",
+                "outer.o",
+            ],
+        );
+        assert_eq!(kept, vec!["out/", "outer.o", "x.log"]);
+        assert!(!truncated);
+    }
+
+    #[test]
+    fn ignored_entries_before_their_folder_are_dropped_at_the_end() {
+        let (kept, _, _) = collect(100, &["out/a.o", "out/deep/b.o", "out/", "z.o"]);
+        assert_eq!(kept, vec!["out/", "z.o"]);
+    }
+
+    #[test]
+    fn ignored_entries_stop_at_the_cap_and_say_so() {
+        let (kept, truncated, read) = collect(2, &["a/", "a/x.o", "b.o", "c.o", "d.o"]);
+        assert_eq!(kept, vec!["a/", "b.o"]);
+        assert!(truncated);
+        // The read stops at the first entry over the cap. Dropped entries do not count.
+        assert_eq!(read, 4);
+        let (_, full, _) = collect(2, &["a/", "a/x.o", "b.o"]);
+        assert!(!full);
     }
 
     #[test]

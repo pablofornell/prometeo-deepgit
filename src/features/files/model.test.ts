@@ -2,8 +2,8 @@
 import { describe, expect, it } from "vitest";
 import type { FileChange, WorkingTree } from "../../api/types";
 import {
-  SEP, buildTree, closeTab, columnOffset, errorText, folderStatus, folderStatuses, groupHits, isStaleVersion, lineSeparatorOf,
-  matchRange, openTab, rankFiles, repoNode, scopeId, statusMap, tabLabels, type DirNode,
+  SEP, buildTree, closeTab, columnOffset, dirNodeStatus, errorText, fileNodeStatus, folderStatus, folderStatuses, groupHits, isStaleVersion, lineSeparatorOf,
+  matchRange, openTab, rankFiles, repoNode, revealIds, scopeId, statusMap, tabLabels, tabsToClose, type DirNode,
 } from "./model";
 
 const change = (path: string, status: FileChange["status"]): FileChange => ({ path, oldPath: null, status, additions: 0, deletions: 0, binary: false });
@@ -42,6 +42,14 @@ describe("buildTree", () => {
     expect(a[1].repoId).toBe("repoA");
     expect(b[0].id).not.toBe(a[1].id);
     expect((a[0] as DirNode).children[0].id).toBe("repoA" + SEP + "src/x.ts");
+  });
+
+  it("shows a path that ends with a slash as a folder without children", () => {
+    const t = buildTree(["src/a.ts", "node_modules/", "out/cache/"]);
+    expect(t.map((n) => n.name)).toEqual(["node_modules", "out", "src"]);
+    expect(t[0]).toMatchObject({ kind: "dir", id: "node_modules/", path: "node_modules/", children: [] });
+    const out = t[1] as DirNode;
+    expect(out.children).toMatchObject([{ kind: "dir", path: "out/cache/", children: [] }]);
   });
 
   it("returns nothing for an empty list", () => {
@@ -117,6 +125,34 @@ describe("folderStatuses and folderStatus", () => {
   });
 });
 
+describe("fileNodeStatus and dirNodeStatus", () => {
+  const files = new Map<string, Parameters<typeof change>[1]>([["a/x.ts", "modified"], ["kept.log", "modified"]]);
+  const folders = folderStatuses(files);
+  const ignored = new Set(["build.log", "kept.log", "dist/", "a/gen/"]);
+
+  it("shows the change of a file, and ignored for an ignored file without a change", () => {
+    expect(fileNodeStatus("a/x.ts", files, ignored)).toBe("modified");
+    expect(fileNodeStatus("build.log", files, ignored)).toBe("ignored");
+    expect(fileNodeStatus("a/y.ts", files, ignored)).toBeNull();
+  });
+
+  it("lets the change of a tracked file win over an ignore rule", () => {
+    expect(fileNodeStatus("kept.log", files, ignored)).toBe("modified");
+  });
+
+  it("shows an ignored folder as ignored, with or without the trailing slash", () => {
+    expect(dirNodeStatus("dist/", folders, ignored)).toBe("ignored");
+    expect(dirNodeStatus("dist", folders, ignored)).toBe("ignored");
+  });
+
+  it("colours a folder only from its changed files, and an ignored file adds nothing", () => {
+    expect(dirNodeStatus("a/", folders, ignored)).toBe("modified");
+    expect(dirNodeStatus("b/", folders, ignored)).toBeNull();
+    // `build.log` is ignored and its folder (the root) has no key, so nothing colours
+    expect(folders.size).toBe(1);
+  });
+});
+
 describe("groupHits", () => {
   it("groups by file in path order and keeps the hit order", () => {
     const hits = [
@@ -132,6 +168,21 @@ describe("groupHits", () => {
 
   it("returns nothing for no hits", () => {
     expect(groupHits([])).toEqual([]);
+  });
+});
+
+describe("revealIds", () => {
+  it("lists every folder above the file", () => {
+    expect(revealIds("r", "src/app/main.ts", false)).toEqual(["r" + SEP + "src/", "r" + SEP + "src/app/"]);
+  });
+
+  it("adds the repo root when the tree has one root for each repo", () => {
+    expect(revealIds("r", "src/main.ts", true)).toEqual(["r" + SEP, "r" + SEP + "src/"]);
+    expect(revealIds("r", "README.md", true)).toEqual(["r" + SEP]);
+  });
+
+  it("is empty for a root file in a tree without repo roots", () => {
+    expect(revealIds("r", "README.md", false)).toEqual([]);
   });
 });
 
@@ -180,6 +231,32 @@ describe("tab helpers", () => {
     const tabs = ["a"];
     expect(closeTab(tabs, "zz", "a")).toBe("a");
     expect(tabs).toEqual(["a"]);
+  });
+
+  describe("tabsToClose", () => {
+    const order = ["a", "b", "c", "d"];
+
+    it("closes this tab, the other tabs or all tabs", () => {
+      expect(tabsToClose(order, "b", "this")).toEqual(["b"]);
+      expect(tabsToClose(order, "b", "others")).toEqual(["a", "c", "d"]);
+      expect(tabsToClose(order, "b", "all")).toEqual(["a", "b", "c", "d"]);
+    });
+
+    it("closes the tabs on one side, in tab order", () => {
+      expect(tabsToClose(order, "c", "left")).toEqual(["a", "b"]);
+      expect(tabsToClose(order, "c", "right")).toEqual(["d"]);
+    });
+
+    it("closes nothing on the side of the first and the last tab", () => {
+      expect(tabsToClose(order, "a", "left")).toEqual([]);
+      expect(tabsToClose(order, "d", "right")).toEqual([]);
+      expect(tabsToClose(["a"], "a", "others")).toEqual([]);
+    });
+
+    it("closes nothing for a tab that is not open, and does not change the list", () => {
+      expect(tabsToClose(order, "zz", "all")).toEqual([]);
+      expect(order).toEqual(["a", "b", "c", "d"]);
+    });
   });
 
   it("adds the parent folder only to tabs with the same file name", () => {

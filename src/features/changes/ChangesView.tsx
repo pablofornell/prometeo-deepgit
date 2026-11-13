@@ -7,7 +7,7 @@ import { For, type JSX, Show, createEffect, createMemo, createResource, createSi
 import * as api from "../../api/tauri";
 import type { RepoStateKind, WorkingTree } from "../../api/types";
 import {
-  Button, EmptyState, HeaderSlot, Icon, IconButton, SegmentedControl, Spinner, VirtualList, copyText, loadSplitSize, openContextMenu, plural,
+  Button, EmptyState, HeaderSlot, Icon, IconButton, SegmentedControl, Spinner, VirtualList, copyText, joinRepoPath, loadSplitSize, openContextMenu, plural,
   type MenuItem, type VirtualListApi,
 } from "../../components/ui";
 import * as actions from "../../state/actions";
@@ -257,7 +257,9 @@ export function ChangesView(): JSX.Element {
   const targets = (row: Row): FileItem[] => (selected().has(row.key) ? items() : rowItems(row));
 
   const pathsText = (list: FileItem[], absolute: boolean): string =>
-    list.map((i) => (absolute ? `${repoById(i.repoId)?.path ?? ""}/${i.file.path}` : i.file.path)).join("\n");
+    list.map((i) => (absolute ? joinRepoPath(repoById(i.repoId)?.path ?? "", i.file.path) : i.file.path)).join("\n");
+  /** True when a repo of the list is unknown: its absolute path cannot be built. */
+  const noAbsolute = (list: FileItem[]): boolean => list.some((i) => !repoById(i.repoId)?.path);
 
   /** The conflicted files a conflict action applies to, by repo. */
   const conflictPaths = (row: Row): Map<string, string[]> => {
@@ -305,7 +307,7 @@ export function ChangesView(): JSX.Element {
       });
       menu.push({ separator: true });
       menu.push({ label: list.length > 1 ? "Copy paths" : "Copy path", icon: "copy", onSelect: () => void copyText(pathsText(list, false)) });
-      menu.push({ label: list.length > 1 ? "Copy absolute paths" : "Copy absolute path", icon: "path", onSelect: () => void copyText(pathsText(list, true)) });
+      menu.push({ label: list.length > 1 ? "Copy absolute paths" : "Copy absolute path", icon: "path", disabled: noAbsolute(list), onSelect: () => void copyText(pathsText(list, true)) });
     } else if (row.kind === "section") {
       const all = allItems(row.repoId, row.section);
       if (row.section === "staged") menu.push({ label: "Unstage all", icon: "minus", onSelect: () => void unstageItems(all) });

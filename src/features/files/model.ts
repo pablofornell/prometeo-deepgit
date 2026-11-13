@@ -59,6 +59,7 @@ function byName(a: FileTreeNode, b: FileTreeNode): number {
 
 /**
  * Builds the folder tree of `paths` (repo-relative file paths). Each level holds its folders and files.
+ * A path that ends with "/" is a folder without children (an ignored folder whose content is not listed).
  * Each level is sorted with the folders first. The ids come from `scopeId`, so one path in two repos gives two ids.
  */
 export function buildTree(paths: readonly string[], repoId = ""): FileTreeNode[] {
@@ -76,7 +77,11 @@ export function buildTree(paths: readonly string[], repoId = ""): FileTreeNode[]
     return node;
   };
   for (const path of paths) {
-    if (path === "" || path.endsWith("/")) continue;
+    if (path === "") continue;
+    if (path.endsWith("/")) {
+      dirAt(path);
+      continue;
+    }
     const slash = path.lastIndexOf("/");
     const parent = dirAt(slash < 0 ? "" : path.slice(0, slash + 1));
     parent.children.push({ kind: "file", id: scopeId(repoId, path), repoId, path, name: path.slice(slash + 1) });
@@ -134,6 +139,23 @@ export function folderStatuses(files: ReadonlyMap<string, FileStatus>): Map<stri
 /** Returns the status that a folder shows. Read it from the map of `folderStatuses`. Returns null when nothing changed. */
 export function folderStatus(dirPath: string, folders: ReadonlyMap<string, FileStatus>): FileStatus | null {
   return folders.get(dirPath.endsWith("/") ? dirPath : dirPath + "/") ?? null;
+}
+
+/**
+ * Returns the status that the tree shows for a file: its change, or "ignored" when `ignored` holds its path.
+ * The change wins, because a tracked file can match an ignore rule. Returns null for a clean file.
+ */
+export function fileNodeStatus(path: string, files: ReadonlyMap<string, FileStatus>, ignored: ReadonlySet<string>): FileStatus | null {
+  return files.get(path) ?? (ignored.has(path) ? "ignored" : null);
+}
+
+/**
+ * Returns the status that the tree shows for a folder (`dirPath` ends with "/", or not). A folder that is ignored as a whole
+ * is "ignored". Any other folder takes the status of its changed files (`folderStatuses`). Ignored files never colour a folder.
+ */
+export function dirNodeStatus(dirPath: string, folders: ReadonlyMap<string, FileStatus>, ignored: ReadonlySet<string>): FileStatus | null {
+  const dir = dirPath.endsWith("/") ? dirPath : dirPath + "/";
+  return ignored.has(dir) ? "ignored" : folderStatus(dir, folders);
 }
 
 // ---------------------------------------------------------------- search hits
@@ -231,6 +253,36 @@ export function closeTab(tabs: string[], key: string, active: string | null): st
   if (active !== key) return active;
   if (i < tabs.length) return tabs[i];
   return i > 0 ? tabs[i - 1] : null;
+}
+
+export type CloseAction = "this" | "others" | "all" | "left" | "right";
+
+/** Returns the keys that a close action closes, in tab order. `key` is the tab that the action starts from. */
+export function tabsToClose(order: readonly string[], key: string, action: CloseAction): string[] {
+  const i = order.indexOf(key);
+  if (i < 0) return [];
+  switch (action) {
+    case "this":
+      return [key];
+    case "others":
+      return order.filter((k) => k !== key);
+    case "all":
+      return [...order];
+    case "left":
+      return order.slice(0, i);
+    case "right":
+      return order.slice(i + 1);
+  }
+}
+
+/**
+ * Returns the ids of the nodes to expand so that the file at `path` shows in the tree: its repo root (only when the tree
+ * has one root for each repo) and every folder above the file.
+ */
+export function revealIds(repoId: string, path: string, withRepoRoot: boolean): string[] {
+  const ids = withRepoRoot ? [repoId + SEP] : [];
+  for (let i = path.indexOf("/"); i >= 0; i = path.indexOf("/", i + 1)) ids.push(scopeId(repoId, path.slice(0, i + 1)));
+  return ids;
 }
 
 /**

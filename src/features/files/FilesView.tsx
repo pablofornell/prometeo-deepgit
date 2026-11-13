@@ -5,8 +5,10 @@
  *
  * This is not a full IDE. There is no rename and no create.
  * A clean tab reloads when its file changes on disk. A tab with unsaved changes keeps its text.
+ * The tree is on the right of the editor. A right-click on a tab opens the close and copy-path menu.
  * Shortcuts work on this tab only: Ctrl+S saves, Ctrl+P opens a file by name, Ctrl+Shift+F searches the project,
- * Ctrl+F finds text in the file, and Ctrl+H finds and replaces.
+ * Ctrl+F finds text in the file, Ctrl+H finds and replaces, Ctrl+W and Ctrl+Shift+W close tabs, and Ctrl+Shift+E
+ * shows the file in the tree.
  */
 import { type JSX, For, Show, createEffect, createMemo, createSignal, on, onCleanup, onMount, untrack } from "solid-js";
 import type { EditorState, Text } from "@codemirror/state";
@@ -14,21 +16,22 @@ import { EditorView, type ViewUpdate } from "@codemirror/view";
 import * as api from "../../api/tauri";
 import type { FileStatus, TextFile } from "../../api/types";
 import {
-  Button, Dialog, EmptyState, Icon, IconButton, Kbd, Spinner, Splitter, StatusLetter, Tree, createExpanded, fileIconFor, loadSplitSize, openDialog, splitPath,
-  statusColorVar, tip, toast, type DialogComponentProps, type TreeRowInfo,
+  Button, Dialog, EmptyState, Icon, IconButton, Kbd, Spinner, Splitter, StatusLetter, Tree, copyText, createExpanded, fileIconFor, joinRepoPath, loadSplitSize, openContextMenu,
+  openDialog, splitPath, statusColorVar, tip, toast, type DialogComponentProps, type MenuItem, type TreeApi, type TreeRowInfo,
 } from "../../components/ui";
 import { confirmAction } from "../../state/dialogs";
 import { repoVersion } from "../../state/events";
 import { shortcutLabel, register, trackOverlay } from "../../state/keymap";
 import { onOpenFile, setNavFile } from "../../state/navigation";
 import { mainTab } from "../../state/selection";
-import { projectRepos } from "../../state/workspace";
+import { projectRepos, repoById } from "../../state/workspace";
 import { createFileState, saveText } from "./editor";
 import { openFind } from "./find/panel";
 import { ProjectSearch, type SearchApi, type SearchOpen } from "./ProjectSearch";
 import { QuickOpen, type QuickFile } from "./QuickOpen";
 import {
-  SEP, buildTree, closeTab, errorText, folderStatus, folderStatuses, isStaleVersion, matchRange, openTab, repoNode, scopeId, statusMap, tabLabels, type TreeNode,
+  SEP, buildTree, closeTab, dirNodeStatus, errorText, fileNodeStatus, folderStatuses, isStaleVersion, matchRange, openTab, repoNode, revealIds, scopeId, statusMap,
+  tabLabels, tabsToClose, type CloseAction, type TreeNode,
 } from "./model";
 import "./files.css";
 
@@ -49,6 +52,8 @@ interface TabInfo {
 
 interface RepoData {
   files: string[];
+  /** Ignored entries. A folder that is ignored as a whole ends with "/". */
+  ignored: string[];
   truncated: boolean;
   error?: string;
 }
@@ -61,6 +66,7 @@ interface RepoStatus {
 const NO_STATUS: RepoStatus = { files: new Map(), folders: new Map() };
 const TREE_KEY = "files-tree";
 const REFRESH_MS = 300;
+const FOCUS_REFRESH_MS = 1000;
 const TOO_MANY = "Too many files: the list shows the first 100 000.";
 const BINARY = "Binary file. DeepGit does not show it.";
 const TOO_LARGE = "This file is larger than 2 MiB. DeepGit does not open it.";
@@ -88,7 +94,9 @@ function sameList(a: RepoData | undefined, b: RepoData): boolean {
     a.truncated === b.truncated &&
     a.error === b.error &&
     a.files.length === b.files.length &&
-    a.files.every((p, i) => p === b.files[i])
+    a.files.every((p, i) => p === b.files[i]) &&
+    a.ignored.length === b.ignored.length &&
+    a.ignored.every((p, i) => p === b.ignored[i])
   );
 }
 
@@ -124,6 +132,7 @@ export function FilesView(): JSX.Element {
   let view: EditorView | undefined;
   let editorEl: HTMLDivElement | undefined;
   let searchApi: SearchApi | undefined;
+  let treeApi: TreeApi | undefined;
 
   const tabList = createMemo(() => {
     const m = infos();
@@ -347,10 +356,10 @@ export function FilesView(): JSX.Element {
     });
   };
 
-  /** Closes a tab. A tab with unsaved changes asks first. */
-  const requestClose = async (key: string): Promise<void> => {
+  /** Closes a tab. A tab with unsaved changes asks first. Returns false when the user cancels. */
+  const requestClose = async (key: string): Promise<boolean> => {
     const t = tabOf(key);
-    if (!t) return;
+    if (!t) return true;
     if (isDirty(key)) {
       const r = await confirmAction({
         title: `Discard changes in ${splitPath(t.path).name}?`,
@@ -359,9 +368,41 @@ export function FilesView(): JSX.Element {
         danger: true,
         cancelLabel: "Cancel",
       });
-      if (!r) return;
+      if (!r) return false;
     }
     removeTab(key);
+    return true;
+  };
+
+  /** Closes the tabs `action` picks, one after the other in tab order. A cancelled question stops the rest. */
+  const closeTabs = async (key: string, action: CloseAction): Promise<void> => {
+    for (const k of tabsToClose(untrack(order), key, action)) if (!(await requestClose(k))) return;
+  };
+
+  const tabMenu = (key: string): MenuItem[] => {
+    const t = tabOf(key);
+    const keys = order();
+    const i = keys.indexOf(key);
+    if (!t || i < 0) return [];
+    const root = repoById(t.repoId)?.path;
+    return [
+      { label: "Close", shortcut: shortcutLabel("files.closeTab") || "Ctrl+W", onSelect: () => void closeTabs(key, "this") },
+      { label: "Close others", disabled: keys.length < 2, onSelect: () => void closeTabs(key, "others") },
+      { label: "Close all", shortcut: shortcutLabel("files.closeAll") || "Ctrl+Shift+W", onSelect: () => void closeTabs(key, "all") },
+      { separator: true },
+      { label: "Close tabs to the left", disabled: i === 0, onSelect: () => void closeTabs(key, "left") },
+      { label: "Close tabs to the right", disabled: i === keys.length - 1, onSelect: () => void closeTabs(key, "right") },
+      { separator: true },
+      { label: "Copy path", icon: "copy", onSelect: () => void copyText(t.path) },
+      {
+        label: "Copy absolute path",
+        icon: "path",
+        disabled: !root,
+        onSelect: () => root && void copyText(joinRepoPath(root, t.path)),
+      },
+      { separator: true },
+      { label: "Reveal in file tree", shortcut: shortcutLabel("files.reveal") || "Ctrl+Shift+E", onSelect: () => revealInTree(t.repoId, t.path) },
+    ];
   };
 
   /** Reads the open tabs that have no unsaved changes. A tab whose file changed shows the new text. */
@@ -390,9 +431,9 @@ export function FilesView(): JSX.Element {
   const listOne = async (repoId: string): Promise<RepoData> => {
     try {
       const l = await api.listFiles(repoId);
-      return { files: l.files, truncated: l.truncated };
+      return { files: l.files, ignored: l.ignored, truncated: l.truncated };
     } catch (e) {
-      return { files: [], truncated: false, error: errorText(e) };
+      return { files: [], ignored: [], truncated: false, error: errorText(e) };
     }
   };
 
@@ -406,12 +447,15 @@ export function FilesView(): JSX.Element {
   };
 
   let token = 0;
+  /** When the last load started. */
+  let loadedAt = 0;
   /**
    * Reloads the status of every repo, and the file lists. With `statusOnly`, a repo that this view saved keeps its list:
    * a save does not add or remove files. A list that did not change keeps its old array, so the tree is not rebuilt.
    */
   const refreshAll = async (statusOnly = false): Promise<void> => {
     const my = ++token;
+    loadedAt = Date.now();
     const repos = untrack(projectRepos);
     if (repos.length === 0) {
       setLists(new Map());
@@ -462,6 +506,16 @@ export function FilesView(): JSX.Element {
   });
   onCleanup(() => clearTimeout(timer));
 
+  // The watcher skips node_modules and target, so an install or a build changes the ignored entries without an event.
+  // The lists load again when the tab is shown (above) and when the window gets the focus back. Focus changes can come in
+  // bursts, so a load that ran less than a second ago is enough.
+  const onFocus = (): void => {
+    if (!shown || Date.now() - loadedAt < FOCUS_REFRESH_MS) return;
+    void refreshAll();
+  };
+  window.addEventListener("focus", onFocus);
+  onCleanup(() => window.removeEventListener("focus", onFocus));
+
   // Close the tabs of a repo that left the project. Keep the tabs with unsaved changes.
   createEffect(
     on(
@@ -476,12 +530,17 @@ export function FilesView(): JSX.Element {
 
   // ---- the tree
 
+  // The tree shows the ignored entries too. An ignored folder has no children: its content is not listed.
+  const treePaths = (d: RepoData | undefined): string[] => (d ? [...d.files, ...d.ignored] : []);
   const roots = createMemo<TreeNode[]>(() => {
     const repos = projectRepos();
     const data = lists();
-    if (repos.length === 1) return buildTree(data.get(repos[0].id)?.files ?? [], repos[0].id);
-    return repos.filter((r) => data.has(r.id)).map((r) => repoNode(r.id, r.name, data.get(r.id)?.files ?? []));
+    if (repos.length === 1) return buildTree(treePaths(data.get(repos[0].id)), repos[0].id);
+    return repos.filter((r) => data.has(r.id)).map((r) => repoNode(r.id, r.name, treePaths(data.get(r.id))));
   });
+  const ignoredSets = createMemo(() => new Map([...lists()].map(([id, d]): [string, Set<string>] => [id, new Set(d.ignored)])));
+  const NO_IGNORED: ReadonlySet<string> = new Set();
+  const ignoredOf = (repoId: string): ReadonlySet<string> => ignoredSets().get(repoId) ?? NO_IGNORED;
   const truncated = createMemo(() => [...lists().values()].some((d) => d.truncated));
   const notices = createMemo(() => {
     const names = new Map(projectRepos().map((r): [string, string] => [r.id, r.name]));
@@ -506,28 +565,33 @@ export function FilesView(): JSX.Element {
       );
     }
     if (n.kind === "dir") {
-      const s = () => folderStatus(n.path, statusOf(n.repoId).folders);
+      const s = () => dirNodeStatus(n.path, statusOf(n.repoId).folders, ignoredOf(n.repoId));
       return (
         <>
-          <Icon name={info.expanded ? "folderOpen" : "folder"} size={16} class="dg-fe-ficon" />
-          <span class="dg-fe-dname" style={{ color: s() ? statusColorVar(s()!) : undefined }} title={n.path}>
+          <Icon name={info.expanded ? "folderOpen" : "folder"} size={16} class={s() === "ignored" ? "dg-fe-ficon is-ignored" : "dg-fe-ficon"} />
+          <span class="dg-fe-dname" classList={{ "is-ignored": s() === "ignored" }} style={{ color: s() ? statusColorVar(s()!) : undefined }} title={n.path}>
             {n.name}
           </span>
         </>
       );
     }
-    const s = () => statusOf(n.repoId).files.get(n.path) ?? null;
+    const s = () => fileNodeStatus(n.path, statusOf(n.repoId).files, ignoredOf(n.repoId));
     return (
       <>
-        <Icon name={fileIconFor(n.path)} size={16} class="dg-fe-ficon" />
-        <span class="dg-fe-fname" style={{ color: s() ? statusColorVar(s()!) : undefined }} title={n.path}>
+        <Icon name={fileIconFor(n.path)} size={16} class={s() === "ignored" ? "dg-fe-ficon is-ignored" : "dg-fe-ficon"} />
+        <span class="dg-fe-fname" classList={{ "is-ignored": s() === "ignored" }} style={{ color: s() ? statusColorVar(s()!) : undefined }} title={n.path}>
           {n.name}
         </span>
         <span class="dg-fe-grow" />
-        <Show when={s()}>{(v) => <StatusLetter status={v()} />}</Show>
+        <Show when={s() && s() !== "ignored"}>
+          <StatusLetter status={s()!} />
+        </Show>
       </>
     );
   };
+  // A conflicted file gets a danger wash on its row.
+  const rowClass = (n: TreeNode): string | undefined =>
+    n.kind === "file" && statusOf(n.repoId).files.get(n.path) === "conflicted" ? "is-conflict" : undefined;
 
   const openNode = (n: TreeNode): void => {
     if (n.kind === "file") void openFile(n.repoId, n.path);
@@ -550,6 +614,20 @@ export function FilesView(): JSX.Element {
     if (!pressOnRow) return;
     pressOnRow = false;
     openNode(n);
+  };
+
+  /** Shows the Files pane, expands the folders above a file, selects its row, centres it and focuses the tree. */
+  const revealInTree = (repoId: string, path: string): void => {
+    setLeftTab("files");
+    const id = scopeId(repoId, path);
+    const slash = path.lastIndexOf("/");
+    ex.set(new Set([...untrack(expanded), ...revealIds(repoId, path, projectRepos().length > 1)]));
+    setSel({ kind: "file", id, repoId, path, name: path.slice(slash + 1) });
+    // The pane shows and the rows render on the next frame. Then the tree can measure and scroll.
+    requestAnimationFrame(() => {
+      treeApi?.scrollToId(id, "center");
+      treeApi?.focus();
+    });
   };
 
   const emptyTree = (): string => (projectRepos().length === 0 ? "Add a project to see its files." : "No files in this project.");
@@ -625,6 +703,34 @@ export function FilesView(): JSX.Element {
         },
         { title: "Replace in the file", group: "Files", when: inFiles, allowInInput: true },
       ),
+      register(
+        "files.closeTab",
+        ["Ctrl+W", "Ctrl+F4"],
+        () => {
+          if (!current) return false;
+          void closeTabs(current, "this");
+        },
+        { title: "Close the tab", group: "Files", when: inFiles, allowInInput: true },
+      ),
+      register(
+        "files.closeAll",
+        "Ctrl+Shift+W",
+        () => {
+          if (!current) return false;
+          void closeTabs(current, "all");
+        },
+        { title: "Close all tabs", group: "Files", when: inFiles, allowInInput: true },
+      ),
+      register(
+        "files.reveal",
+        "Ctrl+Shift+E",
+        () => {
+          const t = current ? tabOf(current) : undefined;
+          if (!t) return false;
+          revealInTree(t.repoId, t.path);
+        },
+        { title: "Reveal the file in the tree", group: "Files", when: inFiles, allowInInput: true },
+      ),
     ];
     onCleanup(() => {
       offs.forEach((off) => off());
@@ -638,45 +744,6 @@ export function FilesView(): JSX.Element {
 
   return (
     <div class="dg-fe">
-      <aside class="dg-fe-side" style={{ width: treeW() + "px" }} aria-label="Project files">
-        <div class="dg-shell-head dg-fe-head" role="tablist" aria-label="Project files tabs">
-          <button type="button" role="tab" aria-selected={leftTab() === "files"} class="dg-shell-tab" classList={{ "is-on": leftTab() === "files" }} onClick={() => setLeftTab("files")}>
-            Files
-          </button>
-          <button type="button" role="tab" aria-selected={leftTab() === "search"} class="dg-shell-tab" classList={{ "is-on": leftTab() === "search" }} onClick={() => setLeftTab("search")}>
-            Search
-          </button>
-          <span class="dg-grow" />
-          <IconButton icon="refresh" label="Refresh the file list" onClick={() => void refreshAll()} />
-          <IconButton icon="collapse" label="Collapse all" onClick={() => ex.clear()} />
-        </div>
-        <div class="dg-fe-pane" hidden={leftTab() !== "files"}>
-          <Show when={truncated()}>
-            <div class="dg-fe-notice">{TOO_MANY}</div>
-          </Show>
-          <For each={notices()}>{(n) => <div class="dg-fe-notice is-error">{n}</div>}</For>
-          <Show when={roots().length > 0} fallback={<Show when={loaded()} fallback={<div class="dg-fe-loading"><Spinner /></div>}><div class="dg-fe-empty">{emptyTree()}</div></Show>}>
-            <div class="dg-fe-tree" onMouseDown={onTreeDown}>
-              <Tree<TreeNode>
-                roots={roots()}
-                getId={(n) => n.id}
-                getChildren={(n) => (n.kind === "file" ? undefined : n.children)}
-                expanded={expanded()}
-                onExpandedChange={ex.set}
-                selectedId={sel()?.id ?? null}
-                onSelect={onTreeSelect}
-                onActivate={(n) => (n.kind === "file" ? openNode(n) : ex.toggle(n.id))}
-                ariaLabel="Project files"
-                renderNode={renderNode}
-              />
-            </div>
-          </Show>
-        </div>
-        <div class="dg-fe-pane" hidden={leftTab() !== "search"}>
-          <ProjectSearch apiRef={(a) => (searchApi = a)} onOpen={openHit} />
-        </div>
-      </aside>
-      <Splitter orientation="vertical" size={treeW()} onSize={setTreeW} min={180} max={520} defaultSize={260} persistKey={TREE_KEY} />
       <section class="dg-fe-main">
         <div class="dg-shell-head dg-fe-tabs" role="tablist" aria-label="Open files">
           <For each={tabList()}>
@@ -689,6 +756,7 @@ export function FilesView(): JSX.Element {
                 classList={{ "is-on": activeKey() === t.key, "is-dirty": t.dirty }}
                 {...tip(t.path)}
                 onClick={() => selectTab(t.key)}
+                onContextMenu={(e) => openContextMenu(e, () => tabMenu(t.key))}
                 onMouseDown={(e) => {
                   if (e.button !== 1) return;
                   e.preventDefault();
@@ -746,6 +814,47 @@ export function FilesView(): JSX.Element {
           </Show>
         </div>
       </section>
+      <Splitter orientation="vertical" size={treeW()} onSize={setTreeW} min={180} max={520} defaultSize={260} persistKey={TREE_KEY} reverse />
+      <aside class="dg-fe-side" style={{ width: treeW() + "px" }} aria-label="Project files">
+        <div class="dg-shell-head dg-fe-head" role="tablist" aria-label="Project files tabs">
+          <button type="button" role="tab" aria-selected={leftTab() === "files"} class="dg-shell-tab" classList={{ "is-on": leftTab() === "files" }} onClick={() => setLeftTab("files")}>
+            Files
+          </button>
+          <button type="button" role="tab" aria-selected={leftTab() === "search"} class="dg-shell-tab" classList={{ "is-on": leftTab() === "search" }} onClick={() => setLeftTab("search")}>
+            Search
+          </button>
+          <span class="dg-grow" />
+          <IconButton icon="refresh" label="Refresh the file list" onClick={() => void refreshAll()} />
+          <IconButton icon="collapse" label="Collapse all" onClick={() => ex.clear()} />
+        </div>
+        <div class="dg-fe-pane" hidden={leftTab() !== "files"}>
+          <Show when={truncated()}>
+            <div class="dg-fe-notice">{TOO_MANY}</div>
+          </Show>
+          <For each={notices()}>{(n) => <div class="dg-fe-notice is-error">{n}</div>}</For>
+          <Show when={roots().length > 0} fallback={<Show when={loaded()} fallback={<div class="dg-fe-loading"><Spinner /></div>}><div class="dg-fe-empty">{emptyTree()}</div></Show>}>
+            <div class="dg-fe-tree" onMouseDown={onTreeDown}>
+              <Tree<TreeNode>
+                roots={roots()}
+                getId={(n) => n.id}
+                getChildren={(n) => (n.kind === "file" ? undefined : n.children)}
+                expanded={expanded()}
+                onExpandedChange={ex.set}
+                selectedId={sel()?.id ?? null}
+                onSelect={onTreeSelect}
+                onActivate={(n) => (n.kind === "file" ? openNode(n) : ex.toggle(n.id))}
+                ariaLabel="Project files"
+                renderNode={renderNode}
+                rowClass={rowClass}
+                apiRef={(a) => (treeApi = a)}
+              />
+            </div>
+          </Show>
+        </div>
+        <div class="dg-fe-pane" hidden={leftTab() !== "search"}>
+          <ProjectSearch apiRef={(a) => (searchApi = a)} onOpen={openHit} />
+        </div>
+      </aside>
       <Show when={quick()}>
         <QuickOpen files={quickFiles} multi={projectRepos().length > 1} onPick={pickQuick} onClose={closeQuick} />
       </Show>

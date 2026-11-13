@@ -2,7 +2,7 @@
 // The mock must refuse what the backend refuses: the file commands (crates/gitcore/tests/files.rs mirrors these).
 import { describe, expect, it } from "vitest";
 import { mockInvoke, mockListen } from "./mock";
-import { FIXED_FILES, SEARCH_TEXT_INVALID, byBytes, CHANGED_ON_DISK, initialWorktree, isBinary, listFiles, readText, searchFiles, versionOf } from "./mockFiles";
+import { FIXED_FILES, SEARCH_TEXT_INVALID, byBytes, CHANGED_ON_DISK, ignoredEntries, initialWorktree, isBinary, listFiles, readText, searchFiles, versionOf } from "./mockFiles";
 import type { FileList, SearchResult, TextFile, Workspace } from "./types";
 
 const call = <T>(cmd: string, args?: Record<string, unknown>) => mockInvoke(cmd, args) as Promise<T>;
@@ -40,6 +40,36 @@ describe("mock files: list", () => {
     expect(list.files).not.toContain("dist/bundle.js");
     for (let i = 1; i < list.files.length; i++) expect(byBytes(list.files[i - 1], list.files[i])).toBeLessThan(0);
     expect(list.truncated).toBe(false);
+  });
+
+  it("reports the ignored files, and a folder that is ignored as a whole as one entry", async () => {
+    const api = await repoNamed("api-gateway");
+    const list = await call<FileList>("list_files", { repoId: api });
+    expect(list.ignored).toEqual(["build.log", "dist/"]);
+  });
+
+  it("gives the outermost folder of ignored files as one entry, whatever the depth", () => {
+    const files = new Map([["src/a.rs", ""], ["out/deep/er/1.o", ""], ["out/deep/er/2.o", ""], ["out/deep/3.o", ""]]);
+    const ignored = new Set(["out/deep/er/1.o", "out/deep/er/2.o", "out/deep/3.o"]);
+    expect(ignoredEntries(files, ignored)).toEqual(["out/"]);
+  });
+
+  it("leaves a folder with a tracked file as file entries", () => {
+    const files = new Map([["out/keep.o", ""], ["out/x.o", ""]]);
+    expect(ignoredEntries(files, new Set(["out/x.o"]))).toEqual(["out/x.o"]);
+  });
+
+  it("flags the list as truncated when the ignored entries pass the cap", () => {
+    const files = new Map([["a", ""], ["b.o", ""], ["c.o", ""], ["d.o", ""]]);
+    const ignored = new Set(["b.o", "c.o", "d.o"]);
+    expect(listFiles(files, ignored, 2)).toEqual({ files: ["a"], ignored: ["b.o", "c.o"], truncated: true });
+    expect(listFiles(files, ignored, 3).truncated).toBe(false);
+  });
+
+  it("keeps an ignored file of a folder with other files as a file entry", () => {
+    const files = new Map([["a/keep.rs", ""], ["a/x.log", ""], ["out/b/c.o", ""], ["out/d.o", ""], ["z.log", ""]]);
+    const ignored = new Set(["a/x.log", "out/b/c.o", "out/d.o", "z.log"]);
+    expect(ignoredEntries(files, ignored)).toEqual(["a/x.log", "out/", "z.log"]);
   });
 
   it("lists a new file, as the backend lists an untracked one", async () => {
@@ -206,8 +236,8 @@ describe("mock files: rules", () => {
 
   it("caps the list and the hits and says so", () => {
     const files = new Map([["a", "x"], ["b", "x"], ["c", "x"]]);
-    expect(listFiles(files, new Set(), 2)).toEqual({ files: ["a", "b"], truncated: true });
-    expect(listFiles(files, new Set(["c"]), 2)).toEqual({ files: ["a", "b"], truncated: false });
+    expect(listFiles(files, new Set(), 2)).toEqual({ files: ["a", "b"], ignored: [], truncated: true });
+    expect(listFiles(files, new Set(["c"]), 2)).toEqual({ files: ["a", "b"], ignored: ["c"], truncated: false });
     const lines = new Map([["a.txt", "hit\nhit\nhit"]]);
     expect(searchFiles(lines, new Set(), "hit", true, false, 2)).toEqual({
       hits: [

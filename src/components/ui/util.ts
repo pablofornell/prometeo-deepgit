@@ -42,6 +42,16 @@ export function splitPath(path: string): { dir: string; name: string } {
   return i < 0 ? { dir: "", name: path } : { dir: path.slice(0, i + 1), name: path.slice(i + 1) };
 }
 
+/**
+ * Joins a repo folder and a path relative to it (written with "/"). A Windows folder (it has a backslash and no "/")
+ * gets backslashes all the way, so the path has one kind of separator. Any other folder gets "/".
+ */
+export function joinRepoPath(repoPath: string, rel: string): string {
+  const windows = repoPath.includes("\\") && !repoPath.includes("/");
+  const base = repoPath.replace(/[\\/]+$/, "");
+  return windows ? `${base}\\${rel.replace(/\//g, "\\")}` : `${base}/${rel}`;
+}
+
 /** Status letter shown next to files (DESIGN.md 5.9). */
 export function statusLetter(s: FileStatus): string {
   switch (s) {
