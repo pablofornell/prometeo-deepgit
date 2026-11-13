@@ -296,10 +296,12 @@ export interface FileDiff {
 
 // ---------------------------------------------------------------- project files
 
-/** Tracked and untracked files of the worktree, without the ignored ones. */
+/** Tracked and untracked files of the worktree, without the ignored ones. The ignored entries come apart in `ignored`. */
 export interface FileList {
   /** Relative paths, sorted by bytes. */
   files: string[];
+  /** Ignored entries, sorted by bytes. A folder that is ignored as a whole is one entry that ends with "/". Its content is not listed. Any other entry is a file. */
+  ignored: string[];
   /** More than 100 000 files: the list stops there. */
   truncated: boolean;
 }

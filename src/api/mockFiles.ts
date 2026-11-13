@@ -74,10 +74,32 @@ export function isFolder(files: Map<string, string>, key: string): boolean {
   return false;
 }
 
-/** Sorted, capped paths that are not ignored (`files::list_files`). */
+/**
+ * The ignored entries, sorted by bytes. A folder whose files are all ignored is one entry that ends with "/"
+ * (the outermost such folder), as `git ls-files --others --ignored --directory` reports it. Other ignored files stand alone.
+ */
+export function ignoredEntries(files: Map<string, string>, ignored: Set<string>): string[] {
+  const out = new Set<string>();
+  for (const path of ignored) {
+    if (!files.has(path)) continue;
+    const parts = path.split("/");
+    let entry = path;
+    for (let i = 1; i < parts.length; i++) {
+      const dir = parts.slice(0, i).join("/") + "/";
+      if ([...files.keys()].every((k) => !k.startsWith(dir) || ignored.has(k))) {
+        entry = dir;
+        break;
+      }
+    }
+    out.add(entry);
+  }
+  return [...out].sort(byBytes);
+}
+
+/** Sorted, capped paths that are not ignored, and the ignored entries (`files::list_files`). */
 export function listFiles(files: Map<string, string>, ignored: Set<string>, max = MAX_LISTED_FILES): FileList {
   const all = [...files.keys()].filter((k) => !ignored.has(k)).sort(byBytes);
-  return { files: all.slice(0, max), truncated: all.length > max };
+  return { files: all.slice(0, max), ignored: ignoredEntries(files, ignored).slice(0, max), truncated: all.length > max };
 }
 
 /** What `read_text_file` returns for a file with this text (`files::read_text_file`). */

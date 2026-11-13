@@ -98,7 +98,7 @@ export const fileDiff = (repoId: string, spec: DiffSpec, path: string, oldPath: 
 /** File content at `rev`, or the worktree file when `rev` is null (max 2 MiB). */
 export const fileContent = (repoId: string, rev: string | null, path: string) => invoke<string>("file_content", { repoId, rev, path });
 export const lastCommitMessage = (repoId: string) => invoke<string>("last_commit_message", { repoId });
-/** Tracked and untracked files of the worktree, without the ignored ones. Sorted by path. */
+/** Tracked and untracked files of the worktree, without the ignored ones (those come apart in `ignored`). Sorted by path. */
 export const listFiles = (repoId: string) => invoke<FileList>("list_files", { repoId });
 /** A worktree file as text (2 MiB at most). Binary and too large files give empty content and a flag. */
 export const readTextFile = (repoId: string, path: string) => invoke<TextFile>("read_text_file", { repoId, path });

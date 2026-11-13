@@ -1,6 +1,6 @@
 //! Project files: list, read, write and search the files of the worktree. Every path is relative
-//! to the repo root. The list and the search skip ignored files. Read and write still accept a
-//! path to an ignored file.
+//! to the repo root. The search skips ignored files, and the list keeps them apart in `ignored`.
+//! Read and write still accept a path to an ignored file.
 
 use std::collections::BTreeSet;
 use std::io::Read;
@@ -23,7 +23,8 @@ pub const MAX_HIT_CHARS: usize = 400;
 const BINARY_SCAN_BYTES: usize = 8000;
 
 /// List the tracked and untracked files that are not ignored, sorted by path. Leave out a tracked
-/// file that is gone from the disk, and a submodule folder.
+/// file that is gone from the disk, and a submodule folder. `ignored` lists the ignored entries: a
+/// folder that is ignored as a whole is one entry that ends with "/", and git does not read inside it.
 pub fn list_files(git: &Git, repo: &RepoInfo) -> Result<FileList, GitError> {
     let root = Path::new(&repo.path);
     let args = [
@@ -40,14 +41,30 @@ pub fn list_files(git: &Git, repo: &RepoInfo) -> Result<FileList, GitError> {
         .filter(|p| !p.is_empty() && is_on_disk(root, p))
         .map(str::to_string)
         .collect();
-    Ok(cap_list(found, MAX_LISTED_FILES))
+    let args = [
+        "ls-files",
+        "-z",
+        "--others",
+        "--ignored",
+        "--exclude-standard",
+        "--directory",
+    ];
+    let out = git.run(root, Some(&repo.id), &args, false)?;
+    let ignored: BTreeSet<String> = out
+        .stdout
+        .split('\0')
+        .filter(|p| !p.is_empty())
+        .map(str::to_string)
+        .collect();
+    Ok(cap_list(found, ignored, MAX_LISTED_FILES))
 }
 
-/// The first `max` paths. `truncated` says that there were more.
-fn cap_list(found: BTreeSet<String>, max: usize) -> FileList {
+/// The first `max` paths of each list. `truncated` says that there were more files.
+fn cap_list(found: BTreeSet<String>, ignored: BTreeSet<String>, max: usize) -> FileList {
     let truncated = found.len() > max;
     FileList {
         files: found.into_iter().take(max).collect(),
+        ignored: ignored.into_iter().take(max).collect(),
         truncated,
     }
 }
@@ -260,10 +277,11 @@ mod tests {
 
     #[test]
     fn cap_keeps_the_first_paths_and_flags_the_rest() {
-        let list = cap_list(set(&["a", "b", "c"]), 2);
+        let list = cap_list(set(&["a", "b", "c"]), set(&["x/", "y", "z"]), 2);
         assert_eq!(list.files, vec!["a", "b"]);
+        assert_eq!(list.ignored, vec!["x/", "y"]);
         assert!(list.truncated);
-        let all = cap_list(set(&["a", "b"]), 2);
+        let all = cap_list(set(&["a", "b"]), set(&[]), 2);
         assert_eq!(all.files.len(), 2);
         assert!(!all.truncated);
     }

@@ -424,12 +424,16 @@ pub struct FileDiff {
     pub too_large: bool,
 }
 
-/// Tracked and untracked files of the worktree, without the ignored ones.
+/// Tracked and untracked files of the worktree, without the ignored ones. The ignored entries come
+/// apart in `ignored`.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct FileList {
     /// Relative paths, sorted by bytes.
     pub files: Vec<String>,
+    /// Ignored entries, sorted by bytes. A folder that is ignored as a whole is one entry that ends
+    /// with "/". Its content is not listed. Any other ignored entry is a file.
+    pub ignored: Vec<String>,
     /// More than 100 000 files: the list stops there.
     pub truncated: bool,
 }

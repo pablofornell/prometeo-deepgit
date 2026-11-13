@@ -3,7 +3,7 @@
 .dg-fe { flex: 1; min-height: 0; min-width: 0; display: flex; }
 .dg-fe [hidden] { display: none !important; }
 
-/* ---- left pane: Files / Search */
+/* ---- side pane (right of the editor): Files / Search */
 .dg-fe-side { flex: none; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
 .dg-fe-pane { flex: 1; min-height: 0; min-width: 0; display: flex; flex-direction: column; }
 .dg-fe-notice { padding: 4px 12px; color: var(--dg-text-secondary); font-size: var(--dg-font-size-medium); line-height: calc(16 * var(--dg-u)); }
@@ -12,6 +12,10 @@
 .dg-fe-loading { flex: 1; min-height: 48px; display: grid; place-items: center; }
 .dg-fe-tree { flex: 1; min-height: 0; display: flex; flex-direction: column; padding-top: 2px; }
 .dg-fe-ficon { color: var(--dg-icon-secondary); flex: none; }
+/* An ignored file or folder: name and icon fade. The colour comes from `--dg-status-ignored`. */
+.dg-fe-ficon.is-ignored, .dg-fe-fname.is-ignored, .dg-fe-dname.is-ignored { opacity: 0.7; }
+/* A conflicted file: the row gets a danger wash. The selection colour wins. */
+.dg-fe-tree .dg-tree-row.is-conflict:not(.is-selected) { background: var(--dg-danger-wash-soft); }
 .dg-fe-dname { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .dg-fe-dname.is-repo { font-weight: var(--dg-weight-semibold); }
 .dg-fe-fname { flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; min-width: 0; }

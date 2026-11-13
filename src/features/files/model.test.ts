@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 import type { FileChange, WorkingTree } from "../../api/types";
 import {
-  SEP, buildTree, closeTab, columnOffset, errorText, folderStatus, folderStatuses, groupHits, isStaleVersion, lineSeparatorOf,
+  SEP, buildTree, closeTab, columnOffset, dirNodeStatus, errorText, fileNodeStatus, folderStatus, folderStatuses, groupHits, isStaleVersion, lineSeparatorOf,
   matchRange, openTab, rankFiles, repoNode, scopeId, statusMap, tabLabels, type DirNode,
 } from "./model";
 
@@ -42,6 +42,14 @@ describe("buildTree", () => {
     expect(a[1].repoId).toBe("repoA");
     expect(b[0].id).not.toBe(a[1].id);
     expect((a[0] as DirNode).children[0].id).toBe("repoA" + SEP + "src/x.ts");
+  });
+
+  it("shows a path that ends with a slash as a folder without children", () => {
+    const t = buildTree(["src/a.ts", "node_modules/", "out/cache/"]);
+    expect(t.map((n) => n.name)).toEqual(["node_modules", "out", "src"]);
+    expect(t[0]).toMatchObject({ kind: "dir", id: "node_modules/", path: "node_modules/", children: [] });
+    const out = t[1] as DirNode;
+    expect(out.children).toMatchObject([{ kind: "dir", path: "out/cache/", children: [] }]);
   });
 
   it("returns nothing for an empty list", () => {
@@ -114,6 +122,34 @@ describe("folderStatuses and folderStatus", () => {
 
   it("gives no folder for a file at the root", () => {
     expect(folders([["README.md", "modified"]]).size).toBe(0);
+  });
+});
+
+describe("fileNodeStatus and dirNodeStatus", () => {
+  const files = new Map<string, Parameters<typeof change>[1]>([["a/x.ts", "modified"], ["kept.log", "modified"]]);
+  const folders = folderStatuses(files);
+  const ignored = new Set(["build.log", "kept.log", "dist/", "a/gen/"]);
+
+  it("shows the change of a file, and ignored for an ignored file without a change", () => {
+    expect(fileNodeStatus("a/x.ts", files, ignored)).toBe("modified");
+    expect(fileNodeStatus("build.log", files, ignored)).toBe("ignored");
+    expect(fileNodeStatus("a/y.ts", files, ignored)).toBeNull();
+  });
+
+  it("lets the change of a tracked file win over an ignore rule", () => {
+    expect(fileNodeStatus("kept.log", files, ignored)).toBe("modified");
+  });
+
+  it("shows an ignored folder as ignored, with or without the trailing slash", () => {
+    expect(dirNodeStatus("dist/", folders, ignored)).toBe("ignored");
+    expect(dirNodeStatus("dist", folders, ignored)).toBe("ignored");
+  });
+
+  it("colours a folder only from its changed files, and an ignored file adds nothing", () => {
+    expect(dirNodeStatus("a/", folders, ignored)).toBe("modified");
+    expect(dirNodeStatus("b/", folders, ignored)).toBeNull();
+    // `build.log` is ignored and its folder (the root) has no key, so nothing colours
+    expect(folders.size).toBe(1);
   });
 });
 
