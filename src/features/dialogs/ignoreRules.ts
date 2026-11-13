@@ -101,11 +101,19 @@ export interface MatchCount {
 /**
  * Counts the files of `files` that `lines` match, with the rules of git (the `ignore` package). A folder line matches the
  * files below it. `tracked` holds the paths that git tracks; it counts the matched files among them.
+ * `ignoreCase` is `core.ignorecase` of the repo: git matches case-sensitively on Linux, so the `ignore` default (true) is wrong.
  * Returns null when there is no list, or the list is too long (section 11.4, rule 3).
+ * The count is a preview of the new lines alone. It does not read the existing rules, so a `!` rule in a nested `.gitignore`
+ * that re-includes a file is not seen (known limit).
  */
-export function countMatches(files: readonly string[] | null, tracked: ReadonlySet<string>, lines: readonly string[]): MatchCount | null {
+export function countMatches(
+  files: readonly string[] | null,
+  tracked: ReadonlySet<string>,
+  lines: readonly string[],
+  ignoreCase: boolean,
+): MatchCount | null {
   if (!files || files.length > MAX_COUNTED_FILES) return null;
-  const rules = ignore().add([...lines]);
+  const rules = ignore({ ignorecase: ignoreCase }).add([...lines]);
   let matched = 0;
   let trackedMatched = 0;
   for (const f of files) {

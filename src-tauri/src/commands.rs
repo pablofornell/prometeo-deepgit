@@ -8,9 +8,9 @@ use gitcore::{
     clone as gitclone, conflicts as gitconflicts, diff, files as gitfiles, log, ops,
     refs as gitrefs, status, ApiError, CloneOpts, CloneProgress, CloneResult, CloneTarget,
     CommitDetails, CommitRow, ConflictEntry, ConflictSide, ConflictVersions, DiffSpec, FileDiff,
-    FileList, Git, HunkRef, IgnoreTarget, LogQuery, LogSessionInfo, MergeOpts, OpResult, Project,
-    Refs, RepoChanged, RepoInfo, RepoSummary, ResetMode, SearchResult, StashUntracked, TextFile,
-    WorkingTree, Workspace,
+    FileList, Git, HunkRef, IgnoreFile, IgnoreTarget, LogQuery, LogSessionInfo, MergeOpts,
+    OpResult, Project, Refs, RepoChanged, RepoInfo, RepoSummary, ResetMode, SearchResult,
+    StashUntracked, TextFile, WorkingTree, Workspace,
 };
 use gitcore::{AuthMode, GitError};
 use tauri::{AppHandle, Emitter, State};
@@ -266,7 +266,11 @@ pub async fn read_text_file(state: St<'_>, repo_id: String, path: String) -> Res
 }
 
 #[tauri::command]
-pub async fn read_ignore_file(state: St<'_>, repo_id: String, target: IgnoreTarget) -> Res<String> {
+pub async fn read_ignore_file(
+    state: St<'_>,
+    repo_id: String,
+    target: IgnoreTarget,
+) -> Res<IgnoreFile> {
     read(&state, &repo_id, move |g, r| {
         gitfiles::read_ignore_file(g, r, target)
     })

@@ -10,7 +10,9 @@ use std::path::{Component, Path, PathBuf};
 use crate::conflicts::write_worktree_file;
 use crate::diff::{worktree_path, MAX_CONTENT_BYTES};
 use crate::error::GitError;
-use crate::model::{FileList, IgnoreTarget, RepoInfo, SearchHit, SearchResult, TextFile};
+use crate::model::{
+    FileList, IgnoreFile, IgnoreTarget, RepoInfo, SearchHit, SearchResult, TextFile,
+};
 use crate::ops::check_rel;
 use crate::runner::{command_error, Git};
 
@@ -127,13 +129,28 @@ fn changed_on_disk() -> GitError {
     GitError::Invalid("The file changed on disk. Reload it before you save.".to_string())
 }
 
-/// Read the text of an ignore file. A missing file gives an empty string. Refuse a symlink and a
-/// folder, and a file over 2 MiB.
+/// Read the text of an ignore file, and the case rule of the repo (`core.ignorecase`, false when unset).
+/// A missing file gives an empty text. Refuse a symlink and a folder, and a file over 2 MiB.
 pub fn read_ignore_file(
     git: &Git,
     repo: &RepoInfo,
     target: IgnoreTarget,
-) -> Result<String, GitError> {
+) -> Result<IgnoreFile, GitError> {
+    let content = read_ignore_text(git, repo, target)?;
+    Ok(IgnoreFile {
+        content,
+        ignore_case: core_ignorecase(git, repo)?,
+    })
+}
+
+/// The value of `core.ignorecase`. Git exits with 1 when the key is not set: that means false.
+fn core_ignorecase(git: &Git, repo: &RepoInfo) -> Result<bool, GitError> {
+    let args = ["config", "--type=bool", "--get", "core.ignorecase"];
+    let out = git.run_unchecked(Path::new(&repo.path), Some(&repo.id), &args, false, None)?;
+    Ok(out.code == 0 && out.stdout.trim() == "true")
+}
+
+fn read_ignore_text(git: &Git, repo: &RepoInfo, target: IgnoreTarget) -> Result<String, GitError> {
     let full = ignore_file_path(git, repo, target)?;
     match std::fs::symlink_metadata(&full) {
         Ok(_) => check_regular(&full, &ignore_label(target))?,

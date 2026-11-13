@@ -3,7 +3,7 @@
 import { describe, expect, it } from "vitest";
 import { mockInvoke, mockListen } from "./mock";
 import { FIXED_FILES, SEARCH_TEXT_INVALID, appendIgnoreLines, byBytes, CHANGED_ON_DISK, initialWorktree, isBinary, listFiles, readText, searchFiles, versionOf } from "./mockFiles";
-import type { FileList, IgnoreTarget, SearchResult, TextFile, Workspace, WorkingTree } from "./types";
+import type { FileList, IgnoreFile, IgnoreTarget, SearchResult, TextFile, Workspace, WorkingTree } from "./types";
 
 const call = <T>(cmd: string, args?: Record<string, unknown>) => mockInvoke(cmd, args) as Promise<T>;
 
@@ -127,7 +127,8 @@ describe("mock files: write", () => {
   });
 });
 
-const readIgnore = (repoId: string, target: IgnoreTarget) => call<string>("read_ignore_file", { repoId, target });
+const readIgnoreFile = (repoId: string, target: IgnoreTarget) => call<IgnoreFile>("read_ignore_file", { repoId, target });
+const readIgnore = async (repoId: string, target: IgnoreTarget) => (await readIgnoreFile(repoId, target)).content;
 const append = (repoId: string, target: IgnoreTarget, patterns: string[]) => call<string[]>("append_ignore_rules", { repoId, target, patterns });
 
 describe("mock files: ignore files", () => {
@@ -159,6 +160,12 @@ describe("mock files: ignore files", () => {
     const ledger = await repoNamed("ledger-service");
     expect(await append(ledger, "gitignore", ["*.log", "gen/"])).toEqual(["gen/"]);
     expect(await append(ledger, "gitignore", ["gen/"])).toEqual([]);
+  });
+
+  it("tells the case rule of the repo: the mock repos are case sensitive, like git on Linux", async () => {
+    const shared = await repoNamed("shared-proto");
+    expect(await readIgnoreFile(shared, "gitignore")).toMatchObject({ ignoreCase: false });
+    expect(await readIgnoreFile(shared, "exclude")).toMatchObject({ ignoreCase: false });
   });
 
   it("keeps the exclude file apart from .gitignore", async () => {

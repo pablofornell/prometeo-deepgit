@@ -70,7 +70,7 @@ describe("escape", () => {
   it("matches the real file after the escape", () => {
     const path = "src/#gen/a[1]!.ts";
     for (const o of patternOptions({ path, isDir: false })) {
-      expect(countMatches([path], new Set(), o.lines), o.label).toEqual({ matched: 1, tracked: 0 });
+      expect(countMatches([path], new Set(), o.lines, false), o.label).toEqual({ matched: 1, tracked: 0 });
     }
   });
 });
@@ -91,7 +91,7 @@ describe("custom text", () => {
 describe("match count", () => {
   const files = ["README.md", "src/gen/api.ts", "src/gen/types.ts", "src/app/api.ts", "src/main.ts", "lib/gen/x.ts"];
   const tracked = new Set(["src/main.ts", "src/gen/api.ts"]);
-  const count = (...l: string[]) => countMatches(files, tracked, l);
+  const count = (...l: string[]) => countMatches(files, tracked, l, false);
 
   it("counts a file", () => {
     expect(count("/src/gen/api.ts")).toEqual({ matched: 1, tracked: 1 });
@@ -117,9 +117,22 @@ describe("match count", () => {
     expect(count()).toEqual({ matched: 0, tracked: 0 });
   });
   it("gives no count without a list or for a list that is too long", () => {
-    expect(countMatches(null, tracked, ["*.ts"])).toBeNull();
-    expect(countMatches(new Array<string>(MAX_COUNTED_FILES + 1).fill("a"), tracked, ["*.ts"])).toBeNull();
-    expect(countMatches(new Array<string>(MAX_COUNTED_FILES).fill("a.ts"), tracked, ["*.ts"])?.matched).toBe(MAX_COUNTED_FILES);
+    expect(countMatches(null, tracked, ["*.ts"], false)).toBeNull();
+    expect(countMatches(new Array<string>(MAX_COUNTED_FILES + 1).fill("a"), tracked, ["*.ts"], false)).toBeNull();
+    expect(countMatches(new Array<string>(MAX_COUNTED_FILES).fill("a.ts"), tracked, ["*.ts"], false)?.matched).toBe(MAX_COUNTED_FILES);
+  });
+  it("matches case when the repo does (core.ignorecase unset or false)", () => {
+    const mixed = ["a.log", "A.LOG", "dir/B.Log", "Gen/x.ts", "gen/y.ts"];
+    const cased = new Set(["A.LOG"]);
+    expect(countMatches(mixed, cased, ["*.log"], false)).toEqual({ matched: 1, tracked: 0 });
+    expect(countMatches(mixed, cased, ["gen/"], false)).toEqual({ matched: 1, tracked: 0 });
+    expect(countMatches(mixed, cased, ["/a.log"], false)).toEqual({ matched: 1, tracked: 0 });
+  });
+  it("ignores case when the repo does (core.ignorecase true)", () => {
+    const mixed = ["a.log", "A.LOG", "dir/B.Log", "Gen/x.ts", "gen/y.ts"];
+    const cased = new Set(["A.LOG"]);
+    expect(countMatches(mixed, cased, ["*.log"], true)).toEqual({ matched: 3, tracked: 1 });
+    expect(countMatches(mixed, cased, ["gen/"], true)).toEqual({ matched: 2, tracked: 0 });
   });
   it("writes the label", () => {
     expect(fileCountLabel(1)).toBe("1 file");

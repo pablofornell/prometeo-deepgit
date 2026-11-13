@@ -3,7 +3,7 @@
  * (`.gitignore` or `.git/info/exclude`), a preview of the line, and a note for tracked files. The dialog writes the lines and
  * shows the toast. It does not stage, commit or untrack anything.
  */
-import { type JSX, For, Show, createMemo, createResource, createSignal } from "solid-js";
+import { type JSX, For, Show, createEffect, createMemo, createResource, createSignal } from "solid-js";
 import * as api from "../../api/tauri";
 import type { IgnoreTarget } from "../../api/types";
 import { Dialog, type DialogComponentProps, Select, TextField, toast } from "../../components/ui";
@@ -71,20 +71,24 @@ export function IgnoreDialog(props: IgnoreProps & DialogComponentProps<IgnoreRes
   // ---- match count: one read of the file list. The counts of the fixed options do not change.
   const [data] = createResource(() => props.repoId, loadFiles);
   const fileData = (): FileData | null => (data.state === "ready" ? (data() ?? null) : null);
+  // `core.ignorecase` of the repo comes with the first read of an ignore file. Git matches with this rule, so the count waits for it.
+  const [ignoreCase, setIgnoreCase] = createSignal<boolean | null>(null);
   const optionCounts = createMemo(() => {
     const d = fileData();
+    const ic = ignoreCase();
     const out = new Map<OptionKind, MatchCount>();
-    if (!d) return out;
+    if (!d || ic === null) return out;
     for (const o of ready) {
-      const c = countMatches(d.files, d.tracked, o.lines);
+      const c = countMatches(d.files, d.tracked, o.lines, ic);
       if (c) out.set(o.kind, c);
     }
     return out;
   });
   const current = createMemo<MatchCount | null>(() => {
     const d = fileData();
-    if (!d) return null;
-    return kind() === "custom" ? countMatches(d.files, d.tracked, lines()) : (optionCounts().get(kind()) ?? null);
+    const ic = ignoreCase();
+    if (!d || ic === null) return null;
+    return kind() === "custom" ? countMatches(d.files, d.tracked, lines(), ic) : (optionCounts().get(kind()) ?? null);
   });
   const trailing = (k: OptionKind): string | undefined => {
     const c = optionCounts().get(k);
@@ -95,7 +99,10 @@ export function IgnoreDialog(props: IgnoreProps & DialogComponentProps<IgnoreRes
   // ---- target file
   const targetLabel = (t: IgnoreTarget): string => (t === "gitignore" ? `${repoName}/.gitignore` : ".git/info/exclude");
   const [existing] = createResource(target, (t) => api.readIgnoreFile(props.repoId, t));
-  const existingText = (): string | null => (existing.state === "ready" ? (existing() ?? "") : null);
+  createEffect(() => {
+    if (existing.state === "ready") setIgnoreCase(existing()?.ignoreCase ?? false);
+  });
+  const existingText = (): string | null => (existing.state === "ready" ? (existing()?.content ?? "") : null);
   const readError = (): string | null => (existing.state === "errored" ? ((existing.error as { message?: string })?.message ?? String(existing.error)) : null);
   const split = createMemo(() => {
     const text = existingText();

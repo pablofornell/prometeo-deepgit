@@ -14,7 +14,7 @@
  */
 import type {
   ApiErrorShape, AuthNotice, AuthPrompt, CloneOpts, CloneProgress, CloneResult, CloneTarget, CommitDetails, ConflictEntry, ConflictSide, ConflictVersions,
-  ConsoleEntry, DiffSpec, ExpectedOids, FileDiff, FileList, IgnoreTarget, LogQuery, LogSessionInfo, MergeOpts, OpResult, Project, CommitRow, HunkOpts, RepoChanged, RepoSummary, Refs,
+  ConsoleEntry, DiffSpec, ExpectedOids, FileDiff, FileList, IgnoreFile, IgnoreTarget, LogQuery, LogSessionInfo, MergeOpts, OpResult, Project, CommitRow, HunkOpts, RepoChanged, RepoSummary, Refs,
   ResetMode, SearchResult, StashUntracked, TextFile, Workspace, WorkingTree,
 } from "./types";
 
@@ -102,8 +102,8 @@ export const lastCommitMessage = (repoId: string) => invoke<string>("last_commit
 export const listFiles = (repoId: string) => invoke<FileList>("list_files", { repoId });
 /** A worktree file as text (2 MiB at most). Binary and too large files give empty content and a flag. */
 export const readTextFile = (repoId: string, path: string) => invoke<TextFile>("read_text_file", { repoId, path });
-/** The text of `.gitignore` (repo root) or `.git/info/exclude`. Empty when the file does not exist. */
-export const readIgnoreFile = (repoId: string, target: IgnoreTarget) => invoke<string>("read_ignore_file", { repoId, target });
+/** The text of `.gitignore` (repo root) or `.git/info/exclude` (empty when the file does not exist), and `core.ignorecase` of the repo. */
+export const readIgnoreFile = (repoId: string, target: IgnoreTarget) => invoke<IgnoreFile>("read_ignore_file", { repoId, target });
 /** Searches the tracked and untracked files that are not ignored. Hits are capped at 2 000. */
 export const searchFiles = (repoId: string, query: string, opts: { caseSensitive: boolean; regex: boolean }) =>
   invoke<SearchResult>("search_files", { repoId, query, caseSensitive: opts.caseSensitive, regex: opts.regex });

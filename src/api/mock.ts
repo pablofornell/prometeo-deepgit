@@ -19,7 +19,7 @@ import { uniqueProjectName, validateProjectName } from "./projectName";
 import { entryOf, genericConflicts, currentOids, hasStage, isTextConflict, sideStages, versionsOf, type MockConflict } from "./mockConflicts";
 import type {
   CloneOpts, CloneProgress, CloneResult, CloneTarget, CommitDetails, CommitRow, ConflictEntry, ConflictLabels, ConflictVersions, ConsoleEntry, DiffSpec,
-  FileChange, FileDiff, GraphRow, IgnoreTarget, LocalBranch, LogQuery, LogSessionInfo, MergeMode, MergeOpts, OpResult, Project, RefLabel, Refs, RepoChanged, RepoInfo,
+  FileChange, FileDiff, GraphRow, IgnoreFile, IgnoreTarget, LocalBranch, LogQuery, LogSessionInfo, MergeMode, MergeOpts, OpResult, Project, RefLabel, Refs, RepoChanged, RepoInfo,
   RepoSummary, ResetMode, Workspace, WorkingTree,
 } from "./types";
 
@@ -763,7 +763,7 @@ const handlers: Record<string, Handler> = {
     const repo = repoOf(a.repoId);
     const target = ignoreTargetArg(a, "read_ignore_file");
     if (target === "exclude") c.git(repo, ["rev-parse", "--git-path", "info/exclude"]);
-    return ignoreText(repo, target);
+    return { content: ignoreText(repo, target), ignoreCase: false } satisfies IgnoreFile;
   },
   search_files: (a, c) => {
     const repo = repoOf(a.repoId);
@@ -858,7 +858,7 @@ const handlers: Record<string, Handler> = {
       excludeTexts.set(repo, text);
     }
     // Git hides an untracked file that a new rule matches. A tracked file stays in the list.
-    const rules = ignore().add(ignoreText(repo, "gitignore")).add(ignoreText(repo, "exclude"));
+    const rules = ignore({ ignorecase: false }).add(ignoreText(repo, "gitignore")).add(ignoreText(repo, "exclude"));
     repo.wt.unstaged = repo.wt.unstaged.filter((f) => {
       if (f.status !== "untracked" || !rules.ignores(f.path)) return true;
       repo.ignored.add(f.path);

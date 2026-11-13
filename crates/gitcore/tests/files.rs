@@ -395,7 +395,9 @@ fn ignore_creates_the_gitignore_and_hides_the_file() {
     repo.write("src/gen/api.ts", "x\n");
     repo.write("src/keep.ts", "y\n");
     assert_eq!(
-        files::read_ignore_file(&g, &repo.info, IgnoreTarget::Gitignore).expect("read"),
+        files::read_ignore_file(&g, &repo.info, IgnoreTarget::Gitignore)
+            .expect("read")
+            .content,
         ""
     );
     let added = files::append_ignore_rules(
@@ -475,7 +477,9 @@ fn ignore_writes_the_exclude_file_in_the_git_folder() {
     );
     assert!(!repo.path().join(".gitignore").exists());
     assert_eq!(
-        files::read_ignore_file(&g, &repo.info, IgnoreTarget::Exclude).expect("read"),
+        files::read_ignore_file(&g, &repo.info, IgnoreTarget::Exclude)
+            .expect("read")
+            .content,
         "/local.env\n"
     );
     let list = files::list_files(&g, &repo.info).expect("list");
@@ -514,4 +518,21 @@ fn ignore_refuses_a_symlink_and_a_folder() {
     let msg =
         invalid(files::read_ignore_file(&g, &repo.info, IgnoreTarget::Gitignore).unwrap_err());
     assert_eq!(msg, "not a regular file: .gitignore");
+}
+
+#[test]
+fn ignore_file_says_whether_the_repo_ignores_case() {
+    let repo = TestRepo::new();
+    let g = git();
+    let read = |t| files::read_ignore_file(&g, &repo.info, t).expect("read");
+    // Unset (the default on Linux) and false: case matters.
+    assert!(!read(IgnoreTarget::Gitignore).ignore_case);
+    repo.sh(&["config", "core.ignorecase", "false"]);
+    assert!(!read(IgnoreTarget::Gitignore).ignore_case);
+    // True, also in the spellings that git reads as true.
+    repo.sh(&["config", "core.ignorecase", "true"]);
+    assert!(read(IgnoreTarget::Gitignore).ignore_case);
+    assert!(read(IgnoreTarget::Exclude).ignore_case);
+    repo.sh(&["config", "core.ignorecase", "yes"]);
+    assert!(read(IgnoreTarget::Gitignore).ignore_case);
 }
