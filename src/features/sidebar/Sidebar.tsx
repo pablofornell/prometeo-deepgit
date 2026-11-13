@@ -15,11 +15,12 @@ import {
   repoById, activeProject, addProject, focusedRepoIdSignal, isRepoFilterActive, projectRepos, rescanProject, selectAllRepos, selectOnlyRepo, selectedRepoIds,
   setFocusedRepoId, summary, toggleRepo,
 } from "../../state/workspace";
+import { collapsedFor, collapsedKey, noCollapsed, pruneCollapsed, type CollapsedState } from "./collapsed";
 import { allHidden, toggleFolder, showOnly } from "./folders";
 import { nodeMenu } from "./menus";
 import { ProjectNameEditor } from "./ProjectNameEditor";
 import { renamingAfterSwitch } from "./rename";
-import { buildTree, expandableIds, filterTree, folderIds, ids, repoDot, stateLabel, worstDot, type SidebarNode } from "./nodes";
+import { ancestorIds, buildTree, expandableIds, filterTree, folderIds, ids, repoDot, stateLabel, worstDot, type SidebarNode } from "./nodes";
 import { cssPx } from "../../state/metrics";
 import "./sidebar.css";
 
@@ -67,11 +68,24 @@ export function Sidebar(): JSX.Element {
   const [selected, setSelected] = createSignal<string | null>(null);
   const [query, setQuery] = createSignal("");
   /** Folders the user collapsed (ids). Every other folder is open, so a new folder starts open (ITERATION-3 1.4). */
-  const [collapsed, setCollapsedSignal] = createSignal<ReadonlySet<string>>(new Set());
-  const collapsedKey = () => `sidebar.collapsedFolders.${activeProject()?.id ?? "none"}`;
+  const [collapsedState, setCollapsedState] = createSignal<CollapsedState>(noCollapsed);
+  const collapsed = () => collapsedFor(collapsedState(), activeProject()?.id);
   const setCollapsed = (next: ReadonlySet<string>) => {
-    setCollapsedSignal(next);
-    savePersisted(collapsedKey(), [...next]);
+    const projectId = activeProject()?.id ?? null;
+    setCollapsedState({ projectId, ids: next });
+    savePersisted(collapsedKey(projectId), [...next]);
+  };
+
+  /**
+   * Opens the folders and repos above a repo, so that a row picked by code (project switch, focus from the log) is a
+   * visible row and the keyboard works on it. The folders stay saved as collapsed: this is for the session only.
+   */
+  const reveal = (repoId: string) => {
+    const above = ancestorIds(untrack(rawTree), ids.repo(repoId));
+    const folders = above.filter((id) => id.startsWith("dir:"));
+    const cur = untrack(collapsed);
+    if (folders.some((id) => cur.has(id))) setCollapsedState({ projectId: activeProject()?.id ?? null, ids: new Set([...cur].filter((id) => !folders.includes(id))) });
+    for (const id of above) if (id.startsWith("repo:") && !untrack(expanded).has(id)) ex.expand(id);
   };
 
   const single = () => projectRepos().length === 1;
@@ -92,9 +106,11 @@ export function Sidebar(): JSX.Element {
         }
         ex.set(open);
         setMoreOpen(new Set<string>());
-        setCollapsedSignal(new Set(loadPersisted<string[]>(collapsedKey(), [])));
+        const projectId = activeProject()?.id ?? null;
+        setCollapsedState({ projectId, ids: new Set(loadPersisted<string[]>(collapsedKey(projectId), [])) });
         setQuery("");
         setSelected(target ? (repos.length > 1 ? ids.repo(target.id) : null) : null);
+        if (target && repos.length > 1) reveal(target.id);
       },
     ),
   );
@@ -104,7 +120,10 @@ export function Sidebar(): JSX.Element {
     on(focusedRepoIdSignal, (id) => {
       if (!id || single()) return;
       const cur = selected();
-      if (!cur || !cur.includes(id)) setSelected(ids.repo(id));
+      if (!cur || !cur.includes(id)) {
+        setSelected(ids.repo(id));
+        reveal(id);
+      }
     }),
   );
 
@@ -119,15 +138,14 @@ export function Sidebar(): JSX.Element {
   );
   const roots = createMemo(() => (q() ? filterTree(rawTree(), q()) : rawTree()));
   const allFolderIds = createMemo(() => folderIds(rawTree()));
-  // a folder that is gone (repo removed, folders merged or split) loses its saved collapsed state
-  createEffect(
-    on(allFolderIds, (all) => {
-      if (q() || all.length === 0) return;
-      const cur = untrack(collapsed);
-      const keep = [...cur].filter((id) => all.includes(id));
-      if (keep.length !== cur.size) setCollapsed(new Set(keep));
-    }),
-  );
+  // a folder that is gone (repo removed, folders merged or split) loses its saved collapsed state; only for the state of
+  // the active project (the effect can run before the new project's ids are loaded)
+  createEffect(() => {
+    const all = allFolderIds();
+    if (q()) return;
+    const next = pruneCollapsed(collapsedState(), activeProject()?.id, all);
+    if (next) setCollapsed(next.ids);
+  });
   /** The tree gets the open folders next to the open repos and groups. */
   const effectiveExpanded = createMemo(() => {
     if (q()) return expandableIds(roots());

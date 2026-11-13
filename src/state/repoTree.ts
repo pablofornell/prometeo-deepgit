@@ -47,12 +47,22 @@ interface Dir {
 /**
  * Groups repos by their folder, relative to the project root (`RepoInfo.name`). A folder shows only when 2 or more repos
  * are below it; a folder with one repo gives the repo to its parent. A folder whose only child is a folder merges with it
- * (`a/b/c`; the id uses the deepest path). Pass the roots of `nestRepos`: nested repos are not grouped.
+ * (`a/b/c`; the id uses the deepest path). Pass the roots of `nestRepos`, or the nested repos of one repo with that
+ * repo as `parent`: the folders are then the ones between the parent and the repos, and the ids stay relative to the
+ * project root.
  */
-export function groupRepos(roots: readonly RepoInfo[]): RepoGroup[] {
+export function groupRepos(roots: readonly RepoInfo[], parent?: RepoInfo): RepoGroup[] {
   const top: Dir = { dirs: new Map(), repos: [] };
+  let prefix: string[] = [];
   for (const repo of roots) {
-    const dirs = segments(repo.name).slice(0, -1);
+    const nameParts = segments(repo.name);
+    let rel = nameParts;
+    if (parent) {
+      const inside = norm(repo.path).slice(norm(parent.path).length);
+      rel = segments(inside);
+      prefix = nameParts.slice(0, Math.max(0, nameParts.length - rel.length));
+    }
+    const dirs = rel.slice(0, -1);
     let at = top;
     for (const d of dirs) {
       let next = at.dirs.get(d);
@@ -75,7 +85,7 @@ export function groupRepos(roots: readonly RepoInfo[]): RepoGroup[] {
     }
     return { items: sortGroups(items), count };
   };
-  return build(top, []).items;
+  return build(top, prefix).items;
 }
 
 /** Row label of a repo: its folder name (the last part of the path relative to the project root). */
@@ -89,7 +99,7 @@ export function sidebarOrder(repos: readonly RepoInfo[]): RepoInfo[] {
   const out: RepoInfo[] = [];
   const addRepo = (r: RepoInfo) => {
     out.push(r);
-    for (const c of children.get(r.id) ?? []) addRepo(c);
+    walk(groupRepos(children.get(r.id) ?? [], r));
   };
   const walk = (list: readonly RepoGroup[]) => {
     for (const g of list) {

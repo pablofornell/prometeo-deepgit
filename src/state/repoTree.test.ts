@@ -73,6 +73,35 @@ describe("groupRepos", () => {
   });
 });
 
+describe("groupRepos inside a repo", () => {
+  const shape = (list: readonly RepoGroup[]): unknown[] => list.map((g) => (g.kind === "repo" ? g.repo.name : { [g.label]: shape(g.children) }));
+  const parent = at("platform");
+
+  it("groups the nested repos of a repo by the folders below it", () => {
+    const kids = reposAt("platform/services/a", "platform/services/b", "platform/libs/x", "platform/libs/y", "platform/tool", "platform/solo/z");
+    const g = groupRepos(kids, parent);
+    expect(shape(g)).toEqual([{ libs: ["platform/libs/x", "platform/libs/y"] }, { services: ["platform/services/a", "platform/services/b"] }, "platform/tool", "platform/solo/z"]);
+    expect(g.filter((x) => x.kind === "folder").map((x) => (x.kind === "folder" ? x.path : ""))).toEqual(["platform/libs", "platform/services"]);
+  });
+
+  it("merges a chain below the repo and sorts case-insensitive and numeric", () => {
+    const g = groupRepos(reposAt("platform/a/b/x", "platform/a/b/y", "platform/R10", "platform/r2", "platform/Q"), parent);
+    expect(shape(g)).toEqual([{ "a/b": ["platform/a/b/x", "platform/a/b/y"] }, "platform/Q", "platform/r2", "platform/R10"]);
+    expect(g[0]).toMatchObject({ path: "platform/a/b", label: "a/b" });
+  });
+
+  it("uses the path below a parent repo that is the project root", () => {
+    const root: RepoInfo = { id: "root", name: "proj", path: "/w" };
+    const kids: RepoInfo[] = ["s/a", "s/b"].map((n) => ({ id: n, name: n, path: `/w/${n}` }));
+    expect(groupRepos(kids, root)[0]).toMatchObject({ kind: "folder", path: "s", label: "s" });
+  });
+
+  it("puts the nested repos in the sidebar order after their parent", () => {
+    const order = sidebarOrder(reposAt("platform", "platform/tool", "platform/services/b", "platform/services/a", "other")).map((r) => r.name);
+    expect(order).toEqual(["other", "platform", "platform/services/a", "platform/services/b", "platform/tool"]);
+  });
+});
+
 describe("sidebarOrder", () => {
   it("lists repos depth-first in sidebar order (folders first, nested repos after their parent)", () => {
     const order = sidebarOrder(reposAt("zeta", "b/two", "b/one", "alpha", "alpha/inner", "c/x/y/1", "c/x/y/2")).map((r) => r.name);

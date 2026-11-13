@@ -121,7 +121,8 @@ export function buildTree(repos: readonly RepoInfo[], ctx: BuildContext): Sideba
   const { roots, children } = nestRepos(repos);
 
   const repoNode = (repo: RepoInfo): SidebarNode => {
-    const nested = (children.get(repo.id) ?? []).map(repoNode);
+    // nested repos are grouped by folder too, relative to their parent repo
+    const nested = groupRepos(children.get(repo.id) ?? [], repo).map(groupNode);
     const show = ctx.query !== "" || ctx.expanded.has(ids.repo(repo.id));
     const refs = show ? ctx.refsOf(repo.id) : undefined;
     const groups = refs ? buildGroups(repo.id, refs, ctx) : [];
@@ -141,6 +142,19 @@ export function buildTree(repos: readonly RepoInfo[], ctx: BuildContext): Sideba
     return refs ? buildGroups(only.id, refs, ctx) : [{ id: `loading:${only.id}`, kind: "loading", repoId: only.id, label: "Loading…" }];
   }
   return groupRepos(roots).map(groupNode);
+}
+
+/** Ids of the nodes above the node `id` (outermost first), or [] when `id` is a root or not in the tree. */
+export function ancestorIds(nodes: readonly SidebarNode[], id: string): string[] {
+  const walk = (list: readonly SidebarNode[], path: string[]): string[] | null => {
+    for (const n of list) {
+      if (n.id === id) return path;
+      const hit = n.children ? walk(n.children, [...path, n.id]) : null;
+      if (hit) return hit;
+    }
+    return null;
+  };
+  return walk(nodes, []) ?? [];
 }
 
 /** Ids of the repos at any level below `nodes` (repo nodes, nested repos too), in tree order. */

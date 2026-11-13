@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 import type { Refs, RepoInfo, RepoSummary } from "../../api/types";
 import {
-  buildTree, expandableIds, filterTree, folderAbsPath, folderIds, repoDot, stateLabel, worstDot,
+  ancestorIds, buildTree, expandableIds, filterTree, folderAbsPath, folderIds, repoDot, stateLabel, worstDot,
   type BuildContext, type SidebarNode,
 } from "./nodes";
 
@@ -91,7 +91,7 @@ const reposAt = (...names: string[]) => names.map(at);
 function outline(nodes: readonly SidebarNode[], depth = 0): string[] {
   return nodes.flatMap((n) => {
     if (n.kind === "folder") return [`${"  ".repeat(depth)}${n.label} (${n.repoIds.length})`, ...outline(n.children, depth + 1)];
-    if (n.kind === "repo") return [`${"  ".repeat(depth)}${n.label}`, ...outline(n.children.filter((c) => c.kind === "repo"), depth + 1)];
+    if (n.kind === "repo") return [`${"  ".repeat(depth)}${n.label}`, ...outline(n.children.filter((c) => c.kind === "repo" || c.kind === "folder"), depth + 1)];
     return [];
   });
 }
@@ -110,13 +110,40 @@ describe("buildTree with folders", () => {
     expect(tree[0].children?.every((n) => n.kind === "repo")).toBe(true);
   });
 
-  it("keeps nested repos under their repo, without folders, and counts them in the folder", () => {
+  it("keeps nested repos under their repo, grouped by folder inside it, and counts them in the folder", () => {
     const repos = reposAt("app", "app/libs/x", "app/libs/y", "t/a", "t/b");
     const tree = buildTree(repos, ctx(undefined, { expanded: new Set() }));
-    expect(outline(tree)).toEqual(["t (2)", "  a", "  b", "app", "  x", "  y"]);
+    expect(outline(tree)).toEqual(["t (2)", "  a", "  b", "app", "  libs (2)", "    x", "    y"]);
     const folder = buildTree(reposAt("g/app", "g/app/sub", "g/other"), ctx(undefined, { expanded: new Set() }))[0];
     expect(folder).toMatchObject({ kind: "folder", label: "g" });
     expect(folder.kind === "folder" && folder.repoIds).toEqual(["g/app", "g/app/sub", "g/other"]);
+  });
+
+  it("groups the repos inside a repo by folder, with ids relative to the project root", () => {
+    const repos = reposAt("platform", "platform/services/a", "platform/services/b", "platform/libs/x", "platform/libs/y", "platform/tool", "platform/solo/z");
+    const tree = buildTree(repos, ctx(undefined, { expanded: new Set() }));
+    expect(outline(tree)).toEqual(["platform", "  libs (2)", "    x", "    y", "  services (2)", "    a", "    b", "  tool", "  z"]);
+    expect(folderIds(tree)).toEqual(["dir:platform/libs", "dir:platform/services"]);
+    // a chain below the repo merges, and a repo nested in a repo that is nested keeps its own level
+    const deep = buildTree(reposAt("p", "p/a/b/x", "p/a/b/y", "p/a/b/x/inner"), ctx(undefined, { expanded: new Set() }));
+    expect(outline(deep)).toEqual(["p", "  a/b (3)", "    x", "      inner", "    y"]);
+    expect(folderIds(deep)).toEqual(["dir:p/a/b"]);
+  });
+
+  it("groups nested repos of a repo at the project root and sorts them like the other levels", () => {
+    const root: RepoInfo = { id: "root", name: "proj", path: "/w" };
+    const kids: RepoInfo[] = ["s/b10", "s/B2", "s/a", "t/x", "t/y", "Z", "m"].map((n) => ({ id: n, name: n, path: `/w/${n}` }));
+    const tree = buildTree([root, ...kids], ctx(undefined, { expanded: new Set() }));
+    expect(outline(tree)).toEqual(["proj", "  s (3)", "    a", "    B2", "    b10", "  t (2)", "    x", "    y", "  m", "  Z"]);
+    expect(folderIds(tree)).toEqual(["dir:s", "dir:t"]);
+  });
+
+  it("lists the ancestors of a node, outermost first", () => {
+    const tree = buildTree(reposAt("g/a", "g/b", "p", "p/x/c", "p/x/d"), ctx(undefined, { expanded: new Set() }));
+    expect(ancestorIds(tree, "repo:p/x/d")).toEqual(["repo:p", "dir:p/x"]);
+    expect(ancestorIds(tree, "repo:g/a")).toEqual(["dir:g"]);
+    expect(ancestorIds(tree, "repo:p")).toEqual([]);
+    expect(ancestorIds(tree, "repo:nope")).toEqual([]);
   });
 
   it("shows a chain label and no folder for a project with one repo", () => {
