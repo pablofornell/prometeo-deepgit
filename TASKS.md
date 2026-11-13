@@ -35,9 +35,9 @@
 - [x] **Bulk push with upstream:** For branches not tracked on the remote, "Push and set upstream" for all selected repos at the same time.
 
 ## 8. File view (mini editor)
-- [ ] **File tree position:** Move the file tree column to the right side of the editor.
-- [ ] **Git status colors:** Color file and folder names by Git status (modified, added, untracked, ignored, conflicted).
-- [ ] **Tab context menu:** Close, Close Others, Close All, Close Tabs to the Left/Right, Copy Path, Reveal in File Tree.
+- [x] **File tree position:** Move the file tree column to the right side of the editor.
+- [x] **Git status colors:** Color file and folder names by Git status (modified, added, untracked, ignored, conflicted).
+- [x] **Tab context menu:** Close, Close Others, Close All, Close Tabs to the Left/Right, Copy Path, Reveal in File Tree.
 - [x] **Find / Find and Replace:** VS Code style floating widget (match case, whole word, regex, match count, replace / replace all).
 
 ## 9. Smart .gitignore
