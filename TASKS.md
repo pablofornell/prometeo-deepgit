@@ -1,10 +1,10 @@
 # DeepGit: next iteration — tasks
 
 ## 1. Global
-- [ ] **Context menu (right-click):** Disable the default webview context menu in all of the application. Show only custom context menus.
-- [ ] **Date format:** All dates use `dd-mm-yyyy`. Remove the ISO format.
+- [x] **Context menu (right-click):** Disable the default webview context menu in all of the application. Show only custom context menus.
+- [x] **Date format:** All dates use `dd-mm-yyyy`. Remove the ISO format.
 - [x] **Mouse side buttons:** Mouse back/forward buttons do back/forward navigation.
-- [ ] **Remove Git command hints:** Remove all "equivalent Git command" hints.
+- [x] **Remove Git command hints:** Remove all "equivalent Git command" hints.
 - [ ] **App icon (tree):** Make the tree icon much denser as the distance from the trunk increases.
 
 ## 2. Projects
