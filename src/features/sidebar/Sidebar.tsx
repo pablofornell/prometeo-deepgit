@@ -9,7 +9,7 @@ import { formatDate, fullDate } from "../../state/dates";
 import { setSidebarVisible } from "../../state/layout";
 import { repoRefs } from "../../state/refs";
 import { changesRepoForNode } from "../../state/changesScope";
-import { selectFile, selectedFile, setChangesRepoId, setDetailsTab, setSelectedCommit } from "../../state/selection";
+import { selectFile, selectedFile, setChangesRepoId, jumpToCommit, setDetailsTab, setSelectedCommit } from "../../state/selection";
 import {
   repoById, activeProject, addProject, focusedRepoIdSignal, isRepoFilterActive, projectRepos, rescanProject, selectAllRepos, selectOnlyRepo, selectedRepoIds,
   setFocusedRepoId, summary, toggleRepo,
@@ -132,6 +132,10 @@ export function Sidebar(): JSX.Element {
     const only = changesRepoForNode(n.kind, n.repoId, projectRepos().length);
     if (only) setChangesRepoId(only);
     if (n.kind === "more") setMoreOpen(new Set([...moreOpen(), n.groupId]));
+    // A branch or tag selects its tip commit in the log (and pulses its node).
+    if (n.kind === "branch") jumpToCommit({ repoId: n.repoId, oid: n.branch.oid });
+    else if (n.kind === "remoteBranch") jumpToCommit({ repoId: n.repoId, oid: n.remote.oid });
+    else if (n.kind === "tag") jumpToCommit({ repoId: n.repoId, oid: n.tag.oid });
     if (n.kind === "stash") {
       // The stash shows its files in "Changed files". A commit file open before is dropped.
       setSelectedCommit({ repoId: n.repoId, oid: n.stash.oid, stash: { index: n.stash.index } });

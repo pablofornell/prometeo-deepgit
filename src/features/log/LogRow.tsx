@@ -9,7 +9,7 @@ import { formatDate, fullDate } from "../../state/dates";
 import { type GraphMetrics, type NodeKind, passThroughShape, rowGraphShape } from "./graph";
 import type { DisplayMap } from "./dateGroups";
 import { splitMatches } from "./query";
-import { pillBudget, pillWidths, visiblePills } from "./pills";
+import { pillBudget, pillMinWidths, pillSpace as pillRoom, pillWidths, visiblePills } from "./pills";
 import { isHeadRow } from "./scan";
 
 export interface WipInfo {
@@ -36,6 +36,9 @@ export interface RowCtx {
   laneColor: (color: number) => string;
   repoName: (repoId: string) => string;
   isSelected: (key: string) => boolean;
+  /** The row is the target of a jump: its node pulses ("pulse") or shows the static ring ("done"). */
+  targetOf: (key: string) => "pulse" | "done" | null;
+  onTargetDone: () => void;
   needle: () => string;
   wip: () => WipInfo | null;
   onRowClick: (e: MouseEvent, ci: number, row: CommitRow) => void;
@@ -47,10 +50,29 @@ export interface RowCtx {
 
 // ---------------------------------------------------------------- graph cell
 
-function Node(props: { x: number; y: number; color: string; kind: NodeKind; m: GraphMetrics }): JSX.Element {
+function Node(props: {
+  x: number;
+  y: number;
+  color: string;
+  kind: NodeKind;
+  m: GraphMetrics;
+  target: "pulse" | "done" | null;
+  onTargetDone: () => void;
+}): JSX.Element {
   return (
     <>
-      <Show when={props.kind === "head"}>
+      <Show when={props.target}>
+        <circle
+          cx={props.x}
+          cy={props.y}
+          r={props.m.ring}
+          class="dg-log-node-target"
+          classList={{ "is-done": props.target === "done" }}
+          stroke={props.color}
+          onAnimationEnd={() => props.onTargetDone()}
+        />
+      </Show>
+      <Show when={props.kind === "head" && !props.target}>
         <circle cx={props.x} cy={props.y} r={props.m.ring} class="dg-log-node-ring" stroke={props.color} />
       </Show>
       <circle
@@ -65,7 +87,7 @@ function Node(props: { x: number; y: number; color: string; kind: NodeKind; m: G
   );
 }
 
-function GraphSvg(props: { ctx: RowCtx; graph: GraphRow; kind: NodeKind; dashedTop?: { x: number } | null }): JSX.Element {
+function GraphSvg(props: { ctx: RowCtx; graph: GraphRow; kind: NodeKind; target: "pulse" | "done" | null; dashedTop?: { x: number } | null }): JSX.Element {
   const shape = createMemo(() => rowGraphShape(props.graph, props.kind, props.ctx.metrics()));
   const w = () => props.ctx.graphWidth();
   const h = () => props.ctx.metrics().rowHeight;
@@ -77,7 +99,12 @@ function GraphSvg(props: { ctx: RowCtx; graph: GraphRow; kind: NodeKind; dashedT
         </Show>
         <For each={shape().edges}>{(e) => <path d={e.d} stroke={props.ctx.laneColor(e.color)} />}</For>
       </g>
-      <Node x={shape().node.x} y={shape().node.y} color={props.ctx.laneColor(shape().node.color)} kind={props.kind} m={props.ctx.metrics()} />
+      <Node x={shape().node.x} y={shape().node.y} color={props.ctx.laneColor(shape().node.color)}
+        kind={props.kind}
+        m={props.ctx.metrics()}
+        target={props.target}
+        onTargetDone={props.ctx.onTargetDone}
+      />
     </svg>
   );
 }
@@ -104,8 +131,9 @@ function CommitRowBody(props: { ctx: RowCtx; ci: number; row: CommitRow }): JSX.
     const a = fullDate(r.authorTime);
     return r.committerTime !== r.authorTime ? `Authored ${a}\nCommitted ${fullDate(r.committerTime)}` : a;
   };
-  const pillSpace = () => pillBudget(ctx.subjectWidth(), ctx.minSubject());
-  const pillMax = () => visiblePills(pillWidths(r.refs), pillSpace());
+  const pillMins = () => pillMinWidths(r.refs);
+  const pillSpace = () => pillRoom(pillBudget(ctx.subjectWidth(), ctx.minSubject()), pillMins());
+  const pillMax = () => visiblePills(pillWidths(r.refs), pillSpace(), pillMins());
   const refsTip = () => r.refs.map((x) => x.name).join("\n");
   const graphTip = () => `${r.oid}\n${r.authorName}${r.refs.length ? "\n" + r.refs.map((x) => x.name).join(", ") : ""}`;
   return (
@@ -120,7 +148,7 @@ function CommitRowBody(props: { ctx: RowCtx; ci: number; row: CommitRow }): JSX.
       onContextMenu={(e) => ctx.onRowMenu(e, props.ci, r)}
     >
       <span class="dg-log-gcell" data-tip={graphTip()} role="gridcell">
-        <GraphSvg ctx={ctx} graph={r.graph} kind={kind} dashedTop={dashedTop()} />
+        <GraphSvg ctx={ctx} graph={r.graph} kind={kind} target={ctx.targetOf(key)} dashedTop={dashedTop()} />
       </span>
       <span class="dg-log-subject" role="gridcell">
         <span class="dg-log-subj">

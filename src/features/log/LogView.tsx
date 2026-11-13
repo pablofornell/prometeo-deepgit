@@ -11,7 +11,7 @@ import { register } from "../../state/keymap";
 import { notifyRepoChanged, repoVersion } from "../../state/events";
 import { refsVersion } from "../../state/refs";
 import { loadPersisted, savePersisted } from "../../state/persist";
-import { mainTab, selectedCommit, setChangesRepoId, setMainTab, setSelectedCommit } from "../../state/selection";
+import { jumpTarget, jumpToCommit, mainTab, selectedCommit, setChangesRepoId, setMainTab, setSelectedCommit } from "../../state/selection";
 import { setSetting, settings } from "../../state/settings";
 import { activeProject, focusedRepo, refreshSummaries, repoById, selectOnlyRepo, selectedRepoIds, selectedRepos, summary } from "../../state/workspace";
 import { resetAuthors, mergeAuthors } from "./authors";
@@ -248,6 +248,29 @@ export function LogView(): JSX.Element {
   let histPos = -1;
 
   const isSelected = (key: string) => multi().has(key);
+
+  // The target of a jump (sidebar branch or tag, H): its node pulses 4 cycles, then a static ring stays. The "done"
+  // flag lives here, not in the row, so a row that scrolls out and back in shows the ring and does not pulse again.
+  const [targetDone, setTargetDone] = createSignal(0);
+  const targetOf = (key: string): "pulse" | "done" | null => {
+    const t = jumpTarget();
+    if (!t || keyOf(t.repoId, t.oid) !== key) return null;
+    return targetDone() === t.id ? "done" : "pulse";
+  };
+  const onTargetDone = () => {
+    const t = jumpTarget();
+    if (t) setTargetDone(t.id);
+  };
+  // A jump to the commit that is already selected adopts nothing: scroll to it here.
+  createEffect(
+    on(jumpTarget, (t) => {
+      if (!t) return;
+      void ctl.find(t.oid, t.repoId).then((ci) => {
+        if (ci === null || jumpTarget()?.id !== t.id) return;
+        ensureVisible(map().displayOf(ci), isVisible(map().displayOf(ci)) ? "auto" : "center");
+      });
+    }),
+  );
   const selCi = createMemo(() => {
     const sc = selectedCommit();
     return sc ? multi().get(keyOf(sc.repoId, sc.oid))?.ci ?? null : null;
@@ -334,13 +357,17 @@ export function LogView(): JSX.Element {
     });
   });
 
-  async function selectHead(): Promise<void> {
+  /** Selects the HEAD commit. `jump`: the user asked for it (`H`), so its node pulses. */
+  async function selectHead(jump = false): Promise<void> {
     const ids = selectedRepoIds();
     const repoId = [selectedCommit()?.repoId, focusedRepo()?.id].find((id): id is string => !!id && ids.includes(id)) ?? ids[0];
     if (!repoId) return;
     const head = summary(repoId)?.headOid ?? null;
     const ci = head ? await ctl.find(head, repoId) : (ctl.scan().heads.get(repoId)?.row ?? null);
-    if (ci !== null) await selectIndex(ci, isVisible(map().displayOf(ci)) ? "auto" : "center");
+    if (ci === null) return;
+    await selectIndex(ci, isVisible(map().displayOf(ci)) ? "auto" : "center");
+    const sc = selectedCommit();
+    if (jump && sc) jumpToCommit(sc);
   }
 
   async function selectParent(): Promise<void> {
@@ -436,7 +463,7 @@ export function LogView(): JSX.Element {
       }, { title: "Focus the text filter", group: "Log", when: onLogTab, allowInInput: true }),
       register("log.clearFilters", "Ctrl+Shift+F", () => clearAllFilters(), { title: "Clear all filters", group: "Log", when: () => onLogTab() && activeFilters().length > 0 }),
       register("log.copyHash", "Ctrl+Shift+C", () => void copyHash(), { title: "Copy the hash of the selected commit", group: "Log", when: () => onLogTab() && !!selectedCommit() && inList() }),
-      register("log.selectHead", "H", () => void selectHead(), { title: "Select HEAD", group: "Log", when: () => onLogTab() && inList() }),
+      register("log.selectHead", "H", () => void selectHead(true), { title: "Select HEAD", group: "Log", when: () => onLogTab() && inList() }),
       register("log.selectParent", "P", () => void selectParent(), { title: "Select the first parent", group: "Log", when: () => onLogTab() && inList() }),
       register("log.focusList", "Esc", () => {
         const el = listEl();
@@ -554,6 +581,8 @@ export function LogView(): JSX.Element {
     laneColor: (color) => `var(--dg-lane-${color % 10})`,
     repoName: (id) => repoById(id)?.name ?? id,
     isSelected,
+    targetOf,
+    onTargetDone,
     needle,
     wip,
     onRowClick: (e, ci, row) => {
