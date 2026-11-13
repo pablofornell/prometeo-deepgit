@@ -194,7 +194,7 @@ Open `http://localhost:1420/#gallery` for a live catalogue of everything below.
 `Icon` (81 icons, `name`, `size`), `Button` (variants `default|primary|danger|ghost`, `size="small"`, `icon`, `title`+`shortcut` tooltip),
 `IconButton` (`icon`, `label`, `shortcut`, `active`), `TextField` / `SearchField` (`value`, `onInput(value)`, `size="filter"`, `error`),
 `Checkbox` (`checked`, `onChange`, `label`, `indeterminate`), `Select` (`options`, `value`, `onChange`), `SegmentedControl`,
-`openContextMenu(event, items)` / `openMenu(buttonEl, items)` (`MenuItem`: `label icon shortcut disabled danger separator heading checked submenu tooltip onSelect onRename` (F2 on the active row)),
+`openContextMenu(event, items)` / `openMenu(buttonEl, items)` (`MenuItem`: `label icon shortcut disabled danger separator heading checked submenu tooltip onSelect onRename` (F2 on the active row)). The webview's own context menu never shows: `App` installs a window listener (`contextGuard.ts`) that cancels it, and on a text field opens Cut / Copy / Paste / Select All. A right click your component handles must call `openContextMenu` (or `preventDefault`), which also keeps that menu away,
 `Popup` (`open`, `anchor`, `onClose`, `placement`), `openDialog(Component, props)` + `Dialog` frame, `toast({ kind, title, body, actions })`,
 `tip("text", "Ctrl+T")` / `use:tooltip` / native `title="Text  Shortcut"`, `Splitter` + `loadSplitSize(key, default)`,
 `VirtualList` (`count`, `rowHeight`, `renderRow(i)`, `onRangeChange(start, end)`, `selectedIndex`, `onSelect(i)` for keyboard, `apiRef` -> `scrollToIndex`),

@@ -5,6 +5,7 @@
 import { type JSX, Show, onCleanup, onMount } from "solid-js";
 import { Gallery } from "./components/ui/Gallery";
 import { DialogHost, MenuHost, ToastHost, TooltipHost } from "./components/ui";
+import { installContextMenuGuard } from "./components/ui/contextGuard";
 import { registerAllDialogs } from "./features/dialogs";
 import { registerMergeDialogs } from "./features/merge";
 import { SearchEverywhere } from "./features/palette/SearchEverywhere";
@@ -28,6 +29,7 @@ export default function App(): JSX.Element {
     registerMergeDialogs();
     registerGlobalShortcuts();
     onCleanup(installKeymap());
+    onCleanup(installContextMenuGuard());
     void loadWorkspace();
   });
   return (
