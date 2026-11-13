@@ -16,7 +16,7 @@ import { EditorView, type ViewUpdate } from "@codemirror/view";
 import * as api from "../../api/tauri";
 import type { FileStatus, TextFile } from "../../api/types";
 import {
-  Button, Dialog, EmptyState, Icon, IconButton, Kbd, Spinner, Splitter, StatusLetter, Tree, copyText, createExpanded, fileIconFor, loadSplitSize, openContextMenu,
+  Button, Dialog, EmptyState, Icon, IconButton, Kbd, Spinner, Splitter, StatusLetter, Tree, copyText, createExpanded, fileIconFor, joinRepoPath, loadSplitSize, openContextMenu,
   openDialog, splitPath, statusColorVar, tip, toast, type DialogComponentProps, type MenuItem, type TreeApi, type TreeRowInfo,
 } from "../../components/ui";
 import { confirmAction } from "../../state/dialogs";
@@ -376,7 +376,7 @@ export function FilesView(): JSX.Element {
     const keys = order();
     const i = keys.indexOf(key);
     if (!t || i < 0) return [];
-    const root = repoById(t.repoId)?.path ?? "";
+    const root = repoById(t.repoId)?.path;
     return [
       { label: "Close", shortcut: shortcutLabel("files.closeTab") || "Ctrl+W", onSelect: () => void closeTabs(key, "this") },
       { label: "Close others", disabled: keys.length < 2, onSelect: () => void closeTabs(key, "others") },
@@ -386,7 +386,12 @@ export function FilesView(): JSX.Element {
       { label: "Close tabs to the right", disabled: i === keys.length - 1, onSelect: () => void closeTabs(key, "right") },
       { separator: true },
       { label: "Copy path", icon: "copy", onSelect: () => void copyText(t.path) },
-      { label: "Copy absolute path", icon: "path", onSelect: () => void copyText(`${root}/${t.path}`) },
+      {
+        label: "Copy absolute path",
+        icon: "path",
+        disabled: !root,
+        onSelect: () => root && void copyText(joinRepoPath(root, t.path)),
+      },
       { separator: true },
       { label: "Reveal in file tree", shortcut: shortcutLabel("files.reveal") || "Alt+F1", onSelect: () => revealInTree(t.repoId, t.path) },
     ];
