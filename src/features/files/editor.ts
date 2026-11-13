@@ -4,14 +4,16 @@
  * The view swaps the states with `view.setState()`.
  *
  * The module uses `@codemirror/state`, `@codemirror/view`, `@codemirror/commands` and `@codemirror/search`.
+ * The find and replace widget is in `find/panel.tsx`.
  * The syntax colours come from `features/merge/editor.ts` (`syntaxPlugin`) and `features/diff/syntax.ts`.
  */
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
-import { highlightSelectionMatches, search, searchKeymap } from "@codemirror/search";
+import { highlightSelectionMatches, searchKeymap } from "@codemirror/search";
 import { EditorSelection, EditorState, type Extension } from "@codemirror/state";
 import { EditorView, type ViewUpdate, drawSelection, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers } from "@codemirror/view";
 import { languageFor } from "../diff/syntax";
 import { syntaxPlugin } from "../merge/editor";
+import { findExtension, findKeymap } from "./find/panel";
 import { crlfInput } from "./lineEnds";
 import { lineSeparatorOf } from "./model";
 
@@ -26,9 +28,9 @@ export function createFileState(doc: string, path: string, onUpdate: (u: ViewUpd
     highlightActiveLine(),
     drawSelection(),
     history(),
-    search({ top: true }),
+    findExtension(),
     highlightSelectionMatches(),
-    keymap.of([...searchKeymap, ...defaultKeymap, ...historyKeymap, indentWithTab]),
+    keymap.of([...findKeymap, ...searchKeymap.filter((k) => !["Mod-f", "F3", "Mod-g", "Escape"].includes(k.key ?? "")), ...defaultKeymap, ...historyKeymap, indentWithTab]),
     syntaxPlugin(languageFor(path)),
     EditorView.contentAttributes.of({ spellcheck: "false", autocorrect: "off", autocapitalize: "off" }),
     EditorView.updateListener.of(onUpdate),

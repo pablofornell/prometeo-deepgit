@@ -1,0 +1,61 @@
+/* Find and replace widget of the file editor (ITERATION-3 section 10). Prefix dg-fe-find. Use tokens only. */
+
+/* The panel strip floats over the text at the top right. It does not take space from the editor. */
+.dg-fe-editor .cm-editor .cm-panels.cm-panels-top {
+  position: absolute; top: 0; right: calc(16 * var(--dg-u)); left: auto; z-index: 300;
+  background: transparent; border: 0; pointer-events: none;
+}
+.dg-fe-find-host { pointer-events: auto; }
+
+.dg-fe-find {
+  display: flex; align-items: stretch; box-sizing: border-box; min-height: calc(34 * var(--dg-u)); padding: 4px 6px 4px 0;
+  background: var(--dg-popup-bg); color: var(--dg-text); font-size: var(--dg-font-size-medium);
+  border: 1px solid var(--dg-popup-border); border-top: 0; border-radius: 0 0 6px 6px; box-shadow: var(--dg-popup-shadow);
+}
+.dg-fe-find.is-expanded { min-height: calc(62 * var(--dg-u)); }
+
+/* Expand toggle: left column, full height */
+.dg-fe-find-expand {
+  flex: none; width: calc(18 * var(--dg-u)); padding: 0; display: grid; place-items: center;
+  border-radius: 3px; color: var(--dg-icon-secondary);
+}
+.dg-fe-find-expand:hover { background: var(--dg-hover-bg); }
+.dg-fe-find-expand.is-hidden { pointer-events: none; }
+.dg-fe-find-expand .dg-icon { transition: transform var(--dg-dur-fast); }
+.dg-fe-find-expand.is-on .dg-icon { transform: rotate(90deg); }
+
+.dg-fe-find-rows { display: flex; flex-direction: column; justify-content: center; gap: 4px; min-width: 0; }
+.dg-fe-find-row { display: flex; align-items: center; gap: 2px; }
+
+/* Inputs */
+.dg-fe-find-field { position: relative; flex: none; width: calc(240 * var(--dg-u)); }
+.dg-fe-find-input {
+  display: block; width: 100%; box-sizing: border-box; height: var(--dg-control-height-small); padding: 0 calc(72 * var(--dg-u)) 0 8px;
+  border: 0; border-radius: var(--dg-input-radius); background: var(--dg-input-bg); color: var(--dg-input-fg);
+  box-shadow: inset 0 0 0 1px var(--dg-input-border); outline: 0; font: inherit;
+}
+.dg-fe-find-input.is-plain { padding-right: 8px; }
+.dg-fe-find-input::placeholder { color: var(--dg-input-placeholder); }
+.dg-fe-find-input:focus { box-shadow: inset 0 0 0 var(--dg-focus-width) var(--dg-input-focus-border); }
+.dg-fe-find-input.is-error, .dg-fe-find-input.is-error:focus { box-shadow: inset 0 0 0 1px var(--dg-input-error-border); }
+
+/* Option toggles inside the find input */
+.dg-fe-find-opts { position: absolute; top: 50%; right: 4px; transform: translateY(-50%); display: flex; gap: 2px; }
+.dg-fe-find-opt {
+  width: calc(20 * var(--dg-u)); height: calc(18 * var(--dg-u)); padding: 0; border-radius: 3px; background: transparent;
+  color: var(--dg-text-secondary); font-family: var(--dg-font-mono); font-size: var(--dg-font-size-small); font-weight: var(--dg-weight-semibold); line-height: 1;
+}
+.dg-fe-find-opt:hover { background: var(--dg-hover-bg); }
+.dg-fe-find-opt.is-word { text-decoration: underline; }
+.dg-fe-find-opt.is-on { background: var(--dg-toolbar-selected-bg); color: var(--dg-toolbar-selected-fg); box-shadow: inset 0 0 0 1px var(--dg-accent-border); }
+
+/* Counter */
+.dg-fe-find-count {
+  flex: none; min-width: calc(64 * var(--dg-u)); margin: 0 6px; box-sizing: border-box; font-size: var(--dg-font-size-small);
+  color: var(--dg-text-secondary); font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.dg-fe-find-count.is-error { color: var(--dg-text-error); }
+
+/* Matches: amber, so they differ from the blue selection */
+.dg-fe-editor .cm-searchMatch { background: var(--dg-find-match-bg); outline: 1px solid var(--dg-find-match-border); border-radius: 2px; }
+.dg-fe-editor .cm-searchMatch-selected { background: var(--dg-find-current-bg); outline: 1px solid var(--dg-find-current-border); }

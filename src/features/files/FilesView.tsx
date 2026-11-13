@@ -3,14 +3,13 @@
  * Each open file keeps its own undo history. The tree shows the git status of files and folders.
  * A save checks that the file did not change on disk.
  *
- * This is not a full IDE. There is no rename, no create and no replace.
+ * This is not a full IDE. There is no rename and no create.
  * A clean tab reloads when its file changes on disk. A tab with unsaved changes keeps its text.
  * Shortcuts work on this tab only: Ctrl+S saves, Ctrl+P opens a file by name, Ctrl+Shift+F searches the project,
- * and Ctrl+F finds text in the file.
+ * Ctrl+F finds text in the file, and Ctrl+H finds and replaces.
  */
 import { type JSX, For, Show, createEffect, createMemo, createSignal, on, onCleanup, onMount, untrack } from "solid-js";
 import type { EditorState, Text } from "@codemirror/state";
-import { openSearchPanel } from "@codemirror/search";
 import { EditorView, type ViewUpdate } from "@codemirror/view";
 import * as api from "../../api/tauri";
 import type { FileStatus, TextFile } from "../../api/types";
@@ -25,6 +24,7 @@ import { onOpenFile, setNavFile } from "../../state/navigation";
 import { mainTab } from "../../state/selection";
 import { projectRepos } from "../../state/workspace";
 import { createFileState, saveText } from "./editor";
+import { openFind } from "./find/panel";
 import { ProjectSearch, type SearchApi, type SearchOpen } from "./ProjectSearch";
 import { QuickOpen, type QuickFile } from "./QuickOpen";
 import {
@@ -612,10 +612,18 @@ export function FilesView(): JSX.Element {
         "Ctrl+F",
         () => {
           if (!view || tabOf(current ?? "")?.kind !== "text") return false;
-          view.focus();
-          openSearchPanel(view);
+          openFind(view);
         },
         { title: "Find in the file", group: "Files", when: inFiles, allowInInput: true },
+      ),
+      register(
+        "files.replace",
+        "Ctrl+H",
+        () => {
+          if (!view || tabOf(current ?? "")?.kind !== "text") return false;
+          openFind(view, true);
+        },
+        { title: "Replace in the file", group: "Files", when: inFiles, allowInInput: true },
       ),
     ];
     onCleanup(() => {
