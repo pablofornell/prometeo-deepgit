@@ -13,9 +13,6 @@
 .dg-welcome-logo { display: block; width: 48px; height: 48px; }
 .dg-welcome-logo-tile { fill: var(--dg-island-bg); }
 .dg-welcome-logo-ring { stroke: var(--dg-island-bg); }
-.dg-welcome-logo-main { color: var(--dg-accent); }
-.dg-welcome-logo-left { color: var(--dg-success); }
-.dg-welcome-logo-right { color: var(--dg-warning); }
 .dg-welcome-title { margin: var(--dg-space-4) 0 0; font-size: var(--dg-font-size-h1); line-height: calc(28 * var(--dg-u)); font-weight: var(--dg-weight-semibold); }
 .dg-welcome-tagline { margin: 0; color: var(--dg-text-muted); }
 

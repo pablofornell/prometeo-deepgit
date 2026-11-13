@@ -99,6 +99,16 @@ make clean       # remove target/ and dist/
 
 `npm run dev` uses a built-in fake backend. It shows an example project with six repositories and thousands of invented commits. It does not touch your files.
 
+## Icons
+
+The app icon is a generated tree of commits (spec: `docs/design/ITERATION-3.md`, section 13). Do not edit these files by hand: `src-tauri/icons/*.svg`, `public/favicon.svg` and `src/features/welcome/logoData.ts`. Change the parameters in `scripts/gen-logo.mjs`, then regenerate everything:
+
+```bash
+bash scripts/gen-icons.sh   # SVGs, Welcome logo data, then every PNG, icon.icns and icon.ico in src-tauri/icons
+```
+
+The script needs `npm install` (it runs `npx tauri icon`), and Python 3 with Pillow for `scripts/pack-ico.py` (`pip install pillow`). The large variant (6 levels) is used from 64 px up, and the small variant (4 levels) for the sizes under 64 px and for the favicon. `icon.icns` can change byte order between runs while its images stay the same.
+
 ## Project layout
 
 ```
