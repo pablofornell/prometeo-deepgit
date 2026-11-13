@@ -14,6 +14,7 @@ import * as api from "../api/tauri";
 import { validateProjectName } from "../api/projectName";
 import type { CloneResult, Project, RepoInfo, RepoSummary } from "../api/types";
 import { dirtyCount } from "./changesScope";
+import { createBatchRefresher } from "./coalesce";
 import { subscribeRepoChanged } from "./events";
 import { loadPersisted, savePersisted } from "./persist";
 
@@ -265,14 +266,11 @@ export const projectTotals = createRoot(() =>
   }),
 );
 
-let inflight: Promise<void> | null = null;
-const pending = new Set<string>();
 let timer: ReturnType<typeof setTimeout> | undefined;
 let lastRun = 0;
 const THROTTLE_MS = 300;
 
 async function fetchSummaries(ids: string[]): Promise<void> {
-  if (ids.length === 0) return;
   try {
     const list = await api.repoSummaries(ids);
     batch(() => {
@@ -283,31 +281,20 @@ async function fetchSummaries(ids: string[]): Promise<void> {
   }
 }
 
+const refresher = createBatchRefresher(fetchSummaries, () => {
+  lastRun = Date.now();
+});
+
 /**
  * Reloads summaries now. Without arguments: every repo of the active project.
  * Calls that arrive while one is running are merged into the next run.
  */
 export function refreshSummaries(repoIds?: string[]): Promise<void> {
-  const ids = repoIds ?? projectRepos().map((r) => r.id);
-  for (const id of ids) pending.add(id);
-  if (inflight) return inflight;
-  inflight = (async () => {
-    try {
-      while (pending.size > 0) {
-        const batchIds = [...pending];
-        pending.clear();
-        lastRun = Date.now();
-        await fetchSummaries(batchIds);
-      }
-    } finally {
-      inflight = null;
-    }
-  })();
-  return inflight;
+  return refresher.run(repoIds ?? projectRepos().map((r) => r.id));
 }
 
 function scheduleRefresh(repoId: string): void {
-  pending.add(repoId);
+  refresher.add(repoId);
   if (timer !== undefined) return;
   const wait = Math.max(0, THROTTLE_MS - (Date.now() - lastRun));
   timer = setTimeout(() => {

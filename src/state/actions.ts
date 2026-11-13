@@ -755,8 +755,8 @@ export async function discardHunk(repoId: string, path: string, hunkIndex: numbe
 }
 
 /**
- * Commits the staged changes of each repo with one message ("Commit in 3 repos"). Repos with nothing
- * staged are skipped unless `amend`.
+ * Commits the staged changes of each repo with one message ("Commit in 3 repos"). The caller passes only the
+ * repos with staged files; the backend decides (the cached summary may be stale).
  */
 export function commit(repoIds: RepoIds, message: string, opts: { amend?: boolean; signOff?: boolean } = {}): Promise<BatchResult> {
   const ids = toIds(repoIds);
@@ -765,7 +765,6 @@ export function commit(repoIds: RepoIds, message: string, opts: { amend?: boolea
     verb: "commit",
     past: opts.amend ? "Amended commit" : "Committed",
     repoIds: ids,
-    skip: (id) => (!opts.amend && summary(id) && (summary(id)?.staged ?? 0) === 0 ? "nothing staged" : null),
     run: (id) => api.commit(id, message, opts.amend ?? false, opts.signOff ?? false),
     body: () => subject,
     progress: `Committing in ${plural(ids.length, "repository", "repositories")}`,

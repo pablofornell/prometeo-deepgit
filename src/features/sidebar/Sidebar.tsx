@@ -141,6 +141,14 @@ export function Sidebar(): JSX.Element {
   };
 
   const activate = (n: SidebarNode) => {
+    // Double-clicking a ref of a repo that the log does not show switches the log to that repo.
+    if (
+      (n.kind === "branch" || n.kind === "remoteBranch" || n.kind === "tag" || n.kind === "stash") &&
+      projectRepos().length > 1 &&
+      !selectedRepoIds().includes(n.repoId)
+    ) {
+      selectOnlyRepo(n.repoId);
+    }
     switch (n.kind) {
       case "repo":
         if (projectRepos().length > 1) selectOnlyRepo(n.repoId);

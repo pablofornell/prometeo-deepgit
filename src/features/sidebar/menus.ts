@@ -85,6 +85,8 @@ function localBranchMenu(n: Node<"branch">): MenuItem[] {
     { label: "Push…", icon: "push", onSelect: () => void actions.push(repoId, { branch: x }) },
     { label: `Pull ${x}`, icon: "pull", disabled: !isCurrent, tooltip: isCurrent ? undefined : "Pull works on the current branch", onSelect: () => void actions.pull(repoId) },
     { separator: true },
+    { label: "Copy branch name", icon: "copy", onSelect: () => void copyText(x) },
+    { separator: true },
     { label: "Rename…", icon: "rename", shortcut: "F2", onSelect: () => void actions.renameBranch(repoId, x) },
     {
       label: "Delete…",
@@ -109,6 +111,8 @@ function remoteBranchMenu(n: Node<"remoteBranch">): MenuItem[] {
     { label: `Merge ${remote.fullName} into ${cur}`, icon: "merge", onSelect: () => void actions.merge([repoId], remote.fullName) },
     { label: `Rebase ${cur} onto ${remote.fullName}`, icon: "rebase", onSelect: () => void actions.rebase([repoId], remote.fullName) },
     { separator: true },
+    { label: "Copy branch name", icon: "copy", onSelect: () => void copyText(remote.fullName) },
+    { separator: true },
     {
       label: `Delete ${remote.fullName} on the remote…`,
       icon: "delete",
@@ -117,8 +121,6 @@ function remoteBranchMenu(n: Node<"remoteBranch">): MenuItem[] {
       tooltip: remote.remote !== "origin" ? "Only branches of origin can be deleted from here" : undefined,
       onSelect: () => void actions.deleteRemoteBranch(repoId, remote.remote, remote.name),
     },
-    { separator: true },
-    { label: "Copy name", icon: "copy", onSelect: () => void copyText(remote.fullName) },
     ...inAllRepos(remote.name),
   ];
 }
