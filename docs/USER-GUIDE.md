@@ -354,6 +354,16 @@ To stage only a part of a file, use the **Stage** button on a hunk in the **File
 - You cannot undo a discard.
 - DeepGit does not discard staged files. Unstage them first.
 
+### Ignore files
+
+Right-click a file or a folder, in the **Local changes** list or in the tree of the **Files** tab, and choose **Add to .gitignore…**.
+Select several files first to add them together. The item is not there for a repository row or for a `.gitignore` file.
+
+- Choose a pattern: this file, this name anywhere, this extension anywhere, this folder, this folder name anywhere, or your own text. The number at the right of each pattern is how many files of the repository it matches.
+- Choose where the line goes: the `.gitignore` at the root of the repository (shared with others), or `.git/info/exclude` (only on your computer).
+- DeepGit adds the line at the end of the file and creates the file when it does not exist. It does not stage or commit. Commit the `.gitignore` when you are ready.
+- Git ignores only untracked files. When a pattern matches tracked files, the dialog says so. DeepGit does not untrack them.
+
 ### Commit
 
 1. Stage the files that you want to commit.

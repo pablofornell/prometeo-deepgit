@@ -172,6 +172,32 @@ export function searchFiles(
   return { hits: hits.slice(0, max), truncated: hits.length > max };
 }
 
+/** Why a pattern line is refused by `files::append_ignore_rules`, or null. */
+export function ignorePatternError(pattern: string): string | null {
+  if (pattern.trim() === "") return "A pattern cannot be empty.";
+  if (/[\0\n\r]/.test(pattern)) return "A pattern cannot contain a line break or a NUL character.";
+  return null;
+}
+
+/**
+ * The text of an ignore file after `append_ignore_rules` (`files::append_ignore_rules`), and the lines that were added.
+ * A line that the file holds already, and a repeated one, are skipped. A new line break comes first when the file does
+ * not end with one. The new lines use `\r\n` when the file does.
+ */
+export function appendIgnoreLines(existing: string, patterns: readonly string[]): { text: string; added: string[] } {
+  const known = new Set(existing.split(/\r?\n/));
+  const added: string[] = [];
+  for (const p of patterns) {
+    if (known.has(p)) continue;
+    known.add(p);
+    added.push(p);
+  }
+  if (added.length === 0) return { text: existing, added };
+  const eol = existing.includes("\r\n") ? "\r\n" : "\n";
+  const lead = existing !== "" && !existing.endsWith("\n") ? eol : "";
+  return { text: existing + lead + added.map((l) => l + eol).join(""), added };
+}
+
 /** A small, realistic file for each path the fixed set names. */
 export const FIXED_FILES: Record<string, string> = {
   "README.md": "# Overview\n\nThis repository holds the service code.\n\n## Build\n\nRun `npm run build` to build the app.\n",

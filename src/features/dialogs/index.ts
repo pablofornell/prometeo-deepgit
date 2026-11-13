@@ -6,6 +6,7 @@ import { registerDialog } from "../../state/dialogs";
 import { AuthDialog } from "./AuthDialog";
 import { CheckoutRemoteDialog } from "./CheckoutRemoteDialog";
 import { CloneDialog } from "./CloneDialog";
+import { IgnoreDialog } from "./IgnoreDialog";
 import { MergeDialog } from "./MergeDialog";
 import { NewBranchDialog } from "./NewBranchDialog";
 import { PushDialog } from "./PushDialog";
@@ -29,4 +30,5 @@ export function registerAllDialogs(): void {
   registerDialog("clone", CloneDialog);
   registerDialog("auth", AuthDialog);
   registerDialog("renameProject", RenameProjectDialog);
+  registerDialog("ignore", IgnoreDialog);
 }

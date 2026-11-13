@@ -919,6 +919,15 @@ export async function openMerge(repoId: string, path: string, opts: { offerConti
   return r?.resolved ?? false;
 }
 
+/**
+ * Opens the "Add to .gitignore" dialog for files and folders of one repo. The dialog writes the lines
+ * (`api.appendIgnoreRules`) and shows the success toast. Nothing is staged or committed.
+ */
+export async function addToIgnore(repoId: string, items: { path: string; isDir: boolean }[]): Promise<void> {
+  if (items.length === 0 || !repoById(repoId)) return;
+  await showDialog("ignore", { repoId, items });
+}
+
 /** Renames a project (dialog "renameProject"; the active project when no id is given). The sidebar card renames in place instead. */
 export async function renameProject(projectId?: string): Promise<void> {
   const id = projectId ?? activeProject()?.id;

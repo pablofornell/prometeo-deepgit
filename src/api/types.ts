@@ -318,6 +318,17 @@ export interface TextFile {
   tooLarge: boolean;
 }
 
+/** The file `appendIgnoreRules` writes: `.gitignore` at the repo root, or `.git/info/exclude` (only on this computer). */
+export type IgnoreTarget = "gitignore" | "exclude";
+
+/** An ignore file with the case rule of its repo. */
+export interface IgnoreFile {
+  /** The text. Empty when the file does not exist. */
+  content: string;
+  /** `core.ignorecase` of the repo (false when unset). Git then matches ignore patterns without regard to case. */
+  ignoreCase: boolean;
+}
+
 /** One matching line of a search. */
 export interface SearchHit {
   path: string;

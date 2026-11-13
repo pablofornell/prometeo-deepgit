@@ -439,6 +439,24 @@ pub struct FileList {
     pub truncated: bool,
 }
 
+/// The file that `append_ignore_rules` writes: `.gitignore` at the repo root, or `.git/info/exclude`.
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum IgnoreTarget {
+    Gitignore,
+    Exclude,
+}
+
+/// An ignore file with the case rule of its repo.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct IgnoreFile {
+    /// The text. Empty when the file does not exist.
+    pub content: String,
+    /// `core.ignorecase` of the repo. Git then matches ignore patterns without regard to case. False when unset.
+    pub ignore_case: bool,
+}
+
 /// A worktree file read as text.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]

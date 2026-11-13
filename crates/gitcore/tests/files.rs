@@ -2,7 +2,7 @@ mod common;
 
 use common::*;
 use gitcore::files;
-use gitcore::GitError;
+use gitcore::{GitError, IgnoreTarget};
 
 /// The message of an `Invalid` error; panics on any other kind.
 fn invalid(e: GitError) -> String {
@@ -429,4 +429,159 @@ fn search_refuses_a_line_break_or_a_nul_and_accepts_an_empty_query() {
     }
     let empty = files::search_files(&g, &repo.info, "", true, false).expect("search");
     assert!(empty.hits.is_empty());
+}
+
+// ------------------------------------------------------------------ ignore files
+
+fn rules(list: &[&str]) -> Vec<String> {
+    list.iter().map(|s| s.to_string()).collect()
+}
+
+#[test]
+fn ignore_creates_the_gitignore_and_hides_the_file() {
+    let repo = TestRepo::new();
+    let g = git();
+    repo.write("src/gen/api.ts", "x\n");
+    repo.write("src/keep.ts", "y\n");
+    assert_eq!(
+        files::read_ignore_file(&g, &repo.info, IgnoreTarget::Gitignore)
+            .expect("read")
+            .content,
+        ""
+    );
+    let added = files::append_ignore_rules(
+        &g,
+        &repo.info,
+        IgnoreTarget::Gitignore,
+        &rules(&["/src/gen/api.ts"]),
+    )
+    .expect("append");
+    assert_eq!(added, vec!["/src/gen/api.ts"]);
+    assert_eq!(repo.read(".gitignore"), "/src/gen/api.ts\n");
+    let list = files::list_files(&g, &repo.info).expect("list");
+    assert_eq!(list.files, vec![".gitignore", "src/keep.ts"]);
+}
+
+#[test]
+fn ignore_adds_a_line_break_first_when_the_file_has_none_at_the_end() {
+    let repo = TestRepo::new();
+    let g = git();
+    repo.write(".gitignore", "*.log");
+    files::append_ignore_rules(&g, &repo.info, IgnoreTarget::Gitignore, &rules(&["dist/"]))
+        .expect("append");
+    assert_eq!(repo.read(".gitignore"), "*.log\ndist/\n");
+}
+
+#[test]
+fn ignore_keeps_the_crlf_style_of_the_file() {
+    let repo = TestRepo::new();
+    let g = git();
+    repo.write(".gitignore", "*.log\r\n");
+    files::append_ignore_rules(&g, &repo.info, IgnoreTarget::Gitignore, &rules(&["dist/"]))
+        .expect("append");
+    assert_eq!(repo.read(".gitignore"), "*.log\r\ndist/\r\n");
+}
+
+#[test]
+fn ignore_skips_a_line_that_is_there_already_and_repeated_lines() {
+    let repo = TestRepo::new();
+    let g = git();
+    repo.write(".gitignore", "*.log\r\nbuild/\n");
+    let added = files::append_ignore_rules(
+        &g,
+        &repo.info,
+        IgnoreTarget::Gitignore,
+        &rules(&["*.log", "dist/", "dist/", "build/"]),
+    )
+    .expect("append");
+    assert_eq!(added, vec!["dist/"]);
+    assert_eq!(repo.read(".gitignore"), "*.log\r\nbuild/\ndist/\r\n");
+    // Nothing new: the file does not change.
+    let again =
+        files::append_ignore_rules(&g, &repo.info, IgnoreTarget::Gitignore, &rules(&["dist/"]))
+            .expect("append");
+    assert!(again.is_empty());
+    assert_eq!(repo.read(".gitignore"), "*.log\r\nbuild/\ndist/\r\n");
+}
+
+#[test]
+fn ignore_writes_the_exclude_file_in_the_git_folder() {
+    let repo = TestRepo::new();
+    let g = git();
+    repo.write("local.env", "secret\n");
+    // `git init` makes `info/exclude`. A repo without it still works.
+    let exclude = repo.path().join(".git/info/exclude");
+    let _ = std::fs::remove_dir_all(repo.path().join(".git/info"));
+    let added = files::append_ignore_rules(
+        &g,
+        &repo.info,
+        IgnoreTarget::Exclude,
+        &rules(&["/local.env"]),
+    )
+    .expect("append");
+    assert_eq!(added, vec!["/local.env"]);
+    assert_eq!(
+        std::fs::read_to_string(&exclude).expect("exclude"),
+        "/local.env\n"
+    );
+    assert!(!repo.path().join(".gitignore").exists());
+    assert_eq!(
+        files::read_ignore_file(&g, &repo.info, IgnoreTarget::Exclude)
+            .expect("read")
+            .content,
+        "/local.env\n"
+    );
+    let list = files::list_files(&g, &repo.info).expect("list");
+    assert!(list.files.is_empty());
+}
+
+#[test]
+fn ignore_refuses_an_empty_pattern_and_a_line_break() {
+    let repo = TestRepo::new();
+    let g = git();
+    for bad in ["", "   ", "a\nb", "a\rb", "a\0b"] {
+        assert!(
+            files::append_ignore_rules(&g, &repo.info, IgnoreTarget::Gitignore, &rules(&[bad]))
+                .is_err(),
+            "{bad:?}"
+        );
+    }
+    assert!(!repo.path().join(".gitignore").exists());
+}
+
+#[cfg(unix)]
+#[test]
+fn ignore_refuses_a_symlink_and_a_folder() {
+    let repo = TestRepo::new();
+    let g = git();
+    repo.write("real.txt", "x\n");
+    std::os::unix::fs::symlink("real.txt", repo.path().join(".gitignore")).expect("symlink");
+    let msg = invalid(
+        files::append_ignore_rules(&g, &repo.info, IgnoreTarget::Gitignore, &rules(&["a"]))
+            .unwrap_err(),
+    );
+    assert_eq!(msg, ".gitignore is a symlink.");
+    assert_eq!(repo.read("real.txt"), "x\n");
+    std::fs::remove_file(repo.path().join(".gitignore")).expect("remove");
+    std::fs::create_dir(repo.path().join(".gitignore")).expect("dir");
+    let msg =
+        invalid(files::read_ignore_file(&g, &repo.info, IgnoreTarget::Gitignore).unwrap_err());
+    assert_eq!(msg, "not a regular file: .gitignore");
+}
+
+#[test]
+fn ignore_file_says_whether_the_repo_ignores_case() {
+    let repo = TestRepo::new();
+    let g = git();
+    let read = |t| files::read_ignore_file(&g, &repo.info, t).expect("read");
+    // Unset (the default on Linux) and false: case matters.
+    assert!(!read(IgnoreTarget::Gitignore).ignore_case);
+    repo.sh(&["config", "core.ignorecase", "false"]);
+    assert!(!read(IgnoreTarget::Gitignore).ignore_case);
+    // True, also in the spellings that git reads as true.
+    repo.sh(&["config", "core.ignorecase", "true"]);
+    assert!(read(IgnoreTarget::Gitignore).ignore_case);
+    assert!(read(IgnoreTarget::Exclude).ignore_case);
+    repo.sh(&["config", "core.ignorecase", "yes"]);
+    assert!(read(IgnoreTarget::Gitignore).ignore_case);
 }

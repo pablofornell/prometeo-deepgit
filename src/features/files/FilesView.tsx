@@ -21,6 +21,7 @@ import {
 } from "../../components/ui";
 import { confirmAction } from "../../state/dialogs";
 import { repoVersion } from "../../state/events";
+import { openFileRequest, takeOpenFileRequest } from "../../state/fileOpen";
 import { shortcutLabel, register, trackOverlay } from "../../state/keymap";
 import { onOpenFile, setNavFile } from "../../state/navigation";
 import { mainTab } from "../../state/selection";
@@ -29,6 +30,7 @@ import { createFileState, saveText } from "./editor";
 import { openFind } from "./find/panel";
 import { ProjectSearch, type SearchApi, type SearchOpen } from "./ProjectSearch";
 import { QuickOpen, type QuickFile } from "./QuickOpen";
+import { openTreeMenu } from "./treeMenu";
 import {
   SEP, buildTree, closeTab, dirNodeStatus, errorText, fileNodeStatus, folderStatuses, isStaleVersion, matchRange, openTab, repoNode, revealIds, scopeId, statusMap,
   tabLabels, tabsToClose, type CloseAction, type TreeNode,
@@ -273,6 +275,13 @@ export function FilesView(): JSX.Element {
     await readInto(key);
     if (current === key && tabOf(key)?.kind === "text") after?.();
   };
+
+  // A request from outside (the "Open .gitignore" toast) opens a file. It waits when this tab mounts after the call.
+  createEffect(() => {
+    if (!openFileRequest()) return;
+    const r = untrack(takeOpenFileRequest);
+    if (r) untrack(() => void openFile(r.repoId, r.path));
+  });
 
   /** Selects the match of a search hit in its open tab. Centres the match and focuses the editor. */
   const revealHit = (o: SearchOpen): void => {
@@ -843,6 +852,10 @@ export function FilesView(): JSX.Element {
                 selectedId={sel()?.id ?? null}
                 onSelect={onTreeSelect}
                 onActivate={(n) => (n.kind === "file" ? openNode(n) : ex.toggle(n.id))}
+                onContextMenu={(n, e) => {
+                  setSel(n);
+                  openTreeMenu(n, e);
+                }}
                 ariaLabel="Project files"
                 renderNode={renderNode}
                 rowClass={rowClass}

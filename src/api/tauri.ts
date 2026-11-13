@@ -14,7 +14,7 @@
  */
 import type {
   ApiErrorShape, AuthNotice, AuthPrompt, CloneOpts, CloneProgress, CloneResult, CloneTarget, CommitDetails, ConflictEntry, ConflictSide, ConflictVersions,
-  ConsoleEntry, DiffSpec, ExpectedOids, FileDiff, FileList, LogQuery, LogSessionInfo, MergeOpts, OpResult, Project, CommitRow, HunkOpts, RepoChanged, RepoSummary, Refs,
+  ConsoleEntry, DiffSpec, ExpectedOids, FileDiff, FileList, IgnoreFile, IgnoreTarget, LogQuery, LogSessionInfo, MergeOpts, OpResult, Project, CommitRow, HunkOpts, RepoChanged, RepoSummary, Refs,
   ResetMode, SearchResult, StashUntracked, TextFile, Workspace, WorkingTree,
 } from "./types";
 
@@ -104,6 +104,8 @@ export const lastCommitMessage = (repoId: string) => invoke<string>("last_commit
 export const listFiles = (repoId: string) => invoke<FileList>("list_files", { repoId });
 /** A worktree file as text (2 MiB at most). Binary and too large files give empty content and a flag. */
 export const readTextFile = (repoId: string, path: string) => invoke<TextFile>("read_text_file", { repoId, path });
+/** The text of `.gitignore` (repo root) or `.git/info/exclude` (empty when the file does not exist), and `core.ignorecase` of the repo. */
+export const readIgnoreFile = (repoId: string, target: IgnoreTarget) => invoke<IgnoreFile>("read_ignore_file", { repoId, target });
 /** Searches the tracked and untracked files that are not ignored. Hits are capped at 2 000. */
 export const searchFiles = (repoId: string, query: string, opts: { caseSensitive: boolean; regex: boolean }) =>
   invoke<SearchResult>("search_files", { repoId, query, caseSensitive: opts.caseSensitive, regex: opts.regex });
@@ -134,6 +136,12 @@ export const discardHunk = (repoId: string, path: string, hunkIndex: number, opt
  */
 export const writeTextFile = (repoId: string, path: string, content: string, expectedVersion: string | null) =>
   invoke<string>("write_text_file", { repoId, path, content, expectedVersion });
+/**
+ * Adds pattern lines at the end of `.gitignore` or `.git/info/exclude` (creates the file). A line that the file holds
+ * already is skipped. Returns the lines that were added. Does not stage and does not commit.
+ */
+export const appendIgnoreRules = (repoId: string, target: IgnoreTarget, patterns: string[]) =>
+  invoke<string[]>("append_ignore_rules", { repoId, target, patterns });
 /** `signOff` adds a `Signed-off-by` trailer (`--signoff`); the backend does not add it twice. */
 export const commit = (repoId: string, message: string, amend = false, signOff = false) =>
   invoke<OpResult>("commit", { repoId, message, amend, signOff });
