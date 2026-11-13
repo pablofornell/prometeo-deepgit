@@ -854,7 +854,11 @@ export function FilesView(): JSX.Element {
                 onActivate={(n) => (n.kind === "file" ? openNode(n) : ex.toggle(n.id))}
                 onContextMenu={(n, e) => {
                   setSel(n);
-                  openTreeMenu(n, e);
+                  const ignored =
+                    n.kind === "file"
+                      ? fileNodeStatus(n.path, statusOf(n.repoId).files, ignoredOf(n.repoId)) === "ignored"
+                      : n.kind === "dir" && dirNodeStatus(n.path, statusOf(n.repoId).folders, ignoredOf(n.repoId)) === "ignored";
+                  openTreeMenu(n, e, ignored);
                 }}
                 ariaLabel="Project files"
                 renderNode={renderNode}
