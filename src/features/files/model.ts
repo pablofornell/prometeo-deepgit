@@ -255,6 +255,36 @@ export function closeTab(tabs: string[], key: string, active: string | null): st
   return i > 0 ? tabs[i - 1] : null;
 }
 
+export type CloseAction = "this" | "others" | "all" | "left" | "right";
+
+/** Returns the keys that a close action closes, in tab order. `key` is the tab that the action starts from. */
+export function tabsToClose(order: readonly string[], key: string, action: CloseAction): string[] {
+  const i = order.indexOf(key);
+  if (i < 0) return [];
+  switch (action) {
+    case "this":
+      return [key];
+    case "others":
+      return order.filter((k) => k !== key);
+    case "all":
+      return [...order];
+    case "left":
+      return order.slice(0, i);
+    case "right":
+      return order.slice(i + 1);
+  }
+}
+
+/**
+ * Returns the ids of the nodes to expand so that the file at `path` shows in the tree: its repo root (only when the tree
+ * has one root for each repo) and every folder above the file.
+ */
+export function revealIds(repoId: string, path: string, withRepoRoot: boolean): string[] {
+  const ids = withRepoRoot ? [repoId + SEP] : [];
+  for (let i = path.indexOf("/"); i >= 0; i = path.indexOf("/", i + 1)) ids.push(scopeId(repoId, path.slice(0, i + 1)));
+  return ids;
+}
+
 /**
  * Returns the labels of the tabs of `paths`. A tab whose file name another tab also uses gets a `hint`.
  * The hint is the name of the parent folder, shown in muted text. A root file has no folder. Its hint is `rootHints[i]`,

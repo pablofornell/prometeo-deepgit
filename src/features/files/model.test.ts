@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { FileChange, WorkingTree } from "../../api/types";
 import {
   SEP, buildTree, closeTab, columnOffset, dirNodeStatus, errorText, fileNodeStatus, folderStatus, folderStatuses, groupHits, isStaleVersion, lineSeparatorOf,
-  matchRange, openTab, rankFiles, repoNode, scopeId, statusMap, tabLabels, type DirNode,
+  matchRange, openTab, rankFiles, repoNode, revealIds, scopeId, statusMap, tabLabels, tabsToClose, type DirNode,
 } from "./model";
 
 const change = (path: string, status: FileChange["status"]): FileChange => ({ path, oldPath: null, status, additions: 0, deletions: 0, binary: false });
@@ -171,6 +171,21 @@ describe("groupHits", () => {
   });
 });
 
+describe("revealIds", () => {
+  it("lists every folder above the file", () => {
+    expect(revealIds("r", "src/app/main.ts", false)).toEqual(["r" + SEP + "src/", "r" + SEP + "src/app/"]);
+  });
+
+  it("adds the repo root when the tree has one root for each repo", () => {
+    expect(revealIds("r", "src/main.ts", true)).toEqual(["r" + SEP, "r" + SEP + "src/"]);
+    expect(revealIds("r", "README.md", true)).toEqual(["r" + SEP]);
+  });
+
+  it("is empty for a root file in a tree without repo roots", () => {
+    expect(revealIds("r", "README.md", false)).toEqual([]);
+  });
+});
+
 describe("lineSeparatorOf", () => {
   it("is CRLF only when the content has a CRLF", () => {
     expect(lineSeparatorOf("a\r\nb")).toBe("\r\n");
@@ -216,6 +231,32 @@ describe("tab helpers", () => {
     const tabs = ["a"];
     expect(closeTab(tabs, "zz", "a")).toBe("a");
     expect(tabs).toEqual(["a"]);
+  });
+
+  describe("tabsToClose", () => {
+    const order = ["a", "b", "c", "d"];
+
+    it("closes this tab, the other tabs or all tabs", () => {
+      expect(tabsToClose(order, "b", "this")).toEqual(["b"]);
+      expect(tabsToClose(order, "b", "others")).toEqual(["a", "c", "d"]);
+      expect(tabsToClose(order, "b", "all")).toEqual(["a", "b", "c", "d"]);
+    });
+
+    it("closes the tabs on one side, in tab order", () => {
+      expect(tabsToClose(order, "c", "left")).toEqual(["a", "b"]);
+      expect(tabsToClose(order, "c", "right")).toEqual(["d"]);
+    });
+
+    it("closes nothing on the side of the first and the last tab", () => {
+      expect(tabsToClose(order, "a", "left")).toEqual([]);
+      expect(tabsToClose(order, "d", "right")).toEqual([]);
+      expect(tabsToClose(["a"], "a", "others")).toEqual([]);
+    });
+
+    it("closes nothing for a tab that is not open, and does not change the list", () => {
+      expect(tabsToClose(order, "zz", "all")).toEqual([]);
+      expect(order).toEqual(["a", "b", "c", "d"]);
+    });
   });
 
   it("adds the parent folder only to tabs with the same file name", () => {

@@ -5,9 +5,9 @@
  *
  * This is not a full IDE. There is no rename, no create and no replace.
  * A clean tab reloads when its file changes on disk. A tab with unsaved changes keeps its text.
- * The tree is on the right of the editor.
+ * The tree is on the right of the editor. A right-click on a tab opens the close and copy-path menu.
  * Shortcuts work on this tab only: Ctrl+S saves, Ctrl+P opens a file by name, Ctrl+Shift+F searches the project,
- * and Ctrl+F finds text in the file.
+ * Ctrl+F finds text in the file, Ctrl+W and Ctrl+Shift+W close tabs, and Alt+F1 shows the file in the tree.
  */
 import { type JSX, For, Show, createEffect, createMemo, createSignal, on, onCleanup, onMount, untrack } from "solid-js";
 import type { EditorState, Text } from "@codemirror/state";
@@ -16,20 +16,20 @@ import { EditorView, type ViewUpdate } from "@codemirror/view";
 import * as api from "../../api/tauri";
 import type { FileStatus, TextFile } from "../../api/types";
 import {
-  Button, Dialog, EmptyState, Icon, IconButton, Kbd, Spinner, Splitter, StatusLetter, Tree, createExpanded, fileIconFor, loadSplitSize, openDialog, splitPath,
-  statusColorVar, tip, toast, type DialogComponentProps, type TreeRowInfo,
+  Button, Dialog, EmptyState, Icon, IconButton, Kbd, Spinner, Splitter, StatusLetter, Tree, copyText, createExpanded, fileIconFor, loadSplitSize, openContextMenu,
+  openDialog, splitPath, statusColorVar, tip, toast, type DialogComponentProps, type MenuItem, type TreeApi, type TreeRowInfo,
 } from "../../components/ui";
 import { confirmAction } from "../../state/dialogs";
 import { repoVersion } from "../../state/events";
 import { shortcutLabel, register, trackOverlay } from "../../state/keymap";
 import { mainTab } from "../../state/selection";
-import { projectRepos } from "../../state/workspace";
+import { projectRepos, repoById } from "../../state/workspace";
 import { createFileState, saveText } from "./editor";
 import { ProjectSearch, type SearchApi, type SearchOpen } from "./ProjectSearch";
 import { QuickOpen, type QuickFile } from "./QuickOpen";
 import {
-  SEP, buildTree, closeTab, dirNodeStatus, errorText, fileNodeStatus, folderStatuses, isStaleVersion, matchRange, openTab, repoNode, scopeId, statusMap, tabLabels,
-  type TreeNode,
+  SEP, buildTree, closeTab, dirNodeStatus, errorText, fileNodeStatus, folderStatuses, isStaleVersion, matchRange, openTab, repoNode, revealIds, scopeId, statusMap,
+  tabLabels, tabsToClose, type CloseAction, type TreeNode,
 } from "./model";
 import "./files.css";
 
@@ -129,6 +129,7 @@ export function FilesView(): JSX.Element {
   let view: EditorView | undefined;
   let editorEl: HTMLDivElement | undefined;
   let searchApi: SearchApi | undefined;
+  let treeApi: TreeApi | undefined;
 
   const tabList = createMemo(() => {
     const m = infos();
@@ -347,10 +348,10 @@ export function FilesView(): JSX.Element {
     });
   };
 
-  /** Closes a tab. A tab with unsaved changes asks first. */
-  const requestClose = async (key: string): Promise<void> => {
+  /** Closes a tab. A tab with unsaved changes asks first. Returns false when the user cancels. */
+  const requestClose = async (key: string): Promise<boolean> => {
     const t = tabOf(key);
-    if (!t) return;
+    if (!t) return true;
     if (isDirty(key)) {
       const r = await confirmAction({
         title: `Discard changes in ${splitPath(t.path).name}?`,
@@ -359,9 +360,36 @@ export function FilesView(): JSX.Element {
         danger: true,
         cancelLabel: "Cancel",
       });
-      if (!r) return;
+      if (!r) return false;
     }
     removeTab(key);
+    return true;
+  };
+
+  /** Closes the tabs `action` picks, one after the other in tab order. A cancelled question stops the rest. */
+  const closeTabs = async (key: string, action: CloseAction): Promise<void> => {
+    for (const k of tabsToClose(untrack(order), key, action)) if (!(await requestClose(k))) return;
+  };
+
+  const tabMenu = (key: string): MenuItem[] => {
+    const t = tabOf(key);
+    const keys = order();
+    const i = keys.indexOf(key);
+    if (!t || i < 0) return [];
+    const root = repoById(t.repoId)?.path ?? "";
+    return [
+      { label: "Close", shortcut: shortcutLabel("files.closeTab") || "Ctrl+W", onSelect: () => void closeTabs(key, "this") },
+      { label: "Close others", disabled: keys.length < 2, onSelect: () => void closeTabs(key, "others") },
+      { label: "Close all", shortcut: shortcutLabel("files.closeAll") || "Ctrl+Shift+W", onSelect: () => void closeTabs(key, "all") },
+      { separator: true },
+      { label: "Close tabs to the left", disabled: i === 0, onSelect: () => void closeTabs(key, "left") },
+      { label: "Close tabs to the right", disabled: i === keys.length - 1, onSelect: () => void closeTabs(key, "right") },
+      { separator: true },
+      { label: "Copy path", icon: "copy", onSelect: () => void copyText(t.path) },
+      { label: "Copy absolute path", icon: "path", onSelect: () => void copyText(`${root}/${t.path}`) },
+      { separator: true },
+      { label: "Reveal in file tree", shortcut: shortcutLabel("files.reveal") || "Alt+F1", onSelect: () => revealInTree(t.repoId, t.path) },
+    ];
   };
 
   /** Reads the open tabs that have no unsaved changes. A tab whose file changed shows the new text. */
@@ -562,6 +590,20 @@ export function FilesView(): JSX.Element {
     openNode(n);
   };
 
+  /** Shows the Files pane, expands the folders above a file, selects its row, centres it and focuses the tree. */
+  const revealInTree = (repoId: string, path: string): void => {
+    setLeftTab("files");
+    const id = scopeId(repoId, path);
+    const slash = path.lastIndexOf("/");
+    ex.set(new Set([...untrack(expanded), ...revealIds(repoId, path, projectRepos().length > 1)]));
+    setSel({ kind: "file", id, repoId, path, name: path.slice(slash + 1) });
+    // The pane shows and the rows render on the next frame. Then the tree can measure and scroll.
+    requestAnimationFrame(() => {
+      treeApi?.scrollToId(id, "center");
+      treeApi?.focus();
+    });
+  };
+
   const emptyTree = (): string => (projectRepos().length === 0 ? "Add a project to see its files." : "No files in this project.");
 
   // ---- quick open
@@ -626,6 +668,34 @@ export function FilesView(): JSX.Element {
         },
         { title: "Find in the file", group: "Files", when: inFiles, allowInInput: true },
       ),
+      register(
+        "files.closeTab",
+        ["Ctrl+W", "Ctrl+F4"],
+        () => {
+          if (!current) return false;
+          void closeTabs(current, "this");
+        },
+        { title: "Close the tab", group: "Files", when: inFiles, allowInInput: true },
+      ),
+      register(
+        "files.closeAll",
+        "Ctrl+Shift+W",
+        () => {
+          if (!current) return false;
+          void closeTabs(current, "all");
+        },
+        { title: "Close all tabs", group: "Files", when: inFiles, allowInInput: true },
+      ),
+      register(
+        "files.reveal",
+        "Alt+F1",
+        () => {
+          const t = current ? tabOf(current) : undefined;
+          if (!t) return false;
+          revealInTree(t.repoId, t.path);
+        },
+        { title: "Reveal the file in the tree", group: "Files", when: inFiles, allowInInput: true },
+      ),
     ];
     onCleanup(() => {
       offs.forEach((off) => off());
@@ -651,6 +721,7 @@ export function FilesView(): JSX.Element {
                 classList={{ "is-on": activeKey() === t.key, "is-dirty": t.dirty }}
                 {...tip(t.path)}
                 onClick={() => selectTab(t.key)}
+                onContextMenu={(e) => openContextMenu(e, () => tabMenu(t.key))}
                 onMouseDown={(e) => {
                   if (e.button !== 1) return;
                   e.preventDefault();
@@ -740,6 +811,7 @@ export function FilesView(): JSX.Element {
                 ariaLabel="Project files"
                 renderNode={renderNode}
                 rowClass={rowClass}
+                apiRef={(a) => (treeApi = a)}
               />
             </div>
           </Show>
