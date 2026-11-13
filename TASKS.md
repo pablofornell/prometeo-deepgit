@@ -32,7 +32,7 @@
 - [x] **Alert icon:** Alerts are per project, the user can dismiss them, and they expire after a configurable time.
 
 ## 7. Branch matrix
-- [ ] **Bulk push with upstream:** For branches not tracked on the remote, "Push and set upstream" for all selected repos at the same time.
+- [x] **Bulk push with upstream:** For branches not tracked on the remote, "Push and set upstream" for all selected repos at the same time.
 
 ## 8. File view (mini editor)
 - [ ] **File tree position:** Move the file tree column to the right side of the editor.
