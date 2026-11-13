@@ -10,7 +10,7 @@
  * `DialogRegistry`, then register a component for it.
  */
 import type { Component } from "solid-js";
-import type { AuthPrompt, MergeOpts, ResetMode } from "../api/types";
+import type { AuthPrompt, IgnoreTarget, MergeOpts, ResetMode } from "../api/types";
 import type { AuthDialogResult } from "./authQueue";
 import { ConfirmDialog, type ConfirmProps, type ConfirmResult, type DialogComponentProps, openDialog } from "../components/ui";
 
@@ -175,6 +175,18 @@ export interface MergeFileResult {
   resolved: boolean;
 }
 
+export interface IgnoreProps {
+  repoId: string;
+  /** The files and folders to ignore. `path` is relative to the repo. */
+  items: { path: string; isDir: boolean }[];
+}
+export interface IgnoreResult {
+  /** The file that got the lines. */
+  target: IgnoreTarget;
+  /** The lines that were added (a line that the file held already is not here). */
+  added: string[];
+}
+
 /** Props and result of every dialog name. */
 export interface DialogRegistry {
   newBranch: { props: NewBranchProps; result: NewBranchResult };
@@ -193,6 +205,7 @@ export interface DialogRegistry {
   conflicts: { props: ConflictsProps; result: ConflictsResult };
   mergeFile: { props: MergeFileProps; result: MergeFileResult };
   renameProject: { props: RenameProjectProps; result: RenameProjectResult };
+  ignore: { props: IgnoreProps; result: IgnoreResult };
 }
 
 export type DialogName = keyof DialogRegistry;

@@ -1,15 +1,16 @@
 //! Project files: list, read, write and search the files of the worktree. Every path is relative
 //! to the repo root. The list and the search skip ignored files. Read and write still accept a
-//! path to an ignored file.
+//! path to an ignored file. The ignore file functions are the only ones that touch `.git/info/exclude`.
 
 use std::collections::BTreeSet;
 use std::io::Read;
-use std::path::{Component, Path};
+use std::io::Write;
+use std::path::{Component, Path, PathBuf};
 
 use crate::conflicts::write_worktree_file;
 use crate::diff::{worktree_path, MAX_CONTENT_BYTES};
 use crate::error::GitError;
-use crate::model::{FileList, RepoInfo, SearchHit, SearchResult, TextFile};
+use crate::model::{FileList, IgnoreTarget, RepoInfo, SearchHit, SearchResult, TextFile};
 use crate::ops::check_rel;
 use crate::runner::{command_error, Git};
 
@@ -124,6 +125,120 @@ pub fn write_text_file(
 
 fn changed_on_disk() -> GitError {
     GitError::Invalid("The file changed on disk. Reload it before you save.".to_string())
+}
+
+/// Read the text of an ignore file. A missing file gives an empty string. Refuse a symlink and a
+/// folder, and a file over 2 MiB.
+pub fn read_ignore_file(
+    git: &Git,
+    repo: &RepoInfo,
+    target: IgnoreTarget,
+) -> Result<String, GitError> {
+    let full = ignore_file_path(git, repo, target)?;
+    match std::fs::symlink_metadata(&full) {
+        Ok(_) => check_regular(&full, &ignore_label(target))?,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(String::new()),
+        Err(e) => return Err(e.into()),
+    }
+    let mut bytes = Vec::new();
+    std::fs::File::open(&full)?
+        .take(MAX_CONTENT_BYTES as u64 + 1)
+        .read_to_end(&mut bytes)?;
+    if bytes.len() > MAX_CONTENT_BYTES {
+        return Err(GitError::Invalid(format!(
+            "{} is larger than 2 MiB.",
+            ignore_label(target)
+        )));
+    }
+    Ok(String::from_utf8_lossy(&bytes).into_owned())
+}
+
+/// Add pattern lines at the end of an ignore file. Create the file (and the `info` folder) when it
+/// is missing. Add a line break first when the file does not end with one. New lines use `\r\n`
+/// when the file already does. Skip a line that the file holds already, and a repeated one.
+/// Return the lines that were added. Do not stage and do not commit.
+pub fn append_ignore_rules(
+    git: &Git,
+    repo: &RepoInfo,
+    target: IgnoreTarget,
+    patterns: &[String],
+) -> Result<Vec<String>, GitError> {
+    for p in patterns {
+        if p.trim().is_empty() {
+            return Err(GitError::Invalid("A pattern cannot be empty.".to_string()));
+        }
+        if p.contains(['\n', '\r', '\0']) {
+            return Err(GitError::Invalid(
+                "A pattern cannot contain a line break or a NUL character.".to_string(),
+            ));
+        }
+    }
+    let full = ignore_file_path(git, repo, target)?;
+    let label = ignore_label(target);
+    let existing = match std::fs::symlink_metadata(&full) {
+        Ok(_) => {
+            check_regular(&full, &label)?;
+            std::fs::read(&full)?
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Vec::new(),
+        Err(e) => return Err(e.into()),
+    };
+    let text = String::from_utf8_lossy(&existing);
+    let mut known: BTreeSet<&str> = text.lines().collect();
+    let mut added = Vec::new();
+    for p in patterns {
+        if known.insert(p.as_str()) {
+            added.push(p.clone());
+        }
+    }
+    if added.is_empty() {
+        return Ok(added);
+    }
+    let eol = if text.contains("\r\n") { "\r\n" } else { "\n" };
+    let mut out = String::new();
+    if !existing.is_empty() && !existing.ends_with(b"\n") {
+        out.push_str(eol);
+    }
+    for line in &added {
+        out.push_str(line);
+        out.push_str(eol);
+    }
+    if let Some(dir) = full.parent() {
+        std::fs::create_dir_all(dir)?;
+    }
+    let mut file = std::fs::OpenOptions::new()
+        .append(true)
+        .create(true)
+        .open(&full)?;
+    file.write_all(out.as_bytes())?;
+    file.flush()?;
+    Ok(added)
+}
+
+/// The path of an ignore file. `.git/info/exclude` comes from git, because a linked worktree
+/// shares it with the main one.
+fn ignore_file_path(git: &Git, repo: &RepoInfo, target: IgnoreTarget) -> Result<PathBuf, GitError> {
+    let root = Path::new(&repo.path);
+    match target {
+        IgnoreTarget::Gitignore => Ok(root.join(".gitignore")),
+        IgnoreTarget::Exclude => {
+            let args = ["rev-parse", "--git-path", "info/exclude"];
+            let out = git.run(root, Some(&repo.id), &args, false)?;
+            let path = PathBuf::from(out.stdout.trim_end_matches(['\n', '\r']));
+            Ok(if path.is_absolute() {
+                path
+            } else {
+                root.join(path)
+            })
+        }
+    }
+}
+
+fn ignore_label(target: IgnoreTarget) -> String {
+    match target {
+        IgnoreTarget::Gitignore => ".gitignore".to_string(),
+        IgnoreTarget::Exclude => ".git/info/exclude".to_string(),
+    }
 }
 
 /// Search the tracked and untracked files that are not ignored. With `regex`, the query is a POSIX

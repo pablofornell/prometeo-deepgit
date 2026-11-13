@@ -63,10 +63,20 @@ export interface RadioOption<T extends string> {
   description?: string;
   /** Red label: the option destroys data. */
   danger?: boolean;
+  /** Writes the description in the mono font (a pattern, a path). */
+  mono?: boolean;
 }
 
 /** Radio list with a description under each label. Arrow keys move the choice (native radios). */
-export function RadioGroup<T extends string>(props: { name: string; value: T; onChange: (v: T) => void; options: RadioOption<T>[]; label: string }): JSX.Element {
+export function RadioGroup<T extends string>(props: {
+  name: string;
+  value: T;
+  onChange: (v: T) => void;
+  options: RadioOption<T>[];
+  label: string;
+  /** Text at the right end of an option (a count). Read inside the row, so a change does not rebuild the list. */
+  trailing?: (v: T) => string | undefined;
+}): JSX.Element {
   return (
     <div class="dg-dialogs-radios" role="radiogroup" aria-label={props.label}>
       <For each={props.options}>
@@ -76,8 +86,9 @@ export function RadioGroup<T extends string>(props: { name: string; value: T; on
             <span class="dg-dialogs-radio-dot" aria-hidden="true" />
             <span class="dg-dialogs-radio-text">
               <span class="dg-dialogs-radio-label">{o.label}</span>
-              <Show when={o.description}>{(d) => <span class="dg-dialogs-radio-desc">{d()}</span>}</Show>
+              <Show when={o.description}>{(d) => <span class="dg-dialogs-radio-desc" classList={{ "dg-dialogs-mono": o.mono }}>{d()}</span>}</Show>
             </span>
+            <Show when={props.trailing?.(o.value)}>{(t) => <span class="dg-dialogs-radio-trailing">{t()}</span>}</Show>
           </label>
         )}
       </For>

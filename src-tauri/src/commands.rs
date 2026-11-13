@@ -8,8 +8,8 @@ use gitcore::{
     clone as gitclone, conflicts as gitconflicts, diff, files as gitfiles, log, ops,
     refs as gitrefs, status, ApiError, CloneOpts, CloneProgress, CloneResult, CloneTarget,
     CommitDetails, CommitRow, ConflictEntry, ConflictSide, ConflictVersions, DiffSpec, FileDiff,
-    FileList, Git, HunkRef, LogQuery, LogSessionInfo, MergeOpts, OpResult, Project, Refs,
-    RepoChanged, RepoInfo, RepoSummary, ResetMode, SearchResult, StashUntracked, TextFile,
+    FileList, Git, HunkRef, IgnoreTarget, LogQuery, LogSessionInfo, MergeOpts, OpResult, Project,
+    Refs, RepoChanged, RepoInfo, RepoSummary, ResetMode, SearchResult, StashUntracked, TextFile,
     WorkingTree, Workspace,
 };
 use gitcore::{AuthMode, GitError};
@@ -266,6 +266,14 @@ pub async fn read_text_file(state: St<'_>, repo_id: String, path: String) -> Res
 }
 
 #[tauri::command]
+pub async fn read_ignore_file(state: St<'_>, repo_id: String, target: IgnoreTarget) -> Res<String> {
+    read(&state, &repo_id, move |g, r| {
+        gitfiles::read_ignore_file(g, r, target)
+    })
+    .await
+}
+
+#[tauri::command]
 pub async fn search_files(
     state: St<'_>,
     repo_id: String,
@@ -379,6 +387,21 @@ pub async fn write_text_file(
 ) -> Res<String> {
     write(&app, &state, &repo_id, move |g, r| {
         gitfiles::write_text_file(g, r, &path, &content, expected_version.as_deref())
+    })
+    .await
+}
+
+/// JS: `{ repoId, target: "gitignore" | "exclude", patterns }`. Returns the lines added.
+#[tauri::command]
+pub async fn append_ignore_rules(
+    app: AppHandle,
+    state: St<'_>,
+    repo_id: String,
+    target: IgnoreTarget,
+    patterns: Vec<String>,
+) -> Res<Vec<String>> {
+    write(&app, &state, &repo_id, move |g, r| {
+        gitfiles::append_ignore_rules(g, r, target, &patterns)
     })
     .await
 }

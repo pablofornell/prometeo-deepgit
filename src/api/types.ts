@@ -316,6 +316,9 @@ export interface TextFile {
   tooLarge: boolean;
 }
 
+/** The file `appendIgnoreRules` writes: `.gitignore` at the repo root, or `.git/info/exclude` (only on this computer). */
+export type IgnoreTarget = "gitignore" | "exclude";
+
 /** One matching line of a search. */
 export interface SearchHit {
   path: string;

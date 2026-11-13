@@ -4,6 +4,7 @@
  * in-memory repositories (`mockData.ts`); write commands mutate that state and emit `repo-changed`.
  * Every git-backed call also emits a `git-console` entry after a small random delay.
  */
+import ignore from "ignore";
 import { checkCloneInput, joinPath, notFoundReason } from "./cloneRules";
 import { layoutGraph } from "./graphLayout";
 import { checkMergeOpts, defaultMergeMessage, effectiveMessage, mergeArgs } from "./mergeRules";
@@ -13,12 +14,12 @@ import {
   type MockCommit, type MockRepo, type MockStash, type Scenario,
 } from "./mockData";
 import { buildFileDiff, fileText, toFileChange } from "./mockDiff";
-import { CHANGED_ON_DISK, fileKey, filePathError, isFolder, listFiles, readText, searchFiles, versionOf } from "./mockFiles";
+import { CHANGED_ON_DISK, appendIgnoreLines, fileKey, filePathError, ignorePatternError, isFolder, listFiles, readText, searchFiles, versionOf } from "./mockFiles";
 import { uniqueProjectName, validateProjectName } from "./projectName";
 import { entryOf, genericConflicts, currentOids, hasStage, isTextConflict, sideStages, versionsOf, type MockConflict } from "./mockConflicts";
 import type {
   CloneOpts, CloneProgress, CloneResult, CloneTarget, CommitDetails, CommitRow, ConflictEntry, ConflictLabels, ConflictVersions, ConsoleEntry, DiffSpec,
-  FileChange, FileDiff, GraphRow, LocalBranch, LogQuery, LogSessionInfo, MergeMode, MergeOpts, OpResult, Project, RefLabel, Refs, RepoChanged, RepoInfo,
+  FileChange, FileDiff, GraphRow, IgnoreTarget, LocalBranch, LogQuery, LogSessionInfo, MergeMode, MergeOpts, OpResult, Project, RefLabel, Refs, RepoChanged, RepoInfo,
   RepoSummary, ResetMode, Workspace, WorkingTree,
 } from "./types";
 
@@ -758,6 +759,12 @@ const handlers: Record<string, Handler> = {
     const key = readableFile(repo, stringArg(a, "path", "read_text_file"));
     return readText(repo.worktree.get(key) ?? "");
   },
+  read_ignore_file: (a, c) => {
+    const repo = repoOf(a.repoId);
+    const target = ignoreTargetArg(a, "read_ignore_file");
+    if (target === "exclude") c.git(repo, ["rev-parse", "--git-path", "info/exclude"]);
+    return ignoreText(repo, target);
+  },
   search_files: (a, c) => {
     const repo = repoOf(a.repoId);
     const query = stringArg(a, "query", "search_files");
@@ -830,6 +837,35 @@ const handlers: Record<string, Handler> = {
     repo.worktree.set(key, content);
     emitChanged(repo);
     return versionOf(content);
+  },
+  append_ignore_rules: (a, c) => {
+    const repo = repoOf(a.repoId);
+    const target = ignoreTargetArg(a, "append_ignore_rules");
+    const patterns = stringList(a, "patterns", "append_ignore_rules");
+    for (const p of patterns) {
+      const refused = ignorePatternError(p);
+      if (refused !== null) fail(refused);
+    }
+    if (target === "exclude") c.git(repo, ["rev-parse", "--git-path", "info/exclude"]);
+    const { text, added } = appendIgnoreLines(ignoreText(repo, target), patterns);
+    if (added.length === 0) return added;
+    if (target === "gitignore") {
+      const had = repo.worktree.has(".gitignore");
+      repo.worktree.set(".gitignore", text);
+      const listed = [...repo.wt.staged, ...repo.wt.unstaged, ...repo.wt.conflicted].some((f) => f.path === ".gitignore");
+      if (!listed) repo.wt.unstaged.push(toFileChange(".gitignore", null, had ? "modified" : "untracked", "wt-ignore-" + repo.info.id));
+    } else {
+      excludeTexts.set(repo, text);
+    }
+    // Git hides an untracked file that a new rule matches. A tracked file stays in the list.
+    const rules = ignore().add(ignoreText(repo, "gitignore")).add(ignoreText(repo, "exclude"));
+    repo.wt.unstaged = repo.wt.unstaged.filter((f) => {
+      if (f.status !== "untracked" || !rules.ignores(f.path)) return true;
+      repo.ignored.add(f.path);
+      return false;
+    });
+    emitChanged(repo);
+    return added;
   },
   stage_hunk: (a, c) => {
     const repo = repoOf(a.repoId);
@@ -1473,6 +1509,29 @@ function stashRestore(a: Args, c: Ctx, drop: boolean): OpResult {
   }
   emitChanged(repo);
   return ok(drop ? `Dropped stash@{${idx}}` : "Applied");
+}
+
+/** The text of `.git/info/exclude` of each mock repo. A repo that is not here has an empty file. */
+const excludeTexts = new WeakMap<MockRepo, string>();
+
+function ignoreText(repo: MockRepo, target: IgnoreTarget): string {
+  return target === "gitignore" ? (repo.worktree.get(".gitignore") ?? "") : (excludeTexts.get(repo) ?? "");
+}
+
+/** The `target` argument of the ignore commands, refused like serde does when it is wrong. */
+function ignoreTargetArg(a: Args, cmd: string): IgnoreTarget {
+  const v = a.target;
+  if (v === undefined) fail(`invalid args \`target\` for command \`${cmd}\`: command ${cmd} missing required key target`);
+  if (v !== "gitignore" && v !== "exclude") fail(`invalid args \`target\` for command \`${cmd}\`: unknown variant \`${String(v)}\`, expected \`gitignore\` or \`exclude\``);
+  return v;
+}
+
+/** A required `Vec<String>` argument, refused like serde does when it is missing or not a list of strings. */
+function stringList(a: Args, key: string, cmd: string): string[] {
+  const v = a[key];
+  if (v === undefined) fail(`invalid args \`${key}\` for command \`${cmd}\`: command ${cmd} missing required key ${key}`);
+  if (!Array.isArray(v) || !v.every((x) => typeof x === "string")) fail(`invalid args \`${key}\` for command \`${cmd}\`: invalid type`);
+  return v as string[];
 }
 
 /** The map key of a worktree file that can be read; the refusal of `read_text_file` otherwise. */

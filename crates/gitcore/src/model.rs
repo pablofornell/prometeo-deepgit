@@ -434,6 +434,14 @@ pub struct FileList {
     pub truncated: bool,
 }
 
+/// The file that `append_ignore_rules` writes: `.gitignore` at the repo root, or `.git/info/exclude`.
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum IgnoreTarget {
+    Gitignore,
+    Exclude,
+}
+
 /// A worktree file read as text.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]

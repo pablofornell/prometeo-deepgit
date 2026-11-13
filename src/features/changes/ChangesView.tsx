@@ -14,6 +14,7 @@ import * as actions from "../../state/actions";
 import { formatDate, fullDate } from "../../state/dates";
 import { confirmAction } from "../../state/dialogs";
 import { notifyRepoChanged, repoVersion } from "../../state/events";
+import { ignoreMenuItems, type IgnoreRef } from "../../state/ignoreMenu";
 import { register } from "../../state/keymap";
 import { loadPersisted, savePersisted } from "../../state/persist";
 import { changesRepoId, changesScopeRepos, mainTab, selectFile, selectedFile, setChangesRepoId } from "../../state/selection";
@@ -272,6 +273,17 @@ export function ChangesView(): JSX.Element {
     for (const [repoId, paths] of conflictPaths(row)) await actions.acceptSide(repoId, paths, side);
   };
 
+  /** The file and folder rows the "Add to .gitignore…" item applies to: the selected rows when the row is in the selection, else the row. */
+  const ignoreRefs = (row: Row): IgnoreRef[] => {
+    const picked = selected().has(row.key) ? rows().filter((r) => selected().has(r.key)) : [row];
+    const refs = new Map<string, IgnoreRef>();
+    for (const r of picked) {
+      if (r.kind === "file") refs.set(`${r.repoId}\0${r.file.path}`, { repoId: r.repoId, path: r.file.path, isDir: false });
+      else if (r.kind === "dir") refs.set(`${r.repoId}\0${r.path}/`, { repoId: r.repoId, path: r.path, isDir: true });
+    }
+    return [...refs.values()];
+  };
+
   const rowMenu = (row: Row, e: MouseEvent): void => {
     e.preventDefault();
     if (row.kind === "file" || row.kind === "dir") {
@@ -307,6 +319,7 @@ export function ChangesView(): JSX.Element {
       menu.push({ separator: true });
       menu.push({ label: list.length > 1 ? "Copy paths" : "Copy path", icon: "copy", onSelect: () => void copyText(pathsText(list, false)) });
       menu.push({ label: list.length > 1 ? "Copy absolute paths" : "Copy absolute path", icon: "path", onSelect: () => void copyText(pathsText(list, true)) });
+      menu.push(...ignoreMenuItems(ignoreRefs(row), actions.addToIgnore));
     } else if (row.kind === "section") {
       const all = allItems(row.repoId, row.section);
       if (row.section === "staged") menu.push({ label: "Unstage all", icon: "minus", onSelect: () => void unstageItems(all) });
