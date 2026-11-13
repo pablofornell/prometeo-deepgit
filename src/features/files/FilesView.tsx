@@ -7,7 +7,7 @@
  * A clean tab reloads when its file changes on disk. A tab with unsaved changes keeps its text.
  * The tree is on the right of the editor. A right-click on a tab opens the close and copy-path menu.
  * Shortcuts work on this tab only: Ctrl+S saves, Ctrl+P opens a file by name, Ctrl+Shift+F searches the project,
- * Ctrl+F finds text in the file, Ctrl+W and Ctrl+Shift+W close tabs, and Alt+F1 shows the file in the tree.
+ * Ctrl+F finds text in the file, Ctrl+W and Ctrl+Shift+W close tabs, and Ctrl+Shift+E shows the file in the tree.
  */
 import { type JSX, For, Show, createEffect, createMemo, createSignal, on, onCleanup, onMount, untrack } from "solid-js";
 import type { EditorState, Text } from "@codemirror/state";
@@ -394,7 +394,7 @@ export function FilesView(): JSX.Element {
         onSelect: () => root && void copyText(joinRepoPath(root, t.path)),
       },
       { separator: true },
-      { label: "Reveal in file tree", shortcut: shortcutLabel("files.reveal") || "Alt+F1", onSelect: () => revealInTree(t.repoId, t.path) },
+      { label: "Reveal in file tree", shortcut: shortcutLabel("files.reveal") || "Ctrl+Shift+E", onSelect: () => revealInTree(t.repoId, t.path) },
     ];
   };
 
@@ -707,7 +707,7 @@ export function FilesView(): JSX.Element {
       ),
       register(
         "files.reveal",
-        "Alt+F1",
+        "Ctrl+Shift+E",
         () => {
           const t = current ? tabOf(current) : undefined;
           if (!t) return false;
