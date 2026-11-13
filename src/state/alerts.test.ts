@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 import {
   ALERT_EXPIRY_CHOICES, MAX_ALERTS, type Alert, type AlertStorage, addAlert, alertBadge, alertExpiryFooter, alertExpiryLabel, alertLevel, alertText,
-  alertsKey, autoFetchAlertText, dismissAutoFetchAlerts, resolveAlertTarget, describeAlerts, dismissAlert, expireAlerts, formatAlertTime, loadAlerts, newAutoFetchFailures, saveAlerts,
+  alertsKey, autoFetchAlertText, dismissAutoFetchAlerts, projectsOfRepos, resolveAlertTarget, describeAlerts, dismissAlert, expireAlerts, formatAlertTime, loadAlerts, newAutoFetchFailures, saveAlerts,
 } from "./alertsCore";
 
 const HOUR = 3_600_000;
@@ -217,6 +217,23 @@ describe("auto-fetch alerts go away with the failure", () => {
     expect(dismissAutoFetchAlerts(list, ["a"]).map((a) => a.id)).toEqual(["2", "3", "4"]);
     expect(dismissAutoFetchAlerts(list, [])).toBe(list);
     expect(dismissAutoFetchAlerts(list, ["zzz"])).toBe(list);
+  });
+  it("removes an alert saved by an earlier session when the repo fetches well, with no failure seen in this session", () => {
+    const st = fakeStorage();
+    const yesterday = new Date(2026, 10, 12, 9, 12).getTime();
+    saveAlerts(st, "p1", [
+      mk("old", { source: "autoFetch", repoId: "r1", repoName: "api", text: "Auto-fetch failed: authentication required.", time: yesterday }),
+      mk("push", { severity: "error", text: "Push rejected.", repoId: "r1", time: yesterday }),
+    ]);
+    // a new session: nothing is known except what the storage has
+    const loaded = loadAlerts(st, "p1");
+    const projects = [{ id: "p1", repos: [{ id: "r1", name: "api" }] }, { id: "p2", repos: [{ id: "r9", name: "web" }] }];
+    expect(projectsOfRepos(projects, ["r1"])).toEqual(["p1"]);
+    expect(projectsOfRepos(projects, ["r1", "r9"])).toEqual(["p1", "p2"]);
+    expect(projectsOfRepos(projects, ["zzz"])).toEqual([]);
+    const kept = dismissAutoFetchAlerts(loaded, ["r1"]);
+    saveAlerts(st, "p1", kept);
+    expect(loadAlerts(st, "p1").map((a) => a.id)).toEqual(["push"]); // the failed push stays: only the auto-fetch alert goes
   });
   it("keeps the source and the repo id through the store", () => {
     const [a] = addAlert([], { projectId: "p1", severity: "warning", text: "t", repoName: "api", repoId: "r1", source: "autoFetch" }, 5, newId);

@@ -152,6 +152,11 @@ export function dismissAlert(list: readonly Alert[], id: string): Alert[] {
   return list.filter((a) => a.id !== id);
 }
 
+/** Ids of the projects that own at least one of the repos. */
+export function projectsOfRepos(projects: readonly AlertProject[], repoIds: readonly string[]): string[] {
+  return projects.filter((p) => p.repos.some((r) => repoIds.includes(r.id))).map((p) => p.id);
+}
+
 /** Removes the auto-fetch alerts of repos (the repos fetch well again). Returns the same array when none matched. */
 export function dismissAutoFetchAlerts(list: readonly Alert[], repoIds: readonly string[]): readonly Alert[] {
   if (repoIds.length === 0) return list;

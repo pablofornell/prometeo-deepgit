@@ -17,7 +17,7 @@
 import { createEffect, createRoot, createSignal, on } from "solid-js";
 import {
   type Alert, type AlertInput, type AlertStorage, type AlertTarget, addAlert, dismissAlert, dismissAutoFetchAlerts, expireAlerts, loadAlerts,
-  resolveAlertTarget, saveAlerts,
+  projectsOfRepos, resolveAlertTarget, saveAlerts,
 } from "./alertsCore";
 import { settings } from "./settings";
 import { activeProject, workspace } from "./workspace";
@@ -74,8 +74,13 @@ export function dismissAll(): void {
   if (projectId) store(projectId, []);
 }
 
-/** Removes the auto-fetch alerts of repos that fetch well again, in whichever project they are. */
+/**
+ * Removes the auto-fetch alerts of repos that fetched well, in whichever project they are. Called after every successful
+ * fetch and pull (`actions.ts`), so an alert from an earlier session goes away too, not only one seen in this session.
+ */
 export function dismissAutoFetchFor(repoIds: readonly string[]): void {
+  if (repoIds.length === 0) return;
+  for (const projectId of projectsOfRepos(workspace.projects, repoIds)) listOf(projectId); // read the saved alerts of those projects
   for (const [projectId, list] of Object.entries(lists())) {
     const kept = dismissAutoFetchAlerts(list, repoIds);
     if (kept !== list) store(projectId, kept);
