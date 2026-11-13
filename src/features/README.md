@@ -117,14 +117,14 @@ Names and their `props` / `result` types are in `DialogRegistry`: `newBranch`, `
 
 ```tsx
 export function RenameBranchDialog(props: RenameBranchProps & DialogComponentProps<RenameBranchResult>) {
-  return <Dialog title="Rename branch" onClose={() => props.close()} command={`git branch -m ...`}
+  return <Dialog title="Rename branch" onClose={() => props.close()}
            primary={{ label: "Rename", onClick: () => props.close({ newName, renameRemote }) }}>…</Dialog>;
 }
 // features/dialogs/index.ts
 registerDialog("renameBranch", RenameBranchDialog);
 ```
 
-Every operation dialog shows the git command (`command` prop, DESIGN.md 11.7). `confirmAction({ title, message, confirmLabel, danger, checkboxes, command })`
+Dialogs do not show a git command (the Git console lists what ran). `confirmAction({ title, message, confirmLabel, danger, checkboxes })`
 is the generic confirmation (primary button names the action; never "OK").
 
 ### Keyboard (`state/keymap.ts`)

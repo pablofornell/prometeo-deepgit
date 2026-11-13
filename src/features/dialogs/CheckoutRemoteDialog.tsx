@@ -5,7 +5,6 @@ import type { CheckoutRemoteProps, CheckoutRemoteResult } from "../../state/dial
 import { repoRefs } from "../../state/refs";
 import { splitRemoteRefLoose } from "../../state/remoteRefs";
 import { repoById } from "../../state/workspace";
-import { gitCmd } from "./command";
 import { Field, Note, ReadOnly } from "./parts";
 import { validateRefName } from "./refname";
 
@@ -26,7 +25,6 @@ export function CheckoutRemoteDialog(props: CheckoutRemoteProps & DialogComponen
     <Dialog
       title="Check out remote branch"
       onClose={() => props.close()}
-      command={gitCmd(repoName(), ["checkout", "-b", trimmed() || "<name>", "--track", props.remoteBranch])}
       primary={{ label: "Check out", disabled: trimmed() === "" || error() !== null, onClick: () => props.close({ localName: trimmed() }) }}
     >
       <Field label="Remote branch">

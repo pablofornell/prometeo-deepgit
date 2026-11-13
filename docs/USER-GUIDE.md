@@ -478,14 +478,11 @@ DeepGit skips a repository when the operation does not apply to it. A skip is no
 
 Double-click a cell to check out the branch in that repository only.
 
-### Dialogs and command preview
+### Dialogs
 
 ![New branch dialog](screenshots/dialog.png)
 
 Every operation that needs a choice opens a dialog.
-Each dialog shows the exact `git` commands at the bottom.
-The preview changes when you change an option.
-Click the copy icon to copy the commands.
 Press `Enter` to run the main action. Press `Esc` to cancel.
 
 | Dialog | Options |
@@ -494,7 +491,7 @@ Press `Enter` to run the main action. Press `Esc` to cancel.
 | **Check out remote branch** | Name of the new local branch. It tracks the remote branch. |
 | **Rename branch** | New name. **Also rename `<remote>/<branch>`** shows the full name of the remote branch that is renamed (see the delete rule below). |
 | **Merge** | Fast-forward when possible, always create a merge commit, or squash. |
-| **Rebase** | Target branch. The command preview shows `--autostash`. A warning appears when the branch has an upstream, because rebase rewrites commits. |
+| **Rebase** | Target branch. A warning appears when the branch has an upstream, because rebase rewrites commits. |
 | **Reset** | Soft, Mixed, Hard or Keep. A red warning shows for Hard. |
 | **Push** | Remote, the commits to push, **Set upstream**, **Push tags**, **Force with lease**. |
 | **Stash** | Message, **Include untracked files**, **Keep index**. |
@@ -669,7 +666,7 @@ The current change is the one under the cursor in the Result, or the one you wen
 A stash saves your local changes and cleans the working tree.
 
 - To stash, press `Ctrl+Alt+Z`, click **Stash changes** in the **Local changes** tab, or use **Stash changes…** in a repository menu.
-- The dialog has **Include untracked files** and **Keep index**. It shows the command.
+- The dialog has **Include untracked files** and **Keep index**.
 - In multi-repo projects, the palette action **Stash changes in all repositories…** stashes all repositories.
 - Stashes appear in the sidebar under **Stashes** in each repository. The **Local changes** tab shows the number of stashes.
 

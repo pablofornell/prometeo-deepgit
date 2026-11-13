@@ -4,7 +4,6 @@ import { Checkbox, Dialog, type DialogComponentProps, TextField, joinNames, shor
 import type { NewBranchProps, NewBranchResult } from "../../state/dialogs";
 import { repoRefs } from "../../state/refs";
 import { summary } from "../../state/workspace";
-import { gitCmd, perRepo } from "./command";
 import { Field, ReadOnly, RepoChecklist, repoNames } from "./parts";
 import { validateRefName } from "./refname";
 
@@ -30,17 +29,12 @@ export function NewBranchDialog(props: NewBranchProps & DialogComponentProps<New
   });
   const canSubmit = () => trimmed() !== "" && error() === null && picked().length > 0;
 
-  const command = () => {
-    const n = trimmed() || "<name>";
-    return perRepo(repoNames(picked()), (repo) => gitCmd(repo, checkout() ? ["checkout", "-b", n, props.startPoint] : ["branch", n, props.startPoint]));
-  };
   const submit = () => props.close({ name: trimmed(), checkout: checkout(), repoIds: picked() });
 
   return (
     <Dialog
       title="New branch"
       onClose={() => props.close()}
-      command={picked().length > 0 ? command() : undefined}
       primary={{ label: "Create branch", disabled: !canSubmit(), onClick: submit }}
     >
       <Field label="Name" error={error()}>

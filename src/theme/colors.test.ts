@@ -209,7 +209,7 @@ describe.each(["dark", "light"] as Theme[])("%s theme", (theme) => {
       ["--dg-ref-tag-fg", "--dg-ref-tag-bg"], ["--dg-ref-stash-fg", "--dg-ref-stash-bg"], ["--dg-ref-overflow-fg", "--dg-ref-overflow-bg"],
       ["--dg-ahead-fg", "--dg-ahead-bg"], ["--dg-behind-fg", "--dg-behind-bg"], ["--dg-banner-operation-fg", "--dg-banner-operation-bg"],
       ["--dg-log-match-fg", "--dg-log-match-bg"], ["--dg-diverged-fg", "--dg-diverged-bg"], ["--dg-ahead-fg", "--dg-diverged-bg"], ["--dg-behind-fg", "--dg-diverged-bg"],
-      ["--dg-tab-active-fg", "--dg-tab-active-bg"], ["--dg-console-prompt", "--dg-command-bg"],
+      ["--dg-tab-active-fg", "--dg-tab-active-bg"],
     ];
     for (const [fg, bg] of pairs) {
       for (const s of [...rows, "--dg-window-bg"]) check(`${fg} on ${bg} over ${s}`, solid(fg), on(s, bg), AA);

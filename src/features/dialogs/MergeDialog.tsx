@@ -4,11 +4,10 @@
  * The rules that switch controls off live in `api/mergeRules.ts` (the backend and the mock apply the same ones).
  */
 import { type JSX, Show, createSignal } from "solid-js";
-import { effectiveMessage, mergeArgs, mergeMessageApplies, noCommitApplies } from "../../api/mergeRules";
+import { effectiveMessage, mergeMessageApplies, noCommitApplies } from "../../api/mergeRules";
 import type { MergeMode, MergeOpts } from "../../api/types";
 import { Checkbox, Dialog, type DialogComponentProps, joinNames } from "../../components/ui";
 import type { MergeProps, MergeResult } from "../../state/dialogs";
-import { gitCmd, perRepo } from "./command";
 import { Field, Note, RadioGroup, ReadOnly, TextArea, repoNames } from "./parts";
 
 export function MergeDialog(props: MergeProps & DialogComponentProps<MergeResult>): JSX.Element {
@@ -30,9 +29,6 @@ export function MergeDialog(props: MergeProps & DialogComponentProps<MergeResult
     allowUnrelatedHistories: unrelated(),
   });
 
-  // mirrors what the backend runs: `merge --no-edit [--no-ff|--ff-only] [--no-commit] [-m msg] <source>` or `merge --squash <source>`
-  const command = () => perRepo(names(), (repo) => gitCmd(repo, ["merge", ...mergeArgs(opts(), props.source)]));
-
   const messageHint = (): string | undefined => {
     if (messageOn()) return "Used when a merge commit is created. Leave it empty to keep git's default message.";
     if (!noCommitApplies(mode())) return "A merge commit is not made in this mode.";
@@ -43,7 +39,6 @@ export function MergeDialog(props: MergeProps & DialogComponentProps<MergeResult
     <Dialog
       title={`Merge ${props.source}`}
       onClose={() => props.close()}
-      command={command()}
       primary={{ label: "Merge", onClick: () => props.close(opts()) }}
     >
       <div class="dg-dialogs-pair">

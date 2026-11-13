@@ -31,7 +31,6 @@ import "./changes.css";
 const rowH = (): number => cssPx("--dg-file-row-height", 24);
 
 const OP_LABEL: Partial<Record<RepoStateKind, string>> = { merging: "Merge", rebasing: "Rebase", cherryPicking: "Cherry-pick", reverting: "Revert" };
-const OP_ARG: Partial<Record<RepoStateKind, string>> = { merging: "merge", rebasing: "rebase", cherryPicking: "cherry-pick", reverting: "revert" };
 
 const totalFiles = (wt: WorkingTree | undefined): number => (wt ? wt.staged.length + wt.unstaged.length + wt.conflicted.length : 0);
 
@@ -401,7 +400,6 @@ export function ChangesView(): JSX.Element {
       message: `Abort the ${label} in ${name}? Changes made by the ${label} are lost.`,
       confirmLabel: `Abort ${label}`,
       danger: true,
-      command: `git -C ${name} ${OP_ARG[state] ?? "operation"} --abort`,
     });
     if (r) await actions.opAbort(id, { confirmed: true });
   };

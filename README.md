@@ -40,10 +40,10 @@ The backend is written in Rust and runs the `git` command-line program. The inte
 - One commit message can go to several repositories at once.
 - The commit message draft is kept for each project.
 
-### Branch operations and dialogs with command preview
+### Branch operations and dialogs
 
 - Checkout, new branch, rename, delete, merge, rebase, cherry-pick, revert, reset, tag, stash, fetch, pull and push.
-- Every dialog shows the exact `git` command before it runs. The command updates when you change an option.
+- The Git console lists every `git` command that DeepGit ran.
 - The menus name the branches they act on, for example "Merge feature/x into main".
 
 ### Branch matrix and synchronous branch control

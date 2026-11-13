@@ -75,7 +75,6 @@ export function AuthDialog(props: AuthProps & DialogComponentProps<AuthDialogRes
     <Dialog
       title={dialogTitle(p())}
       onClose={() => props.close()}
-      command={p().command}
       cancelLabel={p().kind === "hostkey" ? "Reject" : "Cancel"}
       primary={{ label: p().kind === "hostkey" ? "Accept" : "OK", disabled: !canSubmit(), onClick: submit }}
       footerLeft={

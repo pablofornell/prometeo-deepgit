@@ -6,7 +6,6 @@ import type { PushProps, PushResult } from "../../state/dialogs";
 import { planPush, remoteOfUpstream, type PushPlan } from "../../state/pushPlan";
 import { repoRefs } from "../../state/refs";
 import { repoById, summary } from "../../state/workspace";
-import { gitCmd, perRepo } from "./command";
 import { Field, Note, RepoRows } from "./parts";
 
 const remoteOf = (id: string): string | null => remoteOfUpstream(summary(id)?.upstream, repoRefs(id)());
@@ -82,15 +81,6 @@ export function PushDialog(props: PushProps & DialogComponentProps<PushResult>):
     return force() ? `Force push${count}` : `Push${count}`;
   };
 
-  // every repo shows its own branch: repos of one push can be on different branches
-  const command = () =>
-    perRepo(props.repoIds.filter((id) => !!repoById(id)), (id) =>
-      gitCmd(repoById(id)?.name ?? id, [
-        "push", force() && "--force-with-lease", (setUpstream() || noUpstream(id)) && "-u", tags() && "--tags",
-        !useDefaults() && remote(), !useDefaults() && branchOf(id),
-      ]),
-    );
-
   const submit = () =>
     props.close({
       remote: useDefaults() ? null : remote(),
@@ -104,7 +94,6 @@ export function PushDialog(props: PushProps & DialogComponentProps<PushResult>):
     <Dialog
       title="Push"
       onClose={() => props.close()}
-      command={command()}
       width="wide"
       primary={{ label: label(), danger: force(), disabled: nothing(), onClick: submit }}
     >

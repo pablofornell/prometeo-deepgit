@@ -3,9 +3,7 @@ import { type JSX, Show, createSignal } from "solid-js";
 import { Checkbox, Dialog, type DialogComponentProps, TextField } from "../../components/ui";
 import type { RenameBranchProps, RenameBranchResult } from "../../state/dialogs";
 import { repoRefs } from "../../state/refs";
-import { splitRemoteRef } from "../../state/remoteRefs";
 import { repoById } from "../../state/workspace";
-import { gitCmd } from "./command";
 import { Field, Note, ReadOnly } from "./parts";
 import { validateRefName } from "./refname";
 
@@ -25,20 +23,11 @@ export function RenameBranchDialog(props: RenameBranchProps & DialogComponentPro
   const canSubmit = () => trimmed() !== "" && trimmed() !== props.oldName && error() === null;
   const alsoRemote = () => !!props.hasRemote && renameRemote();
   const remoteFull = () => props.remoteName ?? `origin/${props.oldName}`;
-  const remoteOf = () => splitRemoteRef(remoteFull(), repoRefs(props.repoId)())?.remote ?? "origin";
-
-  const command = (): string[] => {
-    const n = trimmed() || "<name>";
-    const lines = [gitCmd(repoName(), ["branch", "-m", props.oldName, n])];
-    if (alsoRemote()) lines.push(gitCmd(repoName(), ["push", "-u", remoteOf(), n]), gitCmd(repoName(), ["push", remoteOf(), "--delete", props.oldName]));
-    return lines;
-  };
 
   return (
     <Dialog
       title="Rename branch"
       onClose={() => props.close()}
-      command={command()}
       primary={{ label: "Rename", disabled: !canSubmit(), onClick: () => props.close({ newName: trimmed(), renameRemote: alsoRemote() }) }}
     >
       <Field label="Current name">

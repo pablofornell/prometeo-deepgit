@@ -323,10 +323,6 @@ export async function deleteBranch(repoIds: RepoIds, name: string, opts: DeleteB
         ...(remoteNames.length > 0 ? [{ id: "remote", label: `Also delete ${remoteLabel}`, checked: remote }] : []),
         { id: "force", label: "Force delete (not merged)", checked: force },
       ],
-      command: ids.flatMap((id) => {
-        const full = remote ? remoteBranchOf(id, name) : undefined;
-        return [`git -C ${nameOf(id)} branch ${force ? "-D" : "-d"} ${name}`, ...(full ? [`git -C ${nameOf(id)} push ${splitRemoteRef(full, cachedRefs(id))?.remote ?? "origin"} --delete ${name}`] : [])];
-      }),
     });
     if (!r) return emptyResult(true);
     remote = r.checked.remote ?? false;
@@ -354,7 +350,6 @@ export async function deleteRemoteBranch(repoId: string, remote: string, name: s
     message: `Delete ${remote}/${name} on the remote server? Other people lose the branch too.`,
     confirmLabel: "Delete remote branch",
     danger: true,
-    command: `git -C ${nameOf(repoId)} push ${remote} --delete ${name}`,
   });
   if (!r) return emptyResult(true);
   return runBatch({
@@ -508,7 +503,6 @@ export async function opAbort(repoIds: RepoIds, opts: { confirmed?: boolean } = 
         message: `Abort ${what} in ${where}? The conflict resolutions you made are lost.`,
         confirmLabel: `Abort ${what}`,
         danger: true,
-        command: active.map((id) => `git -C ${nameOf(id)} ${summary(id)?.state === "cherryPicking" ? "cherry-pick" : opName(id)} --abort`),
       });
       if (!r) return emptyResult(true);
     }
@@ -668,7 +662,6 @@ export async function stashDrop(repoId: string, index: number, oid?: string): Pr
     message: `Drop stash@{${index}} in ${nameOf(repoId)}? Its changes cannot be restored.`,
     confirmLabel: "Drop stash",
     danger: true,
-    command: `git -C ${nameOf(repoId)} stash drop stash@{${index}}`,
   });
   if (!r) return emptyResult(true);
   return runBatch({ verb: "drop stash", past: "Dropped stash", what: `stash@{${index}}`, repoIds: [repoId], run: () => api.stashDrop(repoId, index, oid) });
@@ -690,7 +683,6 @@ export async function tagDelete(repoIds: RepoIds, name: string): Promise<BatchRe
     message: `Delete tag ${name}${ids.length > 1 ? ` in ${plural(ids.length, "repo")}` : ""}?`,
     confirmLabel: "Delete tag",
     danger: true,
-    command: ids.map((id) => `git -C ${nameOf(id)} tag -d ${name}`),
   });
   if (!r) return emptyResult(true);
   return runBatch({ verb: "delete tag", past: "Deleted tag", what: name, repoIds: ids, run: (id) => api.tagDelete(id, name) });
@@ -735,7 +727,6 @@ export async function discard(repoId: string, paths: string[], opts: DiscardOpti
       message: [`Discard changes in ${plural(paths.length, "file")} of ${nameOf(repoId)}? ${shown}`, ...(opts.untracked ? [`${plural(opts.untracked, "untracked file")} will be deleted.`] : []), "This cannot be undone."],
       confirmLabel: `Discard ${plural(paths.length, "file")}`,
       danger: true,
-      command: `git -C ${nameOf(repoId)} restore --worktree -- ${paths.slice(0, 3).join(" ")}${paths.length > 3 ? " …" : ""}`,
     });
     if (!r) return emptyResult(true);
   }

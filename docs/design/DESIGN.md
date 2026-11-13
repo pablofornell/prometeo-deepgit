@@ -35,7 +35,7 @@ Four principles control every decision:
 
 1. **Multi-repo is the default view, not a special mode.** A project with one repository is a project with a list of one. Every list, filter, toast and dialog must handle N repositories.
 2. **Colour carries state, not identity.** A repository or a project has no colour of its own: a neutral icon and its name identify it. Colour means the same thing in every view: added, modified, deleted, ahead, behind, error, success, the kind of a ref, the selected row.
-3. **Show the git command.** Every operation writes its exact git command to the Git console. The status bar shows the last command. Users trust what they can see.
+3. **Show the git command.** Every operation writes its exact git command to the Git console (dialogs do not repeat it). The status bar shows the last command. Users trust what they can see.
 4. **Dense and calm.** Rows are 24 px. Text is 13 px. Chrome is quiet grey. Only state uses colour: refs, status letters, diff, ahead/behind, conflicts.
 
 Where DeepGit spends its boldness: the **branch matrix**. The rest of the UI stays close to JetBrains so that IntelliJ users feel at home on the first day.
@@ -420,9 +420,9 @@ The washes are transparent, so they work on every surface. Where an opaque colou
 8. **Banners.** An operation in progress (merge, rebase, cherry-pick, revert) is the special strong wash with a special border and a 3 px special bar at the left. Errors are the danger wash, warnings the warning wash, done states the success wash, information the info wash, each with its border and a 3 px bar.
 9. **Toasts.** The toast surface with its family mixed in (`--dg-toast-<kind>-bg`), a 1 px family border, a 3 px family bar at the left and the icon in the family fg: success, info, warning, error.
 10. **Console.** The command and `$` are info fg. Exit 0 is success fg. The line of a failed command has a danger wash and a 2 px danger bar; its stderr is danger fg. stderr of a command that worked stays warning fg (git writes progress there).
-11. **Buttons.** Primary: accent fill. Danger: danger fill. Tonal (`variant="tonal"` / `"tonal-danger"`): the wash, the fg and the border of accent or danger. The git command preview in dialogs is an info wash with an info bar.
+11. **Buttons.** Primary: accent fill. Danger: danger fill. Tonal (`variant="tonal"` / `"tonal-danger"`): the wash, the fg and the border of accent or danger.
 12. **Glow.** The title bar is a gradient from `--dg-toolbar-tint` (accent mixed into the window colour) through `--dg-toolbar-tint-2` (violet) to the plain bar at 72 %. The status bar has a weaker accent glow at the left. Dialogs and Search Everywhere have a soft accent wash at the top (`--dg-dialog-glow`). The Welcome screen has an accent glow behind the logo and a violet one in a corner; its cards each get a family (accent, success, special, info) for the top edge and the icon tile.
-13. **Text on a wash.** Muted and secondary text is too weak on a coloured wash. Inside a selected row, a banner, a toast, the command preview and an active tab, `colors.css` section 4 sets them to `--dg-text-muted-on-wash`.
+13. **Text on a wash.** Muted and secondary text is too weak on a coloured wash. Inside a selected row, a banner, a toast and an active tab, `colors.css` section 4 sets them to `--dg-text-muted-on-wash`.
 14. **Motion.** The colour system adds no transition of its own. Existing transitions keep their `prefers-reduced-motion` rules.
 
 **Contrast guarantee** (`src/theme/colors.test.ts`). The test reads the real `tokens.css`, `extra.css` and `colors.css`, resolves `var()` and `color-mix` like the browser, and checks both themes: every `*-fg` on every surface (window, island, panel, raised, popup, dialog, console, editor), plain and under each wash of its family, on a hovered row and on both selected-row backgrounds, and as a pill on a selected row (4.5:1); body and on-wash text on every wash (4.5:1); family solids, lanes, `--dg-icon` and `--dg-icon-secondary` (also on hovered and selected rows), the focus ring and the selection edge (3:1); white on every fill, the primary and danger buttons, Push, HEAD and the project badge (4.5:1); ref pills, ahead/behind, file status, diff and merge lines and words, toasts, banners, console lines, the title bar and status bar glow. It also fails when a stylesheet or a component uses a token that is not defined, and when feature CSS has a hex colour.
@@ -748,8 +748,6 @@ Each menu item names the exact branches. Do not write "Merge selected". Write "M
 #### Dialogs
 
 All dialogs: width 480 (wide 640), radius 10, padding 16 20, background `--dg-dialog-bg`, scrim `--dg-scrim`. Title 13/600. Buttons at the bottom right: secondary first, primary last. `Enter` runs the primary action. `Esc` closes.
-
-Every dialog shows a **command preview** at the bottom: a mono 11.5 line on `--dg-layer-1-bg`, radius 4, padding 6 8: `$ git -C api-gateway reset --mixed 3c0e9b5`. The preview updates when options change.
 
 | Dialog | Fields | Primary button |
 |---|---|---|
@@ -1086,7 +1084,7 @@ Removed. Repositories have no colour, so there is no spine. The **Repository** c
    - "Checkout in 5 repos" (primary; includes origin-only repos, which get a tracking branch).
    - "Create in 7 missing repos from…" (opens a base picker: default branch of each repo, or a named branch).
    - "Pull in 3 repos", "Push in 2 repos", "Merge into…", "Delete in 5 repos…".
-7. Before a batch runs, show a confirm dialog with one row per repo and the exact git command for each row. Repos with uncommitted changes show a select: "Stash and continue" / "Skip".
+7. Before a batch runs, show a confirm dialog with one row per repo. Repos with uncommitted changes show a select: "Stash and continue" / "Skip".
 8. While the batch runs, a 2 px `--dg-matrix-sweep` line moves down the selected column, one row at a time (220 ms per row, or the real duration if longer). Each cell turns into its new state when its command ends. Failed cells show a red ring and a tooltip with the git error.
 9. After the batch, show one toast (5.16) with the summary and the action "Show in console".
 10. Repos where the operation does not apply are skipped, never failed. The toast counts them as "skipped".
@@ -1139,12 +1137,6 @@ Removed. Repositories have no colour, so there is no spine. The **Repository** c
 ### 11.6 Combined graph
 
 Lanes are coloured by lane (4.1 rule 2) in the combined log too. There is no "by repository" lane mode: the Repository column names the repository of each commit.
-
-### 11.7 Command preview in every dialog
-
-**What it is.** Each operation dialog shows the git command it will run, and updates it live as options change. Users learn git and trust the tool.
-
-**How to build it.** See 5.11 "Dialogs". The preview line is selectable text. A copy button (16 px) sits at its right.
 
 ---
 
