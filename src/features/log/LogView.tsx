@@ -243,9 +243,6 @@ export function LogView(): JSX.Element {
 
   const [multi, setMulti] = createSignal<Map<string, Picked>>(new Map());
   let anchorCi: number | null = null;
-  let navigating = false;
-  const history: { repoId: string; oid: string }[] = [];
-  let histPos = -1;
 
   const isSelected = (key: string) => multi().has(key);
   const selCi = createMemo(() => {
@@ -257,16 +254,6 @@ export function LogView(): JSX.Element {
     return ci === null ? null : map().displayOf(ci);
   });
 
-  function pushHistory(repoId: string, oid: string): void {
-    if (navigating) return;
-    const last = history[histPos];
-    if (last && last.repoId === repoId && last.oid === oid) return;
-    history.length = histPos + 1;
-    history.push({ repoId, oid });
-    if (history.length > 100) history.shift();
-    histPos = history.length - 1;
-  }
-
   /** Applies a click or a keyboard move to the selection. Several commits can be selected inside one repo. */
   async function select(row: CommitRow, ci: number, mode: "single" | "toggle" | "range"): Promise<void> {
     const p: Picked = { repoId: row.repoId, oid: row.oid, ci };
@@ -277,7 +264,6 @@ export function LogView(): JSX.Element {
       setMulti(new Map([[key, p]]));
       anchorCi = ci;
       setSelectedCommit({ repoId: row.repoId, oid: row.oid });
-      pushHistory(row.repoId, row.oid);
       return;
     }
     if (mode === "toggle") {
@@ -351,20 +337,6 @@ export function LogView(): JSX.Element {
     if (!parent) return;
     const pi = await ctl.find(parent, row?.repoId);
     if (pi !== null) await selectIndex(pi, "auto");
-  }
-
-  async function goHistory(delta: -1 | 1): Promise<void> {
-    const pos = histPos + delta;
-    const e = history[pos];
-    if (!e) return;
-    histPos = pos;
-    navigating = true;
-    try {
-      const ci = await ctl.find(e.oid, e.repoId);
-      if (ci !== null) await selectIndex(ci, isVisible(map().displayOf(ci)) ? "auto" : "center");
-    } finally {
-      navigating = false;
-    }
   }
 
   async function copyHash(): Promise<void> {
@@ -444,8 +416,6 @@ export function LogView(): JSX.Element {
         el.focus();
         return true;
       }, { title: "Return focus to the log", group: "Tool windows", when: () => onLogTab() && !inList() && inDetailsOrDiff() }),
-      register("log.back", "Alt+Left", () => void goHistory(-1), { title: "Back in the selection history", group: "Log", when: () => onLogTab() && inList() }),
-      register("log.forward", "Alt+Right", () => void goHistory(1), { title: "Forward in the selection history", group: "Log", when: () => onLogTab() && inList() }),
     ];
     onCleanup(() => offs.forEach((off) => off()));
   });

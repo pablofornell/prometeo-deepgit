@@ -7,6 +7,7 @@ import * as actions from "./actions";
 import { notifyRepoChanged } from "./events";
 import { openBottomTool, toggleBottomTool, toggleSidebar } from "./layout";
 import { register } from "./keymap";
+import { inTextField, navBack, navForward } from "./navigation";
 import { detailsTab, mainTab, setDetailsTab, setMainTab } from "./selection";
 import { toggleTheme } from "./settings";
 import { activeProject, focusedRepo, projectRepos, refreshSummaries } from "./workspace";
@@ -64,5 +65,10 @@ export function registerGlobalShortcuts(): void {
     for (const r of projectRepos()) notifyRepoChanged(r.id);
     void refreshSummaries();
   }, g("Refresh"));
+  // Back / forward through the views, commits and files visited (the mouse side buttons do the same). In a text field or
+  // an editor Alt+Left / Alt+Right move the cursor, so the keys stay with it; so they do when there is nowhere to go.
+  const nav = (go: () => boolean) => (e?: KeyboardEvent) => (inTextField(e?.target) ? false : go());
+  register("nav.back", "Alt+Left", nav(navBack), { title: "Go back", group: "Global", when: hasProject });
+  register("nav.forward", "Alt+Right", nav(navForward), { title: "Go forward", group: "Global", when: hasProject });
   register("view.toggleTheme", [], toggleTheme, { title: "Toggle dark / light theme", group: "View" });
 }
