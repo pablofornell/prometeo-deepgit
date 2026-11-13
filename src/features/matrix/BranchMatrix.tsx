@@ -4,15 +4,17 @@
  */
 import { For, type JSX, Show, createEffect, createMemo, createSignal, on } from "solid-js";
 import {
-  AheadBehind, Button, Checkbox, EmptyState, Icon, IconButton, RepoIcon, SearchField, openMenu, plural,
+  AheadBehind, Button, Checkbox, EmptyState, Icon, IconButton, RepoIcon, SearchField, openDialog, openMenu, plural,
   type MenuItem,
 } from "../../components/ui";
 import * as actions from "../../state/actions";
-import { branchTable, matrixBranch, setMatrixBranch, type BranchCell, type BranchColumn } from "../../state/branchTable";
+import { MISSING_CELL, branchTable, matrixBranch, setMatrixBranch, type BranchCell, type BranchColumn } from "../../state/branchTable";
 import { confirmAction } from "../../state/dialogs";
 import { notifyRepoChanged } from "../../state/events";
 import { cachedRefs, refreshRefs } from "../../state/refs";
 import { focusedRepoIdSignal, projectRepos, refreshSummaries, setFocusedRepoId, summary } from "../../state/workspace";
+import { UpstreamPushDialog } from "./UpstreamPushDialog";
+import { columnLacksUpstream, lacksUpstream } from "./upstreamPush";
 import "./matrix.css";
 
 /** Columns drawn at most; the filter narrows the rest. */
@@ -24,6 +26,7 @@ const stateWord: Record<BranchCell["state"], string> = { current: "checked out",
 export function BranchMatrix(): JSX.Element {
   const [filter, setFilter] = createSignal("");
   const [onlyShared, setOnlyShared] = createSignal(true);
+  const [onlyNoUpstream, setOnlyNoUpstream] = createSignal(false);
   const [running, setRunning] = createSignal<string | null>(null);
   const [failed, setFailed] = createSignal<Record<string, string>>({});
   let scroller: HTMLDivElement | undefined;
@@ -36,7 +39,9 @@ export function BranchMatrix(): JSX.Element {
   const columns = createMemo<BranchColumn[]>(() => {
     const q = filter().trim().toLowerCase();
     const sel = matrixBranch();
-    return branchTable().filter((c) => c.name === sel || ((!shared() || c.present >= 2) && (!q || c.name.toLowerCase().includes(q))));
+    return branchTable().filter(
+      (c) => c.name === sel || ((!shared() || c.present >= 2) && (!onlyNoUpstream() || columnLacksUpstream(c)) && (!q || c.name.toLowerCase().includes(q))),
+    );
   });
   const shown = createMemo(() => columns().slice(0, MAX_COLUMNS));
   const selected = createMemo(() => branchTable().find((c) => c.name === matrixBranch()));
@@ -74,7 +79,7 @@ export function BranchMatrix(): JSX.Element {
   };
 
   const idsWhere = (col: BranchColumn, pred: (cell: BranchCell) => boolean): string[] =>
-    repos().filter((r) => !busy(r.id) && pred(col.cells[r.id] ?? { state: "missing", ahead: 0, behind: 0, gone: false })).map((r) => r.id);
+    repos().filter((r) => !busy(r.id) && pred(col.cells[r.id] ?? MISSING_CELL)).map((r) => r.id);
 
   const name = (id: string) => repos().find((r) => r.id === id)?.name ?? id;
 
@@ -130,6 +135,22 @@ export function BranchMatrix(): JSX.Element {
     openMenu(anchor, items);
   };
 
+  /** Opens the dialog; it runs the pushes and reports to the matrix (sweep line on the column, red rings on failures). */
+  const pushSetUpstream = async (col: BranchColumn, ids: string[]) => {
+    await openDialog(UpstreamPushDialog, {
+      branch: col.name,
+      repoIds: ids,
+      onStart: () => {
+        setRunning(col.name);
+        setFailed({});
+      },
+      onRepoDone: (repoId: string, error: string | null) => {
+        if (error) setFailed((f) => ({ ...f, [repoId]: error }));
+      },
+      onEnd: () => setRunning(null),
+    });
+  };
+
   const refresh = async () => {
     await Promise.all(repos().map((r) => refreshRefs(r.id)));
     for (const r of repos()) notifyRepoChanged(r.id);
@@ -169,7 +190,7 @@ export function BranchMatrix(): JSX.Element {
     if (cell.behind > 0) extra.push(`${plural(cell.behind, "commit")} to pull`);
     if (busy(repoId) && cell.state !== "missing") extra.push(`${summary(repoId)?.state} in progress, batch operations skip this repository`);
     const err = failed()[repoId];
-    return [base + (extra.length ? ". " + extra.join(", ") : ""), err ? `Failed: ${err}` : ""].filter(Boolean).join("\n");
+    return [base + (extra.length ? ". " + extra.join(", ") : ""), lacksUpstream(cell) ? "No upstream. Push it to set one." : "", err ? `Failed: ${err}` : ""].filter(Boolean).join("\n");
   };
 
   const ActionBar = (props: { col: BranchColumn }): JSX.Element => {
@@ -178,6 +199,7 @@ export function BranchMatrix(): JSX.Element {
     const createIds = () => idsWhere(col(), (c) => c.state === "missing");
     const pullIds = () => idsWhere(col(), (c) => c.state === "current");
     const pushIds = () => idsWhere(col(), (c) => (c.state === "current" || c.state === "local") && c.ahead > 0);
+    const upstreamIds = () => idsWhere(col(), lacksUpstream);
     const mergeIds = () => idsWhere(col(), (c) => c.state === "local");
     const deleteIds = () => idsWhere(col(), (c) => c.state === "local");
     const skipped = () => repos().filter((r) => busy(r.id) && col().cells[r.id]?.state !== "missing").length;
@@ -210,6 +232,11 @@ export function BranchMatrix(): JSX.Element {
         <Button icon="push" disabled={working() || pushIds().length === 0} title={pushIds().length === 0 ? "No commits to push" : undefined} onClick={() => void run(col().name, async () => [await actions.push(pushIds(), { branch: col().name })])}>
           Push in {plural(pushIds().length, "repo")}
         </Button>
+        <Show when={upstreamIds().length > 0}>
+          <Button icon="push" disabled={working()} onClick={() => void pushSetUpstream(col(), upstreamIds())}>
+            Push and set upstream in {plural(upstreamIds().length, "repo")}
+          </Button>
+        </Show>
         <Button icon="merge" disabled={working() || mergeIds().length === 0} title={mergeIds().length === 0 ? "Needs a local branch that is not checked out" : `Merge ${col().name} into the checked-out branch of each repository`} onClick={() => void run(col().name, async () => [await actions.merge(mergeIds(), col().name)])}>
           Merge into current
         </Button>
@@ -229,6 +256,7 @@ export function BranchMatrix(): JSX.Element {
         <Show when={multi()}>
           <Checkbox checked={onlyShared()} onChange={setOnlyShared} label="Only branches in 2+ repos" />
         </Show>
+        <Checkbox checked={onlyNoUpstream()} onChange={setOnlyNoUpstream} label="Only branches without upstream" />
         <span class="dg-matrix-count">
           {plural(columns().length, "branch", "branches")} · {plural(repos().length, "repo")}
           <Show when={columns().length > MAX_COLUMNS}> · showing {MAX_COLUMNS}</Show>
@@ -248,10 +276,14 @@ export function BranchMatrix(): JSX.Element {
         fallback={
           <EmptyState
             icon="matrix"
-            title={filter() || !shared() ? "No matching branches" : "No branch is shared yet"}
+            title={filter() || !shared() || onlyNoUpstream() ? "No matching branches" : "No branch is shared yet"}
             actions={shared() ? <Button size="small" onClick={() => setOnlyShared(false)}>Show every branch</Button> : undefined}
           >
-            {filter() ? "No branch name contains the filter text." : "Branches that exist in two or more repositories appear here."}
+            {filter()
+              ? "No branch name contains the filter text."
+              : onlyNoUpstream()
+                ? "No local branch without an upstream."
+                : "Branches that exist in two or more repositories appear here."}
           </EmptyState>
         }
       >
@@ -294,7 +326,7 @@ export function BranchMatrix(): JSX.Element {
                     </button>
                     <For each={shown()}>
                       {(c) => {
-                        const cell = () => c.cells[r.id] ?? { state: "missing" as const, ahead: 0, behind: 0, gone: false };
+                        const cell = () => c.cells[r.id] ?? MISSING_CELL;
                         return (
                           <button
                             type="button"

@@ -161,3 +161,62 @@ fn branches_containing_lists_local_and_remote() {
     names.sort();
     assert_eq!(names, vec!["feature", "main", "origin/main"]);
 }
+
+#[test]
+fn unpushed_count_ignores_commits_any_remote_has() {
+    let remote = tempfile::tempdir().unwrap();
+    sh(remote.path(), &["init", "-q", "--bare", "-b", "main"], None);
+    let r = TestRepo::named("local");
+    r.commit_file("a", "1", "one");
+    r.sh(&["remote", "add", "origin", remote.path().to_str().unwrap()]);
+    r.sh(&["push", "-q", "-u", "origin", "main"]);
+
+    // `feat` forks from main, then origin/main moves past the fork point
+    r.sh(&["checkout", "-q", "-b", "feat"]);
+    r.commit_file("f1", "1", "feat 1");
+    r.commit_file("f2", "2", "feat 2");
+    r.sh(&["checkout", "-q", "main"]);
+    r.commit_file("m", "m", "main moves on");
+    r.sh(&["push", "-q", "origin", "main"]);
+    assert_eq!(r.sh(&["rev-parse", "origin/main"]), r.head());
+
+    let g = git();
+    // only the two commits of `feat` are on no remote (not its whole history)
+    assert_eq!(refs::unpushed_count(&g, &r.info, "feat").unwrap(), 2);
+    // everything of main is on origin
+    assert_eq!(refs::unpushed_count(&g, &r.info, "main").unwrap(), 0);
+
+    // another remote that has a commit of `feat` takes it out of the count
+    let other = tempfile::tempdir().unwrap();
+    sh(other.path(), &["init", "-q", "--bare", "-b", "main"], None);
+    r.sh(&["remote", "add", "other", other.path().to_str().unwrap()]);
+    r.sh(&["push", "-q", "other", "feat~1:refs/heads/feat"]);
+    assert_eq!(refs::unpushed_count(&g, &r.info, "feat").unwrap(), 1);
+
+    // a tag with the branch's name is not used
+    r.sh(&["tag", "feat", "main"]);
+    assert_eq!(refs::unpushed_count(&g, &r.info, "feat").unwrap(), 1);
+
+    // a branch that was never pushed anywhere
+    r.sh(&["branch", "lone", "main~1"]);
+    assert_eq!(refs::unpushed_count(&g, &r.info, "lone").unwrap(), 0);
+}
+
+#[test]
+fn unpushed_count_refuses_odd_names_and_missing_branches() {
+    let r = TestRepo::new();
+    r.commit_file("a", "1", "one");
+    let g = git();
+    for bad in ["-x", "a..b", "a^b", "a~1", "+a", "a:b", "a\nb"] {
+        assert!(
+            matches!(
+                refs::unpushed_count(&g, &r.info, bad),
+                Err(gitcore::GitError::Invalid(_))
+            ),
+            "{bad:?}"
+        );
+    }
+    assert!(refs::unpushed_count(&g, &r.info, "missing").is_err());
+    // no remote at all: every commit counts
+    assert_eq!(refs::unpushed_count(&g, &r.info, "main").unwrap(), 1);
+}

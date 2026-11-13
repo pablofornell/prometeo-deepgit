@@ -105,6 +105,8 @@ export interface DialogProps {
   primary?: DialogAction;
   /** Cancel button label (default "Cancel"). */
   cancelLabel?: string;
+  /** False hides the Cancel button (default true). Esc still calls `onClose`. */
+  cancel?: boolean;
   /** 480 px (default), 640 px, or "large" (Settings: up to 1040 x 700 px, the body fills the frame). */
   width?: "normal" | "wide" | "large";
   /** Content at the left of the footer (e.g. a checkbox). */
@@ -174,7 +176,9 @@ export function Dialog(props: DialogProps): JSX.Element {
         <div class="dg-dialog-body">{props.children}</div>
         <div class="dg-dialog-footer">
           <div class="dg-dialog-footer-left">{props.footerLeft}</div>
-          <Button onClick={props.onClose}>{props.cancelLabel ?? "Cancel"}</Button>
+          <Show when={props.cancel ?? true}>
+            <Button onClick={props.onClose}>{props.cancelLabel ?? "Cancel"}</Button>
+          </Show>
           <Show when={props.primary}>
             {(p) => (
               <Button variant={p().danger ? "danger" : "primary"} disabled={p().disabled} onClick={p().onClick}>

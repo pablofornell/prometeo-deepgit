@@ -243,6 +243,7 @@ with the same name in camelCase (e.g. `logOpen`).
 | `commit_details` | `repoId, oid` | `CommitDetails` |
 | `stash_untracked` | `repoId, oid` | `Option<StashUntracked>` (`None` when the stash has no untracked files, e.g. made without `-u`) |
 | `branches_containing` | `repoId, oid` | `Vec<String>` (local + remote names) |
+| `unpushed_count` | `repoId, branch: String` | `u32` (commits of the local branch that are on no remote: `git rev-list --count refs/heads/<branch> --not --remotes`; the branch is checked like a push branch name; a missing branch is an error) |
 | `working_tree` | `repoId` | `WorkingTree` |
 | `file_diff` | `repoId, spec: DiffSpec, path: String, oldPath: Option<String>, context: u32` | `FileDiff` |
 | `file_content` | `repoId, rev: Option<String> /* None = worktree */, path` | `String` (max 2 MiB) |

@@ -69,3 +69,17 @@
 .dg-matrix-bar-title { font-weight: var(--dg-weight-semibold); color: var(--dg-accent-fg); flex: 0 1 auto; max-width: 200px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dg-matrix-bar-sum { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--dg-text-muted-on-wash); font-size: var(--dg-font-size-medium); white-space: nowrap; margin-right: var(--dg-space-4); }
 .dg-matrix-bar .dg-btn { flex: none; }
+
+/* ---- "Push and set upstream" dialog (ITERATION-3.md 7) */
+.dg-matrix-up { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.dg-matrix-up-list { max-height: 240px; }
+.dg-matrix-up-row { display: flex; align-items: center; gap: var(--dg-space-3); min-height: calc(24 * var(--dg-u)); min-width: 0; }
+.dg-matrix-up-row.is-disabled .dg-dialogs-repo-name { color: var(--dg-text-secondary); }
+.dg-matrix-up-detail { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dg-text-secondary); font-size: var(--dg-font-size-medium); }
+.dg-matrix-up-status { flex: 0 1 55%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; color: var(--dg-text-secondary); font-size: var(--dg-font-size-medium); }
+.dg-matrix-up-status.is-ok { color: var(--dg-text-success); }
+.dg-matrix-up-status.is-bad { color: var(--dg-text-error); }
+.dg-matrix-up-icon { flex: none; display: inline-flex; align-items: center; justify-content: center; width: calc(16 * var(--dg-u)); height: calc(16 * var(--dg-u)); }
+.dg-matrix-up-icon .is-ok { color: var(--dg-text-success); }
+.dg-matrix-up-icon .is-bad { color: var(--dg-text-error); }
+.dg-matrix-up-ring { display: inline-block; width: 8px; height: 8px; border-radius: 50%; box-sizing: border-box; box-shadow: inset 0 0 0 1.5px var(--dg-clean-dot); }

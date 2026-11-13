@@ -398,3 +398,24 @@ pub fn branches_containing(git: &Git, repo: &RepoInfo, oid: &str) -> Result<Vec<
         })
         .collect())
 }
+
+/// Commits of the local branch that are on no remote: `git rev-list --count refs/heads/<branch> --not --remotes`.
+/// The branch is a full ref, so a tag with the same name is never used. A missing branch is an error.
+pub fn unpushed_count(git: &Git, repo: &RepoInfo, branch: &str) -> Result<u32, GitError> {
+    crate::error::check_push_branch("branch name", branch)?;
+    if branch.contains("..") {
+        return Err(GitError::Invalid(format!(
+            "Invalid branch name {branch:?}: it cannot contain '..'."
+        )));
+    }
+    let full = format!("refs/heads/{branch}");
+    let out = git.run(
+        path_of(repo),
+        Some(&repo.id),
+        &["rev-list", "--count", &full, "--not", "--remotes"],
+        false,
+    )?;
+    out.stdout.trim().parse().map_err(|_| {
+        GitError::Invalid(format!("Unexpected output of rev-list: {:?}", out.stdout))
+    })
+}
