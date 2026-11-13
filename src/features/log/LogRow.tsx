@@ -132,7 +132,7 @@ function CommitRowBody(props: { ctx: RowCtx; ci: number; row: CommitRow }): JSX.
     return r.committerTime !== r.authorTime ? `Authored ${a}\nCommitted ${fullDate(r.committerTime)}` : a;
   };
   const pillMins = () => pillMinWidths(r.refs);
-  const pillSpace = () => pillRoom(pillBudget(ctx.subjectWidth(), ctx.minSubject()), pillMins());
+  const pillSpace = () => pillRoom(pillBudget(ctx.subjectWidth(), ctx.minSubject(), r.subject.length), pillMins());
   const pillMax = () => visiblePills(pillWidths(r.refs), pillSpace(), pillMins());
   const refsTip = () => r.refs.map((x) => x.name).join("\n");
   const graphTip = () => `${r.oid}\n${r.authorName}${r.refs.length ? "\n" + r.refs.map((x) => x.name).join(", ") : ""}`;

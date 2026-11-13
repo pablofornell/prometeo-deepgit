@@ -130,8 +130,8 @@
 .dg-log-row.is-head .dg-log-subj { font-weight: var(--dg-weight-semibold); }
 .dg-log-refs { display: inline-flex; flex: 0 1 auto; min-width: 0; overflow: hidden; margin-left: auto; }
 .dg-log-refs .dg-refs { flex: 0 1 auto; min-width: 0; }
-/* Pills shrink with an ellipsis down to 40 px (ITERATION-3 2.2). The plain HEAD pill and "+N" never shrink; the split pill keeps its own rules in ui.css. */
-.dg-log-refs .dg-ref:not(.dg-ref-more):not(.dg-ref-split):not(.dg-ref-head) { flex: 0 1 auto; min-width: calc(40 * var(--dg-u)); }
+/* Pills shrink with an ellipsis down to 40 px (ITERATION-3 2.2); they give way before the first (split) pill, so its branch name is cut last. The plain HEAD pill and "+N" never shrink; the split pill keeps its own rules in ui.css. */
+.dg-log-refs .dg-ref:not(.dg-ref-more):not(.dg-ref-split):not(.dg-ref-head) { flex: 0 1000 auto; min-width: calc(40 * var(--dg-u)); }
 .dg-log-refs .dg-ref-split { flex: 0 1 auto; }
 .dg-log-match { background: var(--dg-log-match-bg); color: var(--dg-log-match-fg); border-radius: 2px; }
 .dg-log-repo { display: flex; align-items: center; }

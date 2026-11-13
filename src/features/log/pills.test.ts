@@ -16,6 +16,15 @@ describe("pillBudget", () => {
     expect(pillBudget(120, 120)).toBe(0);
     expect(pillBudget(0, 120)).toBe(0);
   });
+  it("gives a short subject's free room to the pills", () => {
+    // "commit 4" (8 chars, about 60 px) in a 243 px column: 243 - 60 - 8 gap = 175 px, not the 45% share (109 px)
+    expect(pillBudget(243, 120, 8)).toBe(175);
+    expect(pillBudget(588, 120, 8)).toBe(520);
+  });
+  it("keeps the share rule for a long subject, and the subject at least 40 px", () => {
+    expect(pillBudget(300, 120, 80)).toBe(pillBudget(300, 120));
+    expect(pillBudget(300, 120, 0)).toBe(300 - 40 - 8);
+  });
   it("never lets pills plus subject exceed the column", () => {
     for (const w of [90, 150, 240, 400, 900, 2000]) {
       const b = pillBudget(w, 120);
@@ -56,6 +65,25 @@ describe("visiblePills", () => {
   });
 });
 
+describe("visiblePills with a shrinking first pill", () => {
+  // HEAD | main (natural 106, min 90), a long branch (150, min 40), three tags (68, min 40)
+  const widths = [106, 150, 68, 68, 68];
+  const mins = [90, 40, 40, 40, 40];
+  it("keeps the first pill at its natural width while the others give way", () => {
+    // 106 + 4 + 40 + 26 = 176: two pills and +3, the first one not squeezed
+    expect(visiblePills(widths, 176, mins)).toBe(2);
+    // 175 does not fit that: only the first pill and +4, still at its natural width
+    expect(visiblePills(widths, 175, mins)).toBe(1);
+  });
+  it("shows everything when the rest fits at minimum widths beside the natural first pill", () => {
+    expect(visiblePills(widths, 106 + 4 * 40 + 4 * 4, mins)).toBe(5);
+  });
+  it("falls back to the first pill at its minimum when its natural width does not fit", () => {
+    expect(visiblePills(widths, 90 + 26, mins)).toBe(1);
+    expect(visiblePills([200, 100, 100], 90 + 4 + 40 + 26, [90, 40, 40])).toBe(2);
+  });
+});
+
 describe("pillSpace", () => {
   it("is the budget when the first pill and the chip fit in it", () => {
     expect(pillSpace(200, [90, 40, 40])).toBe(200);
@@ -73,9 +101,9 @@ describe("pillWidths", () => {
     expect(pillWidths(refs).length).toBe(2);
   });
   it("gives the split HEAD pill HEAD + 48 px as minimum and an ordinary pill 40 px", () => {
-    const refs: RefLabel[] = [local("feature/PAY-2318-refunds", true), local("develop"), tag("v1")];
+    const refs: RefLabel[] = [local("feature/PAY-2318", true), local("develop"), tag("v1")];
     expect(pillMinWidths(refs)).toEqual([90, 40, 40]);
-    expect(pillWidths(refs)[0]).toBe(212);
+    expect(pillWidths(refs)[0]).toBe(177);
     expect(pillWidths([local("feature/" + "x".repeat(80), true)])[0]).toBe(220);
   });
   it("keeps a plain HEAD pill at its natural width", () => {
