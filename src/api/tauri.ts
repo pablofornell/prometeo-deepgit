@@ -224,6 +224,9 @@ export const onAuthPromptClose = (cb: (e: { id: number }) => void) => listen<{ i
 export const onAuthNotice = (cb: (n: AuthNotice) => void) => listen<AuthNotice>("auth-notice", cb);
 /** A repository changed on disk or through a write command (debounced by the backend). */
 export const onRepoChanged = (cb: (e: RepoChanged) => void) => listen<RepoChanged>("repo-changed", cb);
+/** A mouse side button was pressed (Linux only: the backend reads them from the webview, see `sidebuttons.rs`). */
+export const onNavBack = (cb: () => void) => listen<null>("nav-back", () => cb());
+export const onNavForward = (cb: () => void) => listen<null>("nav-forward", () => cb());
 /** Progress of a running `cloneRepo` (filter on `operationId`). */
 export const onCloneProgress = (cb: (e: CloneProgress) => void) => listen<CloneProgress>("clone-progress", cb);
 

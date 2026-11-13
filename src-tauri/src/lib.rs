@@ -1,6 +1,7 @@
 mod auth;
 mod commands;
 mod logsession;
+mod sidebuttons;
 mod state;
 mod watcher;
 mod workspace;
@@ -81,6 +82,7 @@ pub fn run() {
             let background = state.clone();
             tauri::async_runtime::spawn_blocking(move || background.sync_watcher());
             app.manage(state);
+            sidebuttons::install(app.handle());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

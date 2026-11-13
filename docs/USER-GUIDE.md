@@ -203,6 +203,16 @@ The overview ruler is a map of the whole history.
 It marks HEAD, branch tips, tags, the selected commit and repositories with conflicts.
 Hover a mark to see its name. Click a mark to jump to that commit and select it.
 
+### Go back and forward
+
+DeepGit remembers the places you visit: the **Log**, **Local changes** and **Files** tabs, the commit you selected in the log, and the file you opened in **Files**. Go back and forward like in an IDE:
+
+- Press the **back** side button of your mouse, or `Alt+←`, to go back. The tab changes, the commit is selected and scrolled into view, or the file opens.
+- Press the **forward** side button, or `Alt+→`, to go forward.
+- DeepGit keeps the last 100 places. A new place after you went back drops the places ahead.
+- `Alt+←` and `Alt+→` do not work in a text field or in the file editor, where they move the cursor. The mouse buttons work there.
+- Places of a repository that you removed from the project are skipped. Changing the project starts a new history.
+
 ### Select commits
 
 - Click a row to select a commit. The **Changed files** tab follows.
@@ -211,7 +221,7 @@ Hover a mark to see its name. Click a mark to jump to that commit and select it.
 - Use `↑`, `↓`, `PgUp`, `PgDn`, `Home` and `End` to move.
 - Press `H` to select the HEAD commit.
 - Press `P` to select the first parent of the selected commit.
-- Press `Alt+←` and `Alt+→` to go back and forward in your selection history.
+- Press `Alt+←` and `Alt+→`, or use the back and forward side buttons of your mouse, to go back and forward through the places you visited (see [Go back and forward](#go-back-and-forward)).
 - Press `Enter` or double-click a row to move the focus to the file list in the details island.
 - Press `Ctrl+Shift+C` to copy the full hash.
 - Press `Ctrl+G` to go to a commit by hash. It opens Search Everywhere on the **Commits** tab.
@@ -866,6 +876,7 @@ While a menu, popup or dialog is open, most shortcuts do not work.
 | `Ctrl+Shift+K` | Push the focused repository |
 | `Ctrl+Alt+N` | New branch (focused repository, from HEAD) |
 | `Ctrl+Alt+Z` | Stash changes (focused repository) |
+| `Alt+←` `Alt+→`, or the mouse back / forward buttons | Go back or forward (see below) |
 | `Ctrl+R` | Refresh |
 | `Ctrl+Alt+S` or `Ctrl+,` | Settings |
 | `Ctrl+=` or `Ctrl++`, `Ctrl+-`, `Ctrl+0` | Zoom in, zoom out, reset zoom (UI scale). These work in text fields and in dialogs. |
@@ -896,7 +907,6 @@ While a menu, popup or dialog is open, most shortcuts do not work.
 | `Enter` | Move the focus to the file list of the commit |
 | `H` | Select HEAD |
 | `P` | Select the first parent |
-| `Alt+←` `Alt+→` | Back or forward in the selection history |
 
 ### Local changes
 

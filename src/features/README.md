@@ -66,6 +66,7 @@ feature. Cross-feature communication goes through `state/` (selection, layout, a
 | `events.ts` | `repoVersion(repoId)` / `anyRepoVersion()` (reactive counters bumped on every change), `subscribeRepoChanged(cb)`, `notifyRepoChanged(id)`. Never call `onRepoChanged` / `onGitConsole` yourself. |
 | `auth.ts` | Credential prompts of fetch, pull and push (PLAN.md section 5.6). Started by `startEvents()`; shows the `auth` dialog one prompt at a time (`authQueue.ts`). `clearSavedCredentials()` forgets all saved logins and `credentialStoreUnavailable()` tells that the backend found no key store (both for the Settings page). Features never call it otherwise. |
 | `activity.ts` | `activities()` (running operations for the progress widget), `beginActivity(label, total)`. |
+| `navigation.ts` | Back / forward through the views, commits and files visited: mouse side buttons and `Alt+Left` / `Alt+Right` (stack logic in `navHistory.ts`). A feature that has its own "current file" reports it with `setNavFile(f)` and says how to open one with `onOpenFile(fn)` (`FilesView` does). `navBack()` / `navForward()` run it by code. |
 | `keymap.ts` | See below. |
 | `actions.ts` | See below. |
 | `dialogs.ts` | See below. |

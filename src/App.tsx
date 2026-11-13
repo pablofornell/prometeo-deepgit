@@ -14,6 +14,7 @@ import { Welcome } from "./features/welcome/Welcome";
 import { startAutoFetch } from "./state/autoFetch";
 import { startEvents } from "./state/events";
 import { installKeymap } from "./state/keymap";
+import { startNavigation } from "./state/navigation";
 import { initSettings } from "./state/settings";
 import { registerGlobalShortcuts } from "./state/shortcuts";
 import { activeProject, loadWorkspace, workspace } from "./state/workspace";
@@ -28,6 +29,7 @@ export default function App(): JSX.Element {
     registerMergeDialogs();
     registerGlobalShortcuts();
     onCleanup(installKeymap());
+    onCleanup(startNavigation());
     void loadWorkspace();
   });
   return (

@@ -21,6 +21,7 @@ import {
 import { confirmAction } from "../../state/dialogs";
 import { repoVersion } from "../../state/events";
 import { shortcutLabel, register, trackOverlay } from "../../state/keymap";
+import { onOpenFile, setNavFile } from "../../state/navigation";
 import { mainTab } from "../../state/selection";
 import { projectRepos } from "../../state/workspace";
 import { createFileState, saveText } from "./editor";
@@ -143,6 +144,11 @@ export function FilesView(): JSX.Element {
     return k ? infos()[k] : undefined;
   });
   const tabOf = (key: string): TabInfo | undefined => infos()[key];
+  // Back / forward navigation (state/navigation.ts) records the file of the active tab and can open one.
+  createEffect(() => {
+    const a = active();
+    setNavFile(a ? { repoId: a.repoId, path: a.path } : null);
+  });
 
   const patch = (key: string, p: Partial<TabInfo>): void => {
     if (!untrack(() => infos()[key])) return;
@@ -565,6 +571,7 @@ export function FilesView(): JSX.Element {
     view = new EditorView({ parent: editorEl });
     const inFiles = () => mainTab() === "files";
     const offs = [
+      onOpenFile((repoId, path) => void openFile(repoId, path)),
       register(
         "files.save",
         "Ctrl+S",
