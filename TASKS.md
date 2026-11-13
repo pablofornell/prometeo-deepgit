@@ -8,9 +8,9 @@
 - [x] **App icon (tree):** Make the tree icon much denser as the distance from the trunk increases.
 
 ## 2. Projects
-- [ ] **Sort order:** Sort the project list alphabetically.
-- [ ] **Delete projects:** Delete a project without opening it first.
-- [ ] **Open a folder without a Git repo:** No error. Tell the user the folder is not a Git repository and offer to initialize one.
+- [x] **Sort order:** Sort the project list alphabetically.
+- [x] **Delete projects:** Delete a project without opening it first.
+- [x] **Open a folder without a Git repo:** No error. Tell the user the folder is not a Git repository and offer to initialize one.
 
 ## 3. Repository tree (sidebar)
 - [x] **Group by folder:** Repos in the same parent folder show as a nested tree, at all levels.
@@ -41,4 +41,4 @@
 - [x] **Find / Find and Replace:** VS Code style floating widget (match case, whole word, regex, match count, replace / replace all).
 
 ## 9. Smart .gitignore
-- [ ] **Smart .gitignore:** Add ignore rules from the UI (right-click a file or folder → "Add to .gitignore", with pattern suggestions). Only edit `.gitignore`, no commit.
+- [x] **Smart .gitignore:** Add ignore rules from the UI (right-click a file or folder → "Add to .gitignore", with pattern suggestions). Only edit `.gitignore`, no commit.
