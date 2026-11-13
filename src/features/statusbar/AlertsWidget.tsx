@@ -1,5 +1,5 @@
 /** Status bar alerts (ITERATION-3.md section 6): the bell / warning / error widget and its popover. */
-import { For, type JSX, Show, createEffect, createSignal, onCleanup } from "solid-js";
+import { For, type JSX, Show, createEffect, createSignal, on, onCleanup } from "solid-js";
 import { Button, Icon, IconButton, Popup } from "../../components/ui";
 import { alerts, dismiss, dismissAll, removeExpiredAlerts } from "../../state/alerts";
 import { alertBadge, alertExpiryFooter, alertLevel, describeAlerts, formatAlertTime } from "../../state/alertsCore";
@@ -28,13 +28,16 @@ export function AlertsWidget(): JSX.Element {
     queueMicrotask(() => row(k)?.focus());
   };
 
-  // opening: drop the expired alerts first, then put the focus on the first row
-  createEffect(() => {
-    if (!open()) return;
-    removeExpiredAlerts();
-    setActive(0);
-    setTimeout(() => (row(0) ?? list)?.focus(), 0);
-  });
+  // opening: drop the expired alerts first, then put the focus on the first row. Only `open` is tracked: a change of
+  // the list while the popover is open (a dismiss) must not move the active row.
+  createEffect(
+    on(open, (isOpen) => {
+      if (!isOpen) return;
+      removeExpiredAlerts();
+      setActive(0);
+      setTimeout(() => (row(0) ?? list)?.focus(), 0);
+    }),
+  );
 
   // Esc closes the popover (the Popup does it); the focus goes back to the widget
   createEffect(() => {
@@ -51,6 +54,12 @@ export function AlertsWidget(): JSX.Element {
     const n = alerts().length;
     if (active() > Math.max(0, n - 1)) setActive(Math.max(0, n - 1));
   });
+
+  /** Dismisses a row; the focus goes to the next row, or to the previous one when it was the last. */
+  const dismissRow = (id: string, index: number) => {
+    dismiss(id);
+    focusRow(index);
+  };
 
   const onKeyDown = (e: KeyboardEvent) => {
     const n = alerts().length;
@@ -73,8 +82,7 @@ export function AlertsWidget(): JSX.Element {
       e.preventDefault();
       const a = alerts()[active()];
       if (!a) return;
-      dismiss(a.id);
-      focusRow(active());
+      dismissRow(a.id, active());
     }
   };
 
@@ -104,8 +112,7 @@ export function AlertsWidget(): JSX.Element {
           </span>
         </Show>
       </button>
-      {/* `Popup` has no "top-end": "top-start" is moved inside the window, so at the right edge it ends where "top-end" would */}
-      <Popup open={open()} anchor={() => widget} placement="top-start" onClose={() => setOpen(false)} class="dg-alerts-pop" label="Alerts">
+      <Popup open={open()} anchor={() => widget} placement="top-end" onClose={() => setOpen(false)} class="dg-alerts-pop" label="Alerts">
         <div class="dg-alerts-head">
           <span class="dg-alerts-title">Alerts · {activeProject()?.name ?? ""}</span>
           <Button variant="ghost" size="small" disabled={alerts().length === 0} onClick={() => dismissAll()}>
@@ -129,7 +136,7 @@ export function AlertsWidget(): JSX.Element {
                     {formatAlertTime(a.time)}
                   </div>
                 </div>
-                <IconButton class="dg-alerts-dismiss" icon="close" iconSize={12} size="small" label="Dismiss" tabindex={-1} onClick={() => dismiss(a.id)} />
+                <IconButton class="dg-alerts-dismiss" icon="close" iconSize={12} size="small" label="Dismiss" tabindex={-1} onClick={() => dismissRow(a.id, i())} />
               </div>
             )}
           </For>

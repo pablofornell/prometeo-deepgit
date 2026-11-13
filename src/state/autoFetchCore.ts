@@ -21,8 +21,10 @@ export interface AutoFetchResult {
 }
 
 export interface AutoFetchStatus {
-  /** Repos whose last auto-fetch failed, with the reason. */
+  /** Repos of the active project whose last auto-fetch failed, with the reason. Repos of other projects are not listed. */
   failing: { repoId: string; message: string; failures: number }[];
+  /** The repos of the active project: a repo in here that is not in `failing` has no failure now. */
+  checked: string[];
   /** Unix ms of the next planned run, or null (off, hidden, nothing to do). */
   nextAt: number | null;
   /** A fetch is running now. */
@@ -79,11 +81,18 @@ export function createAutoFetch(deps: AutoFetchDeps): AutoFetch {
   /** The generation of the plan: a timer from an older plan does nothing. */
   let plan = 0;
 
-  const status = (): AutoFetchStatus => ({
-    failing: [...states.entries()].filter(([, s]) => s.failures > 0).map(([repoId, s]) => ({ repoId, message: s.message, failures: s.failures })),
-    nextAt,
-    running,
-  });
+  const status = (): AutoFetchStatus => {
+    const checked = deps.repoIds();
+    const inProject = new Set(checked);
+    return {
+      failing: [...states.entries()]
+        .filter(([repoId, s]) => s.failures > 0 && inProject.has(repoId))
+        .map(([repoId, s]) => ({ repoId, message: s.message, failures: s.failures })),
+      checked: [...checked],
+      nextAt,
+      running,
+    };
+  };
   const publish = () => deps.onStatus?.(status());
 
   const dueAt = (repoId: string): number => {

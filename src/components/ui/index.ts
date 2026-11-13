@@ -18,7 +18,7 @@ export { Dialog, DialogHost, openDialog, hasOpenDialog, moveDialogBy, type Dialo
 export { type PendingReanchor, reanchorClick, reanchorResized, reanchorScale } from "./dialogGeometry";
 export { ConfirmDialog, type ConfirmProps, type ConfirmResult, type ConfirmCheckbox } from "./ConfirmDialog";
 export {
-  ToastHost, toast, dismissToast, notifications, unreadCount, markNotificationsRead, clearNotifications,
+  ToastHost, toast, dismissToast, setToastAlertSink, type ToastAlert, notifications, unreadCount, markNotificationsRead, clearNotifications,
   type ToastOptions, type ToastAction, type ToastKind, type Notification,
 } from "./Toast";
 export { TooltipHost, tooltip, tip, type TooltipValue } from "./Tooltip";

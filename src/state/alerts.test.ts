@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 import {
   ALERT_EXPIRY_CHOICES, MAX_ALERTS, type Alert, type AlertStorage, addAlert, alertBadge, alertExpiryFooter, alertExpiryLabel, alertLevel, alertText,
-  alertsKey, autoFetchAlertText, describeAlerts, dismissAlert, expireAlerts, formatAlertTime, loadAlerts, newAutoFetchFailures, saveAlerts,
+  alertsKey, autoFetchAlertText, dismissAutoFetchAlerts, resolveAlertTarget, describeAlerts, dismissAlert, expireAlerts, formatAlertTime, loadAlerts, newAutoFetchFailures, saveAlerts,
 } from "./alertsCore";
 
 const HOUR = 3_600_000;
@@ -173,23 +173,80 @@ describe("expiry choices", () => {
 });
 
 describe("auto-fetch failures", () => {
-  it("raises a failure once per attempt and forgets a repo that recovered", () => {
-    let reported = new Map<string, number>();
-    let r = newAutoFetchFailures(reported, [{ repoId: "a", message: "auth", failures: 1 }]);
+  const fail = (repoId: string, failures = 1) => ({ repoId, message: "auth", failures });
+  it("raises a failure once per attempt", () => {
+    let r = newAutoFetchFailures(new Map(), [fail("a")], ["a", "b"]);
     expect(r.raise).toEqual([{ repoId: "a", message: "auth" }]);
-    reported = r.reported;
-    r = newAutoFetchFailures(reported, [{ repoId: "a", message: "auth", failures: 1 }]); // same status again
+    r = newAutoFetchFailures(r.reported, [fail("a")], ["a", "b"]); // same status again
     expect(r.raise).toEqual([]);
-    r = newAutoFetchFailures(r.reported, [{ repoId: "a", message: "auth", failures: 2 }, { repoId: "b", message: "net", failures: 1 }]);
+    r = newAutoFetchFailures(r.reported, [fail("a", 2), fail("b")], ["a", "b"]);
     expect(r.raise.map((x) => x.repoId)).toEqual(["a", "b"]);
-    r = newAutoFetchFailures(r.reported, []);
-    expect([...r.reported.keys()]).toEqual([]);
-    r = newAutoFetchFailures(r.reported, [{ repoId: "a", message: "auth", failures: 1 }]);
-    expect(r.raise).toHaveLength(1);
+  });
+  it("reports a repo that fetches well again as recovered, and raises its next failure", () => {
+    let r = newAutoFetchFailures(new Map(), [fail("a"), fail("b")], ["a", "b"]);
+    r = newAutoFetchFailures(r.reported, [fail("b")], ["a", "b"]);
+    expect(r.recovered).toEqual(["a"]);
+    expect([...r.reported.keys()]).toEqual(["b"]);
+    r = newAutoFetchFailures(r.reported, [fail("a"), fail("b")], ["a", "b"]);
+    expect(r.raise.map((x) => x.repoId)).toEqual(["a"]);
+  });
+  it("keeps what it reported for the repos of another project: no recovery, no second alert on return", () => {
+    let r = newAutoFetchFailures(new Map(), [fail("a")], ["a"]);
+    r = newAutoFetchFailures(r.reported, [], ["x", "y"]); // switched to a project without a and without failures
+    expect(r.recovered).toEqual([]);
+    expect([...r.reported.keys()]).toEqual(["a"]);
+    r = newAutoFetchFailures(r.reported, [fail("a")], ["a"]); // back: the same failure, already reported
+    expect(r.raise).toEqual([]);
   });
   it("writes the alert text", () => {
     expect(autoFetchAlertText("authentication required")).toBe("Auto-fetch failed: authentication required.");
     expect(autoFetchAlertText("Could not resolve host.\n  Try later.")).toBe("Auto-fetch failed: Could not resolve host. Try later.");
     expect(autoFetchAlertText("  ")).toBe("Auto-fetch failed.");
+  });
+});
+
+describe("auto-fetch alerts go away with the failure", () => {
+  const mk = (id: string, over: Partial<Alert>): Alert => ({ id, projectId: "p1", severity: "warning", text: "t", time: 1, ...over });
+  it("removes only the auto-fetch alerts of the repos that recovered", () => {
+    const list = [
+      mk("1", { source: "autoFetch", repoId: "a" }),
+      mk("2", { source: "autoFetch", repoId: "b" }),
+      mk("3", { repoId: "a" }), // a toast about the same repo stays
+      mk("4", {}),
+    ];
+    expect(dismissAutoFetchAlerts(list, ["a"]).map((a) => a.id)).toEqual(["2", "3", "4"]);
+    expect(dismissAutoFetchAlerts(list, [])).toBe(list);
+    expect(dismissAutoFetchAlerts(list, ["zzz"])).toBe(list);
+  });
+  it("keeps the source and the repo id through the store", () => {
+    const [a] = addAlert([], { projectId: "p1", severity: "warning", text: "t", repoName: "api", repoId: "r1", source: "autoFetch" }, 5, newId);
+    expect(a).toMatchObject({ repoId: "r1", source: "autoFetch" });
+    const st = fakeStorage();
+    saveAlerts(st, "p1", [a]);
+    expect(loadAlerts(st, "p1")).toEqual([a]);
+  });
+});
+
+describe("which project an alert belongs to", () => {
+  const projects = [
+    { id: "p1", repos: [{ id: "r1", name: "api" }, { id: "r2", name: "ledger" }] },
+    { id: "p2", repos: [{ id: "r3", name: "web" }, { id: "r4", name: "api" }] },
+  ];
+  it("uses the project id when given, even if another project is active", () => {
+    expect(resolveAlertTarget(projects, { projectId: "p2" }, "p1")).toEqual({ projectId: "p2", repoId: undefined, repoName: undefined });
+  });
+  it("uses the project that owns the repo id, and fills the repo name", () => {
+    expect(resolveAlertTarget(projects, { repoId: "r3" }, "p1")).toEqual({ projectId: "p2", repoId: "r3", repoName: "web" });
+  });
+  it("finds the project by repo name, the active project first", () => {
+    expect(resolveAlertTarget(projects, { repoName: "api" }, "p2")).toEqual({ projectId: "p2", repoId: "r4", repoName: "api" });
+    expect(resolveAlertTarget(projects, { repoName: "api" }, "p1")).toEqual({ projectId: "p1", repoId: "r1", repoName: "api" });
+    expect(resolveAlertTarget(projects, { repoName: "web" }, "p1")).toMatchObject({ projectId: "p2", repoId: "r3" });
+  });
+  it("falls back to the active project, or nothing", () => {
+    expect(resolveAlertTarget(projects, {}, "p1")?.projectId).toBe("p1");
+    expect(resolveAlertTarget(projects, { repoName: "nope" }, "p2")?.projectId).toBe("p2");
+    expect(resolveAlertTarget(projects, {}, undefined)).toBeUndefined();
+    expect(resolveAlertTarget([], {}, "p1")).toBeUndefined();
   });
 });

@@ -1,29 +1,44 @@
 /** Status bar (DESIGN.md 5.19): command ticker (11.3), progress area (5.17), focused repo, branch, alerts (ITERATION-3.md 6), fetch age, theme. */
-import { For, type JSX, Show, createMemo, createSignal } from "solid-js";
-import { AheadBehind, Icon, Popup, ProgressBar, RepoIcon, Spinner, THEME_ICONS } from "../../components/ui";
+import { For, type JSX, Show, createEffect, createMemo, createSignal, on, onCleanup } from "solid-js";
+import { AheadBehind, Icon, Popup, ProgressBar, RepoIcon, Spinner, THEME_ICONS, setToastAlertSink } from "../../components/ui";
 import * as actions from "../../state/actions";
 import { activities } from "../../state/activity";
-import { startAlerts } from "../../state/alerts";
+import { raiseAlert, startAlerts } from "../../state/alerts";
 import { autoFetchLine } from "../../state/autoFetch";
 import { consoleEntries, formatCommand, isBackgroundEntry, lastUserEntry } from "../../state/console";
 import { fetchAge } from "../../state/fetchAge";
 import { openBottomTool, setSidebarVisible } from "../../state/layout";
 import { runBinding } from "../../state/keymap";
 import { resolvedTheme, settings, toggleTheme } from "../../state/settings";
-import { focusedRepo, repoById, summary } from "../../state/workspace";
+import { activeProject, focusedRepo, repoById, summary } from "../../state/workspace";
 import { AlertsWidget } from "./AlertsWidget";
 import { middleTruncate } from "./format";
 import "./statusbar.css";
 
 /** The ticker shows at most this many characters of the command; the middle is cut. */
 const MAX_COMMAND_CHARS = 72;
+/** The ticker shows a failed command in red for this long; the error then lives in the alerts list. */
+const FAILED_FADE_MS = 10_000;
 /** Entries of one multi-repo command start within this window. */
 const SAME_BATCH_MS = 10_000;
 
 export function StatusBar(): JSX.Element {
   startAlerts();
+  setToastAlertSink(raiseAlert); // every warning and error toast becomes an alert
   let progressBtn: HTMLButtonElement | undefined;
   const [progressOpen, setProgressOpen] = createSignal(false);
+
+  /** Id of the failed command that no longer shows in red: it faded after `FAILED_FADE_MS` or the project changed. */
+  const [fadedId, setFadedId] = createSignal<number | null>(null);
+  createEffect(
+    on([() => activeProject()?.id, () => lastUserEntry()?.id, () => lastUserEntry()?.exitCode], ([, id, code], prev) => {
+      if (id === undefined) return;
+      if (prev && prev[0] !== activeProject()?.id) return setFadedId(id); // project switch: neutral at once
+      if (code === null || code === 0) return;
+      const timer = window.setTimeout(() => setFadedId(id), FAILED_FADE_MS);
+      onCleanup(() => window.clearTimeout(timer));
+    }),
+  );
 
   /** How many repos ran the same command as the last user entry just before it ("× 12"). */
   const batchSize = createMemo(() => {
@@ -51,6 +66,7 @@ export function StatusBar(): JSX.Element {
       <Show when={lastUserEntry()}>
         {(e) => {
           const failed = () => e().exitCode !== null && e().exitCode !== 0;
+          const faded = () => failed() && fadedId() === e().id;
           const owner = () => (e().repoId ? repoById(e().repoId!) : undefined);
           return (
             <button
@@ -61,7 +77,7 @@ export function StatusBar(): JSX.Element {
               onClick={() => openBottomTool("console")}
             >
               <Show when={e().exitCode !== null} fallback={<Spinner size={14} />}>
-                <Icon name={failed() ? "error" : "check"} size={14} class={failed() ? "dg-statusbar-bad" : "dg-statusbar-ok"} />
+                <Icon name={failed() ? "error" : "check"} size={14} class={faded() ? undefined : failed() ? "dg-statusbar-bad" : "dg-statusbar-ok"} />
               </Show>
               <span class="dg-statusbar-cmd">
                 <Show when={batchSize() < 2 && owner()}>

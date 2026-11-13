@@ -4,21 +4,23 @@
  *
  *   startAlerts();                    // once (the status bar does it)
  *   alerts()                          // alerts of the active project, newest first (reactive)
- *   raiseAlert({ severity: "error", text: "Push rejected.", repoName: "api" });   // active project
- *   dismiss(id); dismissAll();
+ *   raiseAlert({ severity: "error", text: "Push rejected.", repoId });   // the project of the repo
+ *   dismiss(id); dismissAll(); dismissAutoFetchFor(repoIds);
  *   removeExpiredAlerts();
  *
- * Every warning and error `toast` becomes an alert (through `setToastAlertSink`). The auto-fetch failures are raised
- * from `autoFetch.ts`. An alert is removed after `settings.alertExpiryHours`: at start, every 60 s, and when the
+ * Every warning and error `toast` becomes an alert: the status bar passes `raiseAlert` to `setToastAlertSink` (this file does not import
+ * the toast component, so the workspace store can import it in tests without a DOM). The auto-fetch failures are raised
+ * from `autoFetch.ts`. An alert goes to the project that started the action (`projectId`, or the project of `repoId`
+ * or `repoName`), and only without those to the active project. An alert is removed after `settings.alertExpiryHours`: at start, every 60 s, and when the
  * popover opens.
  */
 import { createEffect, createRoot, createSignal, on } from "solid-js";
-import { setToastAlertSink } from "../components/ui/Toast";
 import {
-  type Alert, type AlertInput, type AlertStorage, addAlert, dismissAlert, expireAlerts, loadAlerts, saveAlerts,
+  type Alert, type AlertInput, type AlertStorage, type AlertTarget, addAlert, dismissAlert, dismissAutoFetchAlerts, expireAlerts, loadAlerts,
+  resolveAlertTarget, saveAlerts,
 } from "./alertsCore";
 import { settings } from "./settings";
-import { activeProject } from "./workspace";
+import { activeProject, workspace } from "./workspace";
 
 const EXPIRE_EVERY_MS = 60_000;
 
@@ -54,11 +56,12 @@ export function alerts(): readonly Alert[] {
   return id ? (lists()[id] ?? []) : [];
 }
 
-/** Adds an alert to the active project. Does nothing without a project. */
-export function raiseAlert(a: Omit<AlertInput, "projectId">): void {
-  const projectId = activeProject()?.id;
-  if (!projectId) return;
-  store(projectId, addAlert(listOf(projectId), { ...a, projectId }, Date.now(), newId));
+/** Adds an alert to the project of `a` (see the header). Does nothing when there is no project. */
+export function raiseAlert(a: Omit<AlertInput, "projectId"> & AlertTarget): void {
+  const to = resolveAlertTarget(workspace.projects, a, activeProject()?.id);
+  if (!to) return;
+  const { projectId: _p, ...rest } = a;
+  store(to.projectId, addAlert(listOf(to.projectId), { ...rest, projectId: to.projectId, repoId: to.repoId, repoName: to.repoName }, Date.now(), newId));
 }
 
 export function dismiss(id: string): void {
@@ -69,6 +72,14 @@ export function dismiss(id: string): void {
 export function dismissAll(): void {
   const projectId = activeProject()?.id;
   if (projectId) store(projectId, []);
+}
+
+/** Removes the auto-fetch alerts of repos that fetch well again, in whichever project they are. */
+export function dismissAutoFetchFor(repoIds: readonly string[]): void {
+  for (const [projectId, list] of Object.entries(lists())) {
+    const kept = dismissAutoFetchAlerts(list, repoIds);
+    if (kept !== list) store(projectId, kept);
+  }
 }
 
 /** Forgets every alert of a project (the project was removed). */
@@ -93,11 +104,10 @@ export function removeExpiredAlerts(): void {
 
 let started = false;
 
-/** Connects the toasts, loads the alerts of the active project and starts the 60 s expiry sweep. Safe to call twice. */
+/** Loads the alerts of the active project and starts the 60 s expiry sweep. Safe to call twice. */
 export function startAlerts(): void {
   if (started) return;
   started = true;
-  setToastAlertSink((a) => raiseAlert(a));
   createRoot(() => {
     // load the list of a project when it becomes active, and sweep when the project or the expiry changes
     createEffect(

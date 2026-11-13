@@ -10,7 +10,7 @@
  * for the Notifications tool window; `unreadCount()` drives the dot on the bell.
  * The host docks above the status bar at the bottom-left; the shell sets `--dg-toast-width`.
  * A warning or an error toast also becomes a status bar alert of the active project (`state/alerts.ts`, through
- * `setToastAlertSink`); `repoName` says which repository it is about.
+ * `setToastAlertSink`); `repoName` / `repoId` say which repository it is about and `projectId` which project.
  */
 import { For, type JSX, Show, createSignal, onCleanup } from "solid-js";
 import { Icon } from "./Icon";
@@ -36,6 +36,13 @@ export interface ToastOptions {
   timeout?: number;
   /** Repository the toast is about; shown in the alert that a warning or an error creates. */
   repoName?: string;
+  /** Id of that repository: the alert goes to the project that owns it. */
+  repoId?: string;
+  /**
+   * The project that started the action. Pass it (or `repoId`) when the toast comes after an await: the alert goes
+   * to that project, not to the one that is active when the result arrives. Default: the active project now.
+   */
+  projectId?: string;
 }
 
 /** What a warning or an error toast hands to the alerts. */
@@ -43,6 +50,8 @@ export interface ToastAlert {
   severity: "error" | "warning";
   text: string;
   repoName?: string;
+  repoId?: string;
+  projectId?: string;
 }
 
 export interface Notification extends ToastOptions {
@@ -75,7 +84,7 @@ export function setToastAlertSink(sink: ((a: ToastAlert) => void) | undefined): 
 /** Shows a toast and records it as a notification. Returns its id. */
 export function toast(opts: ToastOptions): number {
   const n: Notification = { ...opts, id: ++seq, time: Date.now(), read: false };
-  if (opts.kind === "warning" || opts.kind === "error") alertSink?.({ severity: opts.kind, text: alertText(opts.title, opts.body), repoName: opts.repoName });
+  if (opts.kind === "warning" || opts.kind === "error") alertSink?.({ severity: opts.kind, text: alertText(opts.title, opts.body), repoName: opts.repoName, repoId: opts.repoId, projectId: opts.projectId });
   setToasts((t) => [...t, n]);
   setHistory((h) => [n, ...h].slice(0, 100));
   return n.id;

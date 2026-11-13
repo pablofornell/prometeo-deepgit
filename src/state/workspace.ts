@@ -13,6 +13,7 @@ import { createStore, produce, reconcile } from "solid-js/store";
 import * as api from "../api/tauri";
 import { validateProjectName } from "../api/projectName";
 import type { CloneResult, Project, RepoInfo, RepoSummary } from "../api/types";
+import { clearProjectAlerts } from "./alerts";
 import { dirtyCount } from "./changesScope";
 import { subscribeRepoChanged } from "./events";
 import { loadPersisted, savePersisted } from "./persist";
@@ -81,6 +82,7 @@ export async function setActiveProject(projectId: string): Promise<void> {
 
 export async function removeProject(projectId: string): Promise<void> {
   await api.projectRemove(projectId);
+  clearProjectAlerts(projectId);
   const wasActive = workspace.activeProjectId === projectId;
   setWorkspace(
     produce((s) => {

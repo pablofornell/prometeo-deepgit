@@ -13,12 +13,13 @@
  *  - no toast, no progress activity; the backend tags these fetches `background` in the console entry (hidden unless "Show background commands" is on);
  *  - no login dialog: the backend runs them with `AuthMode::Silent` (`background`), saved credentials only;
  *  - a repo that fails backs off on its own: its interval doubles up to 60 min and resets on its first success;
- *  - each failed attempt raises one status bar alert of the active project (`state/alerts.ts`); a dismissed alert does not
- *    come back until the next failed attempt.
+ *  - each failed attempt raises one status bar alert in the project of the repo (`state/alerts.ts`); a dismissed alert does not
+ *    come back until the next failed attempt, and the alert goes away by itself when the repo fetches well again;
+ *  - `autoFetchStatus().failing` lists only the repos of the active project.
  */
 import { createEffect, createRoot, createSignal, on, untrack } from "solid-js";
 import * as actions from "./actions";
-import { raiseAlert } from "./alerts";
+import { dismissAutoFetchFor, raiseAlert } from "./alerts";
 import { autoFetchAlertText, newAutoFetchFailures } from "./alertsCore";
 import { type AutoFetchStatus, createAutoFetch } from "./autoFetchCore";
 import { lastFetchAt } from "./fetchAge";
@@ -28,7 +29,7 @@ import { activeProject, projectRepos, repoById } from "./workspace";
 
 // ---------------------------------------------------------------- app wiring
 
-const [autoFetchStatus, setAutoFetchStatus] = createSignal<AutoFetchStatus>({ failing: [], nextAt: null, running: false });
+const [autoFetchStatus, setAutoFetchStatus] = createSignal<AutoFetchStatus>({ failing: [], checked: [], nextAt: null, running: false });
 
 /** State of the auto-fetch for the status bar (reactive). */
 export { autoFetchStatus };
@@ -48,11 +49,12 @@ export function autoFetchLine(): string {
 let reportedFailures = new Map<string, number>();
 
 function raiseFailureAlerts(status: AutoFetchStatus): void {
-  const r = newAutoFetchFailures(reportedFailures, status.failing);
+  const r = newAutoFetchFailures(reportedFailures, status.failing, status.checked);
   reportedFailures = r.reported;
-  for (const f of r.raise) {
-    raiseAlert({ severity: "warning", text: autoFetchAlertText(f.message), repoName: repoById(f.repoId)?.name });
-  }
+  // the alert goes to the project of the repo, not to the one that is active when the fetch ends
+  for (const f of r.raise) raiseAlert({ severity: "warning", text: autoFetchAlertText(f.message), repoId: f.repoId, source: "autoFetch" });
+  // a repo that fetches well again no longer needs its alert
+  if (r.recovered.length > 0) dismissAutoFetchFor(r.recovered);
 }
 
 let started = false;
