@@ -5,7 +5,7 @@
 - [x] **Date format:** All dates use `dd-mm-yyyy`. Remove the ISO format.
 - [x] **Mouse side buttons:** Mouse back/forward buttons do back/forward navigation.
 - [x] **Remove Git command hints:** Remove all "equivalent Git command" hints.
-- [ ] **App icon (tree):** Make the tree icon much denser as the distance from the trunk increases.
+- [x] **App icon (tree):** Make the tree icon much denser as the distance from the trunk increases.
 
 ## 2. Projects
 - [ ] **Sort order:** Sort the project list alphabetically.
