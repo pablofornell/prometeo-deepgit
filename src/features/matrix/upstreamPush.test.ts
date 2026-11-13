@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { Refs } from "../../api/types";
 import { buildBranchTable, type BranchCell } from "../../state/branchTable";
 import {
-  columnLacksUpstream, commitsText, countUnpushed, defaultRemote, firstLine, lacksUpstream, planUpstreamRows, remoteNames, runUpstreamPushes,
+  columnLacksUpstream, commitsText, defaultRemote, firstLine, lacksUpstream, planUpstreamRows, remoteNames, runUpstreamPushes,
   summarizeRun, type RowStatus,
 } from "./upstreamPush";
 
@@ -62,35 +62,33 @@ describe("remotes", () => {
   });
 });
 
-describe("countUnpushed", () => {
-  const row = (oid: string, parents: string[], remote = false) => ({ oid, parents, refs: remote ? [{ kind: "remote" as const, name: "origin/main", isCurrent: false }] : [] });
-  it("counts the commits above the first remote commit", () => {
-    const rows = [row("c", ["b"]), row("b", ["a"]), row("a", ["z"], true), row("z", [])];
-    expect(countUnpushed(rows, false)).toEqual({ count: 2, complete: true });
-  });
-  it("passes the remote label down to the parents of a merge", () => {
-    const rows = [row("m", ["x", "y"]), row("x", ["r"], true), row("y", ["r"]), row("r", [])];
-    expect(countUnpushed(rows, false)).toEqual({ count: 2, complete: true });
-  });
-  it("counts everything when no remote has the history", () => {
-    const rows = [row("b", ["a"]), row("a", [])];
-    expect(countUnpushed(rows, false)).toEqual({ count: 2, complete: true });
-  });
-  it("is incomplete when the log was capped before a remote commit", () => {
-    expect(countUnpushed([row("b", ["a"]), row("a", ["z"])], true)).toEqual({ count: 2, complete: false });
-  });
-  it("is zero when the tip is on a remote", () => {
-    expect(countUnpushed([row("a", [], true)], true)).toEqual({ count: 0, complete: true });
-  });
+describe("commitsText", () => {
   it("writes the count", () => {
-    expect(commitsText({ count: 1, complete: true })).toBe("1 commit");
-    expect(commitsText({ count: 3, complete: true })).toBe("3 commits");
-    expect(commitsText({ count: 0, complete: true })).toBe("0 commits");
-    expect(commitsText({ count: 300, complete: false })).toBe("300+ commits");
+    expect(commitsText(1)).toBe("1 commit");
+    expect(commitsText(3)).toBe("3 commits");
+    expect(commitsText(0)).toBe("0 commits");
   });
 });
 
 describe("runUpstreamPushes", () => {
+  it("skips the repos that have not started when the run is stopped", async () => {
+    let stopped = false;
+    const started: string[] = [];
+    const res = await runUpstreamPushes(
+      ["a", "b", "c", "d"],
+      async (id) => {
+        started.push(id);
+        await new Promise((r) => setTimeout(r, 5));
+        stopped = true;
+        return { ok: true, message: "" };
+      },
+      () => undefined,
+      2,
+      () => stopped,
+    );
+    expect(started).toEqual(["a", "b"]);
+    expect(Object.values(res).map((s) => s.kind)).toEqual(["done", "done", "skipped", "skipped"]);
+  });
   it("runs at most the limit at once and keeps going after a failure", async () => {
     let active = 0;
     let peak = 0;
@@ -139,5 +137,11 @@ describe("summarizeRun", () => {
   });
   it("reports the failed repos with the console action", () => {
     expect(summarizeRun("feat", "origin", { a: done, b: bad, c: bad }, name)).toEqual({ kind: "error", title: "Push failed in 2 of 3 repos", body: "repo-b, repo-c", console: true });
+  });
+  it("does not count skipped repos as pushed or failed", () => {
+    const skipped: RowStatus = { kind: "skipped" };
+    expect(summarizeRun("feat", "origin", { a: done, b: skipped, c: skipped }, name)).toEqual({ kind: "success", title: "Pushed feat to 1 repo", body: "Upstream set to origin/feat. 2 skipped.", console: false });
+    expect(summarizeRun("feat", "origin", { a: bad, b: skipped }, name)).toEqual({ kind: "error", title: "Push failed in 1 of 1 repo", body: "repo-a. 1 skipped.", console: true });
+    expect(summarizeRun("feat", "origin", { a: skipped }, name)).toEqual({ kind: "info", title: "Nothing was pushed", body: "1 skipped.", console: false });
   });
 });

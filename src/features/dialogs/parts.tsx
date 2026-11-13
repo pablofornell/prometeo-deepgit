@@ -86,14 +86,21 @@ export function RadioGroup<T extends string>(props: { name: string; value: T; on
 }
 
 /** Repo checklist with "All" and "None" links (new branch in several repos). */
-export function RepoChecklist(props: { repoIds: string[]; picked: string[]; onChange: (ids: string[]) => void; detail?: (repoId: string) => string | undefined }): JSX.Element {
+export function RepoChecklist(props: {
+  repoIds: string[];
+  picked: string[];
+  onChange: (ids: string[]) => void;
+  detail?: (repoId: string) => string | undefined;
+  /** Rows that cannot be checked (never picked; "All" skips them). */
+  disabled?: (repoId: string) => boolean;
+}): JSX.Element {
   const toggle = (id: string, on: boolean) => props.onChange(props.repoIds.filter((x) => (x === id ? on : props.picked.includes(x))));
   return (
     <div class="dg-dialogs-field">
       <div class="dg-dialogs-label-row">
         <span class="dg-dialogs-label">Repositories ({props.picked.length} of {props.repoIds.length})</span>
         <span class="dg-dialogs-links">
-          <button type="button" class="dg-dialogs-link" onClick={() => props.onChange([...props.repoIds])}>All</button>
+          <button type="button" class="dg-dialogs-link" onClick={() => props.onChange(props.repoIds.filter((id) => !props.disabled?.(id)))}>All</button>
           <button type="button" class="dg-dialogs-link" onClick={() => props.onChange([])}>None</button>
         </span>
       </div>
@@ -106,6 +113,7 @@ export function RepoChecklist(props: { repoIds: string[]; picked: string[]; onCh
                 {(r) => (
                   <Checkbox
                     checked={props.picked.includes(id)}
+                    disabled={props.disabled?.(id)}
                     onChange={(on) => toggle(id, on)}
                     label={
                       <span class="dg-dialogs-repo">

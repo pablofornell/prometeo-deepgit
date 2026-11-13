@@ -721,6 +721,21 @@ const handlers: Record<string, Handler> = {
     for (const [n, o] of repo.remotes) if (ancestors(repo, o).has(oid)) out.push(n);
     return out;
   },
+  unpushed_count: (a, c) => {
+    const repo = repoOf(a.repoId);
+    const branch = str(a.branch);
+    // like gitcore: the name is checked like a push branch, and `refs/heads/<branch>` is used, never a tag
+    if (branch.startsWith("-") || /[\0\n\r]/.test(branch)) fail(`Invalid branch name "${branch}": it cannot start with '-' or contain a control character.`);
+    if (branch.startsWith("+") || /[:^~]/.test(branch)) fail(`Invalid branch name "${branch}": it cannot start with '+' or contain ':', '^' or '~'.`);
+    if (branch.includes("..")) fail(`Invalid branch name "${branch}": it cannot contain '..'.`);
+    c.git(repo, ["rev-list", "--count", `refs/heads/${branch}`, "--not", "--remotes"]);
+    const tip = repo.branches.get(branch) ?? fail(`fatal: bad revision 'refs/heads/${branch}'`);
+    const onRemote = new Set<string>();
+    for (const o of repo.remotes.values()) for (const x of ancestors(repo, o)) onRemote.add(x);
+    let n = 0;
+    for (const x of ancestors(repo, tip)) if (!onRemote.has(x)) n++;
+    return n;
+  },
   working_tree: (a, c): WorkingTree => {
     const repo = repoOf(a.repoId);
     c.git(repo, ["status", "--porcelain=v2", "-z", "--untracked-files=all"]);

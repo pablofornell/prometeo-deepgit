@@ -92,7 +92,9 @@ export const commitDetails = (repoId: string, oid: string) => invoke<CommitDetai
 export const stashUntracked = (repoId: string, oid: string) => invoke<StashUntracked | null>("stash_untracked", { repoId, oid });
 /** Local and remote branch names that contain the commit. */
 export const branchesContaining = (repoId: string, oid: string) => invoke<string[]>("branches_containing", { repoId, oid });
-export const workingTree = (repoId: string) => invoke<WorkingTree>("working_tree", { repoId });
+/** Commits of the local branch that are on no remote (`git rev-list --count refs/heads/<branch> --not --remotes`). */
+export const unpushedCount = (repoId: string, branch: string) => invoke<number>("unpushed_count", { repoId, branch });
+export const workingTree =(repoId: string) => invoke<WorkingTree>("working_tree", { repoId });
 export const fileDiff = (repoId: string, spec: DiffSpec, path: string, oldPath: string | null = null, context = 3) =>
   invoke<FileDiff>("file_diff", { repoId, spec, path, oldPath, context });
 /** File content at `rev`, or the worktree file when `rev` is null (max 2 MiB). */

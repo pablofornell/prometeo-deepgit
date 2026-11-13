@@ -99,6 +99,7 @@ pub fn run() {
             commands::commit_details,
             commands::stash_untracked,
             commands::branches_containing,
+            commands::unpushed_count,
             commands::working_tree,
             commands::file_diff,
             commands::file_content,

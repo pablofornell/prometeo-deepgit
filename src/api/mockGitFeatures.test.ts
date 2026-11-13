@@ -350,3 +350,25 @@ describe("mock console background flag", () => {
     expect(seen.filter((e) => e.args[0] !== "fetch").every((e) => e.background === false)).toBe(true);
   });
 });
+
+describe("mock unpushed_count", () => {
+  const count = (repoId: string, branch: string) => call<number>("unpushed_count", { repoId, branch });
+
+  it("counts the commits that are on no remote, and a push brings it to 0", async () => {
+    const [, , refunds] = await repoIds();
+    const onMain = await count(refunds, "main");
+    await sideBranch(refunds, false, "up-side");
+    // the commits of main that no remote has, plus the one commit of the side branch
+    expect(await count(refunds, "up-side")).toBe(onMain + 1);
+    await call("push", { repoId: refunds, remote: "origin", branch: "up-side", force: false, setUpstream: true, tags: false });
+    expect(await count(refunds, "up-side")).toBe(0);
+  });
+
+  it("refuses names the backend refuses and a missing branch", async () => {
+    const [, , refunds] = await repoIds();
+    for (const bad of ["-x", "a..b", "a^b", "a~1", "+a", "a:b"]) {
+      await expect(count(refunds, bad)).rejects.toMatchObject({ message: expect.stringContaining("Invalid branch name") });
+    }
+    await expect(count(refunds, "no-such-branch")).rejects.toBeDefined();
+  });
+});

@@ -220,6 +220,14 @@ pub async fn branches_containing(state: St<'_>, repo_id: String, oid: String) ->
 }
 
 #[tauri::command]
+pub async fn unpushed_count(state: St<'_>, repo_id: String, branch: String) -> Res<u32> {
+    read(&state, &repo_id, move |g, r| {
+        gitrefs::unpushed_count(g, r, &branch)
+    })
+    .await
+}
+
+#[tauri::command]
 pub async fn working_tree(state: St<'_>, repo_id: String) -> Res<WorkingTree> {
     read(&state, &repo_id, status::working_tree).await
 }
