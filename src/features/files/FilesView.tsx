@@ -64,6 +64,7 @@ interface RepoStatus {
 const NO_STATUS: RepoStatus = { files: new Map(), folders: new Map() };
 const TREE_KEY = "files-tree";
 const REFRESH_MS = 300;
+const FOCUS_REFRESH_MS = 1000;
 const TOO_MANY = "Too many files: the list shows the first 100 000.";
 const BINARY = "Binary file. DeepGit does not show it.";
 const TOO_LARGE = "This file is larger than 2 MiB. DeepGit does not open it.";
@@ -439,12 +440,15 @@ export function FilesView(): JSX.Element {
   };
 
   let token = 0;
+  /** When the last load started. */
+  let loadedAt = 0;
   /**
    * Reloads the status of every repo, and the file lists. With `statusOnly`, a repo that this view saved keeps its list:
    * a save does not add or remove files. A list that did not change keeps its old array, so the tree is not rebuilt.
    */
   const refreshAll = async (statusOnly = false): Promise<void> => {
     const my = ++token;
+    loadedAt = Date.now();
     const repos = untrack(projectRepos);
     if (repos.length === 0) {
       setLists(new Map());
@@ -494,6 +498,16 @@ export function FilesView(): JSX.Element {
     else timer = setTimeout(() => void refreshAll(true), REFRESH_MS);
   });
   onCleanup(() => clearTimeout(timer));
+
+  // The watcher skips node_modules and target, so an install or a build changes the ignored entries without an event.
+  // The lists load again when the tab is shown (above) and when the window gets the focus back. Focus changes can come in
+  // bursts, so a load that ran less than a second ago is enough.
+  const onFocus = (): void => {
+    if (!shown || Date.now() - loadedAt < FOCUS_REFRESH_MS) return;
+    void refreshAll();
+  };
+  window.addEventListener("focus", onFocus);
+  onCleanup(() => window.removeEventListener("focus", onFocus));
 
   // Close the tabs of a repo that left the project. Keep the tabs with unsaved changes.
   createEffect(
