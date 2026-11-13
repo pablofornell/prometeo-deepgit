@@ -86,15 +86,27 @@ export async function setActiveProject(projectId: string): Promise<void> {
   await refreshSummaries();
 }
 
+/**
+ * Removes a project from the list (the folder and its repositories stay on disk). When it was the active project, the next
+ * one in the sorted list opens (the previous one when it was the last); with none left the shell shows `Welcome`.
+ */
 export async function removeProject(projectId: string): Promise<void> {
+  const sorted = sortedProjects();
+  const at = sorted.findIndex((p) => p.id === projectId);
+  const next = at < 0 ? undefined : (sorted[at + 1] ?? sorted[at - 1]);
   await api.projectRemove(projectId);
   const wasActive = workspace.activeProjectId === projectId;
   setWorkspace(
     produce((s) => {
       s.projects = s.projects.filter((p) => p.id !== projectId);
-      if (s.activeProjectId === projectId) s.activeProjectId = s.projects[0]?.id ?? null;
+      if (wasActive) s.activeProjectId = next?.id ?? null;
     }),
   );
+  if (wasActive && next) {
+    // the backend chose its own successor and saved it: tell it the sorted one
+    await setActiveProject(next.id);
+    return;
+  }
   if (wasActive) projectSwitched();
   else restoreRepoFilter();
   await refreshSummaries();

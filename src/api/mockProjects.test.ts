@@ -50,3 +50,21 @@ describe("mock command project_add", () => {
     expect((await call<Workspace>("workspace_load")).projects.map((p) => p.name)).toEqual(ws.projects.map((p) => p.name));
   });
 });
+
+describe("mock command project_remove", () => {
+  it("refuses an unknown project like remove_project in Rust", async () => {
+    await expect(call("project_remove", { projectId: "nope" })).rejects.toMatchObject({ message: "unknown project" });
+  });
+
+  it("makes the next project active when the active one goes, and keeps the others", async () => {
+    const ws = await call<Workspace>("workspace_load");
+    const added = await call<Project>("project_add", { path: "/elsewhere/removal-test" });
+    expect((await call<Workspace>("workspace_load")).activeProjectId).toBe(added.id);
+    await call("project_remove", { projectId: added.id });
+    const after = await call<Workspace>("workspace_load");
+    // it was the last: the previous one becomes active
+    expect(after.activeProjectId).toBe(ws.projects[ws.projects.length - 1].id);
+    expect(after.projects.map((p) => p.id)).toEqual(ws.projects.map((p) => p.id));
+    await call("project_set_active", { projectId: ws.activeProjectId });
+  });
+});

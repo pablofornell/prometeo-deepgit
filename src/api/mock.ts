@@ -634,8 +634,12 @@ const handlers: Record<string, Handler> = {
     return structuredClone(project);
   },
   project_remove: (a) => {
-    workspace.projects = workspace.projects.filter((p) => p.id !== str(a.projectId));
-    if (workspace.activeProjectId === str(a.projectId)) workspace.activeProjectId = workspace.projects[0]?.id ?? null;
+    // like `workspace::remove_project`: the next project (the previous one when it was the last) becomes active
+    const id = str(a.projectId);
+    const pos = workspace.projects.findIndex((p) => p.id === id);
+    if (pos < 0) fail("unknown project");
+    workspace.projects.splice(pos, 1);
+    if (workspace.activeProjectId === id) workspace.activeProjectId = workspace.projects[Math.min(pos, workspace.projects.length - 1)]?.id ?? null;
   },
   project_rescan: (a) => {
     const p = workspace.projects.find((x) => x.id === str(a.projectId)) ?? fail("Project not found");

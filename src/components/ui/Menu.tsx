@@ -11,6 +11,7 @@
  *   ])} />
  *   openMenu(buttonEl, items);   // dropdown under a button
  *
+ * `trailingAction` adds an icon button at the right end of a row (it replaces the shortcut text while it shows).
  * Keyboard: Up/Down/Home/End move, Right opens a submenu, Left closes it, Enter/Space selects, Esc closes.
  * Panels are keyed by depth, so hovering only moves the highlight (no remount, no re-measure, no pop-in replay). A pointer
  * travelling diagonally towards an open submenu does not close it (`menuGeometry.ts`).
@@ -20,6 +21,7 @@ import { type Accessor, For, Index, type JSX, Show, createEffect, createMemo, cr
 import { Portal } from "solid-js/web";
 import { trackOverlay } from "../../state/keymap";
 import { closeWhenDialogOpens } from "../../state/overlays";
+import { IconButton } from "./Button";
 import { Icon } from "./Icon";
 import type { IconName } from "./icons";
 import { Kbd } from "./Kbd";
@@ -46,6 +48,8 @@ export interface MenuItem {
   onSelect?: () => void;
   /** F2 on the active item closes the menu and calls this (rename the thing the row stands for). */
   onRename?: () => void;
+  /** Icon button at the right end of the row; shows on hover and on the active row. `Delete` on the active row runs it. */
+  trailingAction?: { icon: IconName; label: string; onSelect: () => void };
 }
 
 interface Level {
@@ -178,6 +182,13 @@ function onKey(e: KeyboardEvent): void {
     case "Tab":
       stop();
       break;
+    case "Delete": {
+      const item = lvl.items[lvl.active];
+      if (!item?.trailingAction || !selectable(item)) break;
+      stop();
+      runTrailing(item);
+      break;
+    }
     case "F2": {
       const item = lvl.items[lvl.active];
       if (!item?.onRename || !selectable(item)) break;
@@ -188,6 +199,14 @@ function onKey(e: KeyboardEvent): void {
       break;
     }
   }
+}
+
+/** Closes the menu and runs the trailing action of `item` (the button never selects the row). */
+function runTrailing(item: MenuItem): void {
+  const action = item.trailingAction;
+  if (!action) return;
+  closeMenu();
+  action.onSelect();
 }
 
 /** Applies the hover result of item `index` at `depth` (highlight, and the submenu if the item has one). */
@@ -263,6 +282,7 @@ function MenuPanel(props: { level: Accessor<Level>; depth: number }): JSX.Elemen
                   "is-active": props.level().active === i(),
                   "is-disabled": !!item.disabled,
                   "is-danger": !!item.danger,
+                  "has-trailing": !!item.trailingAction,
                 }}
                 role={item.checked !== undefined ? "menuitemcheckbox" : "menuitem"}
                 aria-checked={item.checked}
@@ -300,6 +320,22 @@ function MenuPanel(props: { level: Accessor<Level>; depth: number }): JSX.Elemen
                 <span class="dg-menu-label">{item.label}</span>
                 <Show when={item.shortcut}>
                   <span class="dg-menu-shortcut">{item.shortcut}</span>
+                </Show>
+                <Show when={item.trailingAction}>
+                  {(a) => (
+                    <IconButton
+                      class="dg-menu-trailing"
+                      icon={a().icon}
+                      label={a().label}
+                      size="small"
+                      iconSize={14}
+                      tabIndex={-1}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        runTrailing(item);
+                      }}
+                    />
+                  )}
                 </Show>
                 <Show when={item.submenu}>
                   <Icon name="chevronRight" size={14} class="dg-menu-arrow" />
