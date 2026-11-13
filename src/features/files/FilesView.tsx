@@ -5,6 +5,7 @@
  *
  * This is not a full IDE. There is no rename, no create and no replace.
  * A clean tab reloads when its file changes on disk. A tab with unsaved changes keeps its text.
+ * The tree is on the right of the editor.
  * Shortcuts work on this tab only: Ctrl+S saves, Ctrl+P opens a file by name, Ctrl+Shift+F searches the project,
  * and Ctrl+F finds text in the file.
  */
@@ -623,45 +624,6 @@ export function FilesView(): JSX.Element {
 
   return (
     <div class="dg-fe">
-      <aside class="dg-fe-side" style={{ width: treeW() + "px" }} aria-label="Project files">
-        <div class="dg-shell-head dg-fe-head" role="tablist" aria-label="Project files tabs">
-          <button type="button" role="tab" aria-selected={leftTab() === "files"} class="dg-shell-tab" classList={{ "is-on": leftTab() === "files" }} onClick={() => setLeftTab("files")}>
-            Files
-          </button>
-          <button type="button" role="tab" aria-selected={leftTab() === "search"} class="dg-shell-tab" classList={{ "is-on": leftTab() === "search" }} onClick={() => setLeftTab("search")}>
-            Search
-          </button>
-          <span class="dg-grow" />
-          <IconButton icon="refresh" label="Refresh the file list" onClick={() => void refreshAll()} />
-          <IconButton icon="collapse" label="Collapse all" onClick={() => ex.clear()} />
-        </div>
-        <div class="dg-fe-pane" hidden={leftTab() !== "files"}>
-          <Show when={truncated()}>
-            <div class="dg-fe-notice">{TOO_MANY}</div>
-          </Show>
-          <For each={notices()}>{(n) => <div class="dg-fe-notice is-error">{n}</div>}</For>
-          <Show when={roots().length > 0} fallback={<Show when={loaded()} fallback={<div class="dg-fe-loading"><Spinner /></div>}><div class="dg-fe-empty">{emptyTree()}</div></Show>}>
-            <div class="dg-fe-tree" onMouseDown={onTreeDown}>
-              <Tree<TreeNode>
-                roots={roots()}
-                getId={(n) => n.id}
-                getChildren={(n) => (n.kind === "file" ? undefined : n.children)}
-                expanded={expanded()}
-                onExpandedChange={ex.set}
-                selectedId={sel()?.id ?? null}
-                onSelect={onTreeSelect}
-                onActivate={(n) => (n.kind === "file" ? openNode(n) : ex.toggle(n.id))}
-                ariaLabel="Project files"
-                renderNode={renderNode}
-              />
-            </div>
-          </Show>
-        </div>
-        <div class="dg-fe-pane" hidden={leftTab() !== "search"}>
-          <ProjectSearch apiRef={(a) => (searchApi = a)} onOpen={openHit} />
-        </div>
-      </aside>
-      <Splitter orientation="vertical" size={treeW()} onSize={setTreeW} min={180} max={520} defaultSize={260} persistKey={TREE_KEY} />
       <section class="dg-fe-main">
         <div class="dg-shell-head dg-fe-tabs" role="tablist" aria-label="Open files">
           <For each={tabList()}>
@@ -731,6 +693,45 @@ export function FilesView(): JSX.Element {
           </Show>
         </div>
       </section>
+      <Splitter orientation="vertical" size={treeW()} onSize={setTreeW} min={180} max={520} defaultSize={260} persistKey={TREE_KEY} reverse />
+      <aside class="dg-fe-side" style={{ width: treeW() + "px" }} aria-label="Project files">
+        <div class="dg-shell-head dg-fe-head" role="tablist" aria-label="Project files tabs">
+          <button type="button" role="tab" aria-selected={leftTab() === "files"} class="dg-shell-tab" classList={{ "is-on": leftTab() === "files" }} onClick={() => setLeftTab("files")}>
+            Files
+          </button>
+          <button type="button" role="tab" aria-selected={leftTab() === "search"} class="dg-shell-tab" classList={{ "is-on": leftTab() === "search" }} onClick={() => setLeftTab("search")}>
+            Search
+          </button>
+          <span class="dg-grow" />
+          <IconButton icon="refresh" label="Refresh the file list" onClick={() => void refreshAll()} />
+          <IconButton icon="collapse" label="Collapse all" onClick={() => ex.clear()} />
+        </div>
+        <div class="dg-fe-pane" hidden={leftTab() !== "files"}>
+          <Show when={truncated()}>
+            <div class="dg-fe-notice">{TOO_MANY}</div>
+          </Show>
+          <For each={notices()}>{(n) => <div class="dg-fe-notice is-error">{n}</div>}</For>
+          <Show when={roots().length > 0} fallback={<Show when={loaded()} fallback={<div class="dg-fe-loading"><Spinner /></div>}><div class="dg-fe-empty">{emptyTree()}</div></Show>}>
+            <div class="dg-fe-tree" onMouseDown={onTreeDown}>
+              <Tree<TreeNode>
+                roots={roots()}
+                getId={(n) => n.id}
+                getChildren={(n) => (n.kind === "file" ? undefined : n.children)}
+                expanded={expanded()}
+                onExpandedChange={ex.set}
+                selectedId={sel()?.id ?? null}
+                onSelect={onTreeSelect}
+                onActivate={(n) => (n.kind === "file" ? openNode(n) : ex.toggle(n.id))}
+                ariaLabel="Project files"
+                renderNode={renderNode}
+              />
+            </div>
+          </Show>
+        </div>
+        <div class="dg-fe-pane" hidden={leftTab() !== "search"}>
+          <ProjectSearch apiRef={(a) => (searchApi = a)} onOpen={openHit} />
+        </div>
+      </aside>
       <Show when={quick()}>
         <QuickOpen files={quickFiles} multi={projectRepos().length > 1} onPick={pickQuick} onClose={closeQuick} />
       </Show>
