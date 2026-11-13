@@ -48,6 +48,24 @@ describe("mock files: list", () => {
     expect(list.ignored).toEqual(["build.log", "dist/"]);
   });
 
+  it("gives the outermost folder of ignored files as one entry, whatever the depth", () => {
+    const files = new Map([["src/a.rs", ""], ["out/deep/er/1.o", ""], ["out/deep/er/2.o", ""], ["out/deep/3.o", ""]]);
+    const ignored = new Set(["out/deep/er/1.o", "out/deep/er/2.o", "out/deep/3.o"]);
+    expect(ignoredEntries(files, ignored)).toEqual(["out/"]);
+  });
+
+  it("leaves a folder with a tracked file as file entries", () => {
+    const files = new Map([["out/keep.o", ""], ["out/x.o", ""]]);
+    expect(ignoredEntries(files, new Set(["out/x.o"]))).toEqual(["out/x.o"]);
+  });
+
+  it("flags the list as truncated when the ignored entries pass the cap", () => {
+    const files = new Map([["a", ""], ["b.o", ""], ["c.o", ""], ["d.o", ""]]);
+    const ignored = new Set(["b.o", "c.o", "d.o"]);
+    expect(listFiles(files, ignored, 2)).toEqual({ files: ["a"], ignored: ["b.o", "c.o"], truncated: true });
+    expect(listFiles(files, ignored, 3).truncated).toBe(false);
+  });
+
   it("keeps an ignored file of a folder with other files as a file entry", () => {
     const files = new Map([["a/keep.rs", ""], ["a/x.log", ""], ["out/b/c.o", ""], ["out/d.o", ""], ["z.log", ""]]);
     const ignored = new Set(["a/x.log", "out/b/c.o", "out/d.o", "z.log"]);

@@ -303,6 +303,110 @@ impl Git {
         self.run_reported(repo, repo_id, args, write, stdin, None)
     }
 
+    /// Runs a read-only git command that prints NUL-terminated records, and hands each record to
+    /// `on_record` while it runs. When `on_record` returns false the process is killed and the
+    /// rest of the output is never read: use it to cap a listing that can be huge. A non-zero exit
+    /// that the caller did not cause is an error, like `run`.
+    pub fn run_records(
+        &self,
+        repo: &Path,
+        repo_id: Option<&str>,
+        args: &[&str],
+        mut on_record: impl FnMut(&str) -> bool,
+    ) -> Result<(), GitError> {
+        let started_at = unix_ms();
+        let timer = Instant::now();
+        let mut cmd = Command::new(&self.bin);
+        cmd.arg("-C")
+            .arg(repo)
+            .args([
+                "-c",
+                "core.quotepath=false",
+                "-c",
+                "color.ui=never",
+                "--no-pager",
+            ])
+            .args(args)
+            .env_remove("GIT_DIR")
+            .env_remove("GIT_WORK_TREE")
+            .env_remove("GIT_INDEX_FILE")
+            .env("GIT_TERMINAL_PROMPT", "0")
+            .env("LC_ALL", "C")
+            .env("GIT_OPTIONAL_LOCKS", "0")
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .stdin(Stdio::null());
+        no_window(&mut cmd);
+        let mut child = cmd.spawn()?;
+        // stderr is read on its own thread, so a full pipe cannot block git while this thread reads stdout.
+        let err = child.stderr.take().map(|mut p| {
+            std::thread::spawn(move || {
+                let mut b = Vec::new();
+                let _ = p.read_to_end(&mut b);
+                b
+            })
+        });
+        let mut records = 0usize;
+        let mut stopped = false;
+        if let Some(pipe) = child.stdout.take() {
+            let mut reader = std::io::BufReader::new(pipe);
+            let mut buf = Vec::new();
+            loop {
+                buf.clear();
+                match std::io::BufRead::read_until(&mut reader, 0, &mut buf) {
+                    Ok(0) | Err(_) => break,
+                    Ok(_) => {}
+                }
+                if buf.last() == Some(&0) {
+                    buf.pop();
+                }
+                if buf.is_empty() {
+                    continue;
+                }
+                records += 1;
+                if !on_record(&String::from_utf8_lossy(&buf)) {
+                    stopped = true;
+                    break;
+                }
+            }
+        }
+        if stopped {
+            let _ = child.kill();
+        }
+        let status = child.wait()?;
+        let stderr = err
+            .and_then(|h| h.join().ok())
+            .map(|b| String::from_utf8_lossy(&b).into_owned())
+            .unwrap_or_default();
+        let code = status.code().unwrap_or(-1);
+        let out = Output {
+            stdout: String::new(),
+            stderr,
+            code,
+        };
+        if let Some(sink) = &self.sink {
+            sink(ConsoleEntry {
+                id: NEXT_ENTRY_ID.fetch_add(1, Ordering::Relaxed),
+                repo_id: repo_id.map(str::to_string),
+                args: args.iter().map(|a| a.to_string()).collect(),
+                started_at,
+                duration_ms: timer.elapsed().as_millis() as u64,
+                exit_code: Some(code),
+                stdout: format!(
+                    "{records} records read{}",
+                    if stopped { " (stopped early)" } else { "" }
+                ),
+                stderr: truncate(&out.stderr),
+                background: false,
+            });
+        }
+        if stopped || code == 0 {
+            Ok(())
+        } else {
+            Err(command_error(repo, args, &out))
+        }
+    }
+
     /// Runs a network command (`clone`) and hands its stderr to `on_stderr` while it runs, for
     /// progress. `cancel` kills the process group and gives `GitError::Cancelled`; the usual
     /// network limits apply. A non-zero exit is an error, like `run`. `dir` is where git starts

@@ -75,18 +75,30 @@ export function isFolder(files: Map<string, string>, key: string): boolean {
 }
 
 /**
- * The ignored entries, sorted by bytes. A folder whose files are all ignored is one entry that ends with "/"
- * (the outermost such folder), as `git ls-files --others --ignored --directory` reports it. Other ignored files stand alone.
+ * The ignored entries, sorted by bytes (`IgnoredEntries` in files.rs). A folder with no file that is not ignored is one
+ * entry that ends with "/", the outermost such folder. The files inside it are not listed. Other ignored files stand alone.
  */
 export function ignoredEntries(files: Map<string, string>, ignored: Set<string>): string[] {
+  // For each folder: how many files lie below it, and how many of those are ignored.
+  const below = new Map<string, { all: number; ignored: number }>();
+  for (const path of files.keys()) {
+    const isIgnored = ignored.has(path);
+    for (let i = path.indexOf("/"); i >= 0; i = path.indexOf("/", i + 1)) {
+      const dir = path.slice(0, i + 1);
+      const c = below.get(dir) ?? { all: 0, ignored: 0 };
+      c.all++;
+      if (isIgnored) c.ignored++;
+      below.set(dir, c);
+    }
+  }
   const out = new Set<string>();
   for (const path of ignored) {
     if (!files.has(path)) continue;
-    const parts = path.split("/");
     let entry = path;
-    for (let i = 1; i < parts.length; i++) {
-      const dir = parts.slice(0, i).join("/") + "/";
-      if ([...files.keys()].every((k) => !k.startsWith(dir) || ignored.has(k))) {
+    for (let i = path.indexOf("/"); i >= 0; i = path.indexOf("/", i + 1)) {
+      const dir = path.slice(0, i + 1);
+      const c = below.get(dir);
+      if (c && c.all === c.ignored) {
         entry = dir;
         break;
       }
@@ -96,10 +108,11 @@ export function ignoredEntries(files: Map<string, string>, ignored: Set<string>)
   return [...out].sort(byBytes);
 }
 
-/** Sorted, capped paths that are not ignored, and the ignored entries (`files::list_files`). */
+/** Sorted, capped paths that are not ignored, and the ignored entries (`files::list_files`). `truncated` also covers the ignored list. */
 export function listFiles(files: Map<string, string>, ignored: Set<string>, max = MAX_LISTED_FILES): FileList {
   const all = [...files.keys()].filter((k) => !ignored.has(k)).sort(byBytes);
-  return { files: all.slice(0, max), ignored: ignoredEntries(files, ignored).slice(0, max), truncated: all.length > max };
+  const entries = ignoredEntries(files, ignored);
+  return { files: all.slice(0, max), ignored: entries.slice(0, max), truncated: all.length > max || entries.length > max };
 }
 
 /** What `read_text_file` returns for a file with this text (`files::read_text_file`). */

@@ -431,10 +431,11 @@ pub struct FileDiff {
 pub struct FileList {
     /// Relative paths, sorted by bytes.
     pub files: Vec<String>,
-    /// Ignored entries, sorted by bytes. A folder that is ignored as a whole is one entry that ends
-    /// with "/". Its content is not listed. Any other ignored entry is a file.
+    /// Ignored entries, sorted by bytes. A folder with no file that is tracked or not ignored is one
+    /// entry that ends with "/", the outermost such folder. The entries inside it are not listed,
+    /// even when a file rule (`*.o`) ignores them. Any other ignored entry is a file.
     pub ignored: Vec<String>,
-    /// More than 100 000 files: the list stops there.
+    /// More than 100 000 files, or more than 100 000 ignored entries: the lists stop there.
     pub truncated: bool,
 }
 

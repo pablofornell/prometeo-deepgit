@@ -178,7 +178,7 @@ pub struct Hunk { pub old_start: u32, pub old_lines: u32, pub new_start: u32, pu
 pub struct FileDiff { pub path: String, pub old_path: Option<String>, pub binary: bool,
   pub hunks: Vec<Hunk>, pub too_large: bool /* > 20_000 lines: hunks empty */ }
 
-pub struct FileList { pub files: Vec<String> /* tracked + untracked, not ignored; sorted by bytes */, pub ignored: Vec<String> /* ignored entries, sorted by bytes; a folder ignored as a whole is one entry ending with "/" */, pub truncated: bool /* > 100_000 files: list stops there */ }
+pub struct FileList { pub files: Vec<String> /* tracked + untracked, not ignored; sorted by bytes */, pub ignored: Vec<String> /* ignored entries, sorted by bytes; the outermost folder with no tracked or non-ignored file is one entry ending with "/", its content is not listed */, pub truncated: bool /* > 100_000 files or > 100_000 ignored entries: the lists stop there */ }
 pub struct TextFile { pub content: String /* empty when binary or too_large */, pub version: String /* SHA-1 hex, "-", byte length; send it back on save; empty when too_large */,
   pub binary: bool /* NUL in the first 8_000 bytes, or not UTF-8 */, pub too_large: bool /* > 2 MiB: not loaded */ }
 pub struct SearchHit { pub path: String, pub line: u32 /* 1-based */, pub column: u32 /* 1-based, in characters */, pub text: String /* cut to 400 characters */ }
@@ -246,7 +246,7 @@ with the same name in camelCase (e.g. `logOpen`).
 | `working_tree` | `repoId` | `WorkingTree` |
 | `file_diff` | `repoId, spec: DiffSpec, path: String, oldPath: Option<String>, context: u32` | `FileDiff` |
 | `file_content` | `repoId, rev: Option<String> /* None = worktree */, path` | `String` (max 2 MiB) |
-| `list_files` | `repoId` | `FileList` (`git ls-files --cached --others --exclude-standard`; files only, a deleted tracked file and a submodule folder are left out; `ignored` comes from `git ls-files --others --ignored --exclude-standard --directory`) |
+| `list_files` | `repoId` | `FileList` (`git ls-files --cached --others --exclude-standard`; files only, a deleted tracked file and a submodule folder are left out; `ignored` comes from `git ls-files --others --ignored --exclude-standard --directory`, read record by record: git also lists the files inside a folder that a file rule ignores, so each entry inside a listed folder is dropped, and the read stops at 100 000 entries) |
 | `read_text_file` | `repoId, path: String` | `TextFile` (worktree only. Errors: a symlink (`<path> is a symlink.`), a folder or a special file (`not a regular file: <path>`), a missing file (`file not found: <path>`), a path outside the repo (`path outside the repo: <path>`), a path in `.git` (`path inside the git folder: <path>`)) |
 | `search_files` | `repoId, query: String, caseSensitive: bool, regex: bool /* true = POSIX extended regex (-E), false = fixed text (-F) */` | `SearchResult` (`git grep -n --column -I -z --untracked --exclude-standard`, ignored files left out. An empty query gives no hits. A query with a NUL or a line break is refused. An invalid regex gives git's error) |
 | `last_commit_message` | `repoId` | `String` |

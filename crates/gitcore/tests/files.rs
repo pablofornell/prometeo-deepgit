@@ -73,6 +73,25 @@ fn list_reports_ignored_entries_and_a_whole_ignored_folder_as_one() {
 }
 
 #[test]
+fn list_reports_a_folder_that_a_file_rule_ignores_as_one_entry() {
+    let repo = TestRepo::new();
+    repo.commit_file(".gitignore", "*.o\n", "ignore rules");
+    repo.commit_file("src/main.c", "int main() {}\n", "main");
+    for i in 0..30 {
+        repo.write(&format!("out/deep/{i}.o"), "obj\n");
+    }
+    repo.write("out/top.o", "obj\n");
+    // A folder with a file that is not ignored lists its ignored files one by one.
+    repo.write("src/main.o", "obj\n");
+    repo.write("mixed/keep.txt", "text\n");
+    repo.write("mixed/a.o", "obj\n");
+
+    let list = files::list_files(&git(), &repo.info).expect("list");
+    assert_eq!(list.ignored, vec!["mixed/a.o", "out/", "src/main.o"]);
+    assert!(!list.truncated);
+}
+
+#[test]
 fn list_of_an_empty_repo_is_empty() {
     let repo = TestRepo::new();
     let list = files::list_files(&git(), &repo.info).expect("list");
