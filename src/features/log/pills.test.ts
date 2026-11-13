@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 import type { RefLabel } from "../../api/types";
-import { pillBudget, pillMinWidths, pillSpace, pillWidths, visiblePills } from "./pills";
+import { pillBudget, pillMinWidths, pillSpace, pillWidths, subjectTextWidth, visiblePills } from "./pills";
 
 const local = (name: string, isCurrent = false): RefLabel => ({ kind: "local", name, isCurrent });
 const tag = (name: string): RefLabel => ({ kind: "tag", name, isCurrent: false });
@@ -18,11 +18,11 @@ describe("pillBudget", () => {
   });
   it("gives a short subject's free room to the pills", () => {
     // "commit 4" (8 chars, about 60 px) in a 243 px column: 243 - 60 - 8 gap = 175 px, not the 45% share (109 px)
-    expect(pillBudget(243, 120, 8)).toBe(175);
-    expect(pillBudget(588, 120, 8)).toBe(520);
+    expect(pillBudget(243, 120, subjectTextWidth("commit 4"))).toBe(175);
+    expect(pillBudget(588, 120, subjectTextWidth("commit 4"))).toBe(520);
   });
   it("keeps the share rule for a long subject, and the subject at least 40 px", () => {
-    expect(pillBudget(300, 120, 80)).toBe(pillBudget(300, 120));
+    expect(pillBudget(300, 120, subjectTextWidth("x".repeat(80)))).toBe(pillBudget(300, 120));
     expect(pillBudget(300, 120, 0)).toBe(300 - 40 - 8);
   });
   it("never lets pills plus subject exceed the column", () => {
@@ -72,8 +72,9 @@ describe("visiblePills with a shrinking first pill", () => {
   it("keeps the first pill at its natural width while the others give way", () => {
     // 106 + 4 + 40 + 26 = 176: two pills and +3, the first one not squeezed
     expect(visiblePills(widths, 176, mins)).toBe(2);
-    // 175 does not fit that: only the first pill and +4, still at its natural width
-    expect(visiblePills(widths, 175, mins)).toBe(1);
+    // below that the second pill still shows while its minimum fits (the first pill then shrinks a little): never fewer
+    expect(visiblePills(widths, 175, mins)).toBe(2);
+    expect(visiblePills(widths, 131, mins)).toBe(1);
   });
   it("shows everything when the rest fits at minimum widths beside the natural first pill", () => {
     expect(visiblePills(widths, 106 + 4 * 40 + 4 * 4, mins)).toBe(5);
@@ -81,6 +82,45 @@ describe("visiblePills with a shrinking first pill", () => {
   it("falls back to the first pill at its minimum when its natural width does not fit", () => {
     expect(visiblePills(widths, 90 + 26, mins)).toBe(1);
     expect(visiblePills([200, 100, 100], 90 + 4 + 40 + 26, [90, 40, 40])).toBe(2);
+  });
+});
+
+describe("subjectTextWidth", () => {
+  it("counts 7.5 px for a Latin character and 13 px for a wide one (CJK, emoji), by code point", () => {
+    expect(subjectTextWidth("commit 4")).toBe(60);
+    expect(subjectTextWidth("修正")).toBe(26);
+    expect(subjectTextWidth("fix 🐛")).toBe(4 * 7.5 + 13);
+    expect(subjectTextWidth("")).toBe(0);
+  });
+  it("gives a CJK subject less room than a Latin one of the same length", () => {
+    expect(pillBudget(300, 120, subjectTextWidth("修正修正修正修正"))).toBeLessThan(pillBudget(300, 120, subjectTextWidth("abcdefgh")));
+  });
+});
+
+describe("visiblePills is monotonic in the budget", () => {
+  const fixtures: { name: string; widths: number[]; mins: number[] }[] = [
+    { name: "split + 2 tags", widths: [220, 80, 80], mins: [90, 40, 40] },
+    { name: "split + 4", widths: [106, 150, 68, 68, 68], mins: [90, 40, 40, 40, 40] },
+    { name: "plain HEAD + 3", widths: [40, 150, 100, 60], mins: [40, 40, 40, 40] },
+    { name: "two long", widths: [220, 150], mins: [90, 40] },
+  ];
+  for (const f of fixtures) {
+    it(f.name, () => {
+      let prev = 0;
+      for (let b = 100; b <= 600; b++) {
+        const k = visiblePills(f.widths, b, f.mins);
+        expect(k, `budget ${b}`).toBeGreaterThanOrEqual(prev);
+        expect(k).toBeGreaterThanOrEqual(1);
+        expect(k).toBeLessThanOrEqual(f.widths.length);
+        prev = k;
+      }
+      expect(prev).toBe(f.widths.length);
+    });
+  }
+  it("shows every pill whose minimum fits, between the minimum sum and the natural sum", () => {
+    // [220, 80, 80], mins [90, 40, 40]: minimums sum to 178, naturals to 388
+    for (const b of [178, 200, 246, 260, 300, 387]) expect(visiblePills([220, 80, 80], b, [90, 40, 40])).toBe(3);
+    expect(visiblePills([220, 80, 80], 177, [90, 40, 40])).toBe(2);
   });
 });
 
@@ -101,10 +141,18 @@ describe("pillWidths", () => {
     expect(pillWidths(refs).length).toBe(2);
   });
   it("gives the split HEAD pill HEAD + 48 px as minimum and an ordinary pill 40 px", () => {
-    const refs: RefLabel[] = [local("feature/PAY-2318", true), local("develop"), tag("v1")];
+    const refs: RefLabel[] = [local("feature/PAY-2318-refunds", true), local("develop"), tag("v1")];
     expect(pillMinWidths(refs)).toEqual([90, 40, 40]);
-    expect(pillWidths(refs)[0]).toBe(177);
+    // 42 + 12 + 14 + 164 = 232, capped at 220
+    expect(pillWidths(refs)[0]).toBe(220);
+    expect(pillWidths([local("feature/PAY-2318", true)])[0]).toBe(177);
     expect(pillWidths([local("feature/" + "x".repeat(80), true)])[0]).toBe(220);
+  });
+  it("never shrinks a split HEAD pill with a short branch name, so \"main\" is not cut", () => {
+    // 42 + 12 + 14 + 28 + 14 (synced) = 110
+    const refs: RefLabel[] = [local("main", true), { kind: "remote", name: "origin/main", isCurrent: false }];
+    expect(pillWidths(refs)).toEqual([110]);
+    expect(pillMinWidths(refs)).toEqual([110]);
   });
   it("keeps a plain HEAD pill at its natural width", () => {
     const refs: RefLabel[] = [{ kind: "head", name: "HEAD", isCurrent: true }, local("develop")];

@@ -22,24 +22,38 @@ const MAX_SPLIT = 220;
 /** Smallest width of an ordinary pill, and of the branch segment of the split HEAD pill (the HEAD segment never shrinks). */
 const MIN_PILL = 40;
 const MIN_BRANCH = 48;
-/** Estimated width of one character of the subject (semibold on the HEAD row), the gap between subject and pills, and the subject's own minimum. */
+/** A split pill up to this wide (a short branch name) keeps its natural width as its minimum. */
+const SHORT_SPLIT = 130;
+/**
+ * Estimated width of one character of the subject (semibold on the HEAD row): 7.5 px, and 13 px from U+2E80 on (CJK
+ * and other wide scripts, emoji), the gap between subject and pills, and the subject's own minimum.
+ */
 const SUBJECT_CHAR = 7.5;
+const SUBJECT_WIDE_CHAR = 13;
+const WIDE_FROM = 0x2e80;
 const SUBJECT_GAP = 8;
 const SUBJECT_MIN = 40;
 
 const KIND_ORDER: Record<RefLabel["kind"], number> = { head: 0, local: 1, remote: 2, tag: 3, stash: 4 };
 
+/** Estimated width in px of the subject text (counts code points, so an emoji is one character). */
+export function subjectTextWidth(text: string): number {
+  let w = 0;
+  for (const ch of text) w += (ch.codePointAt(0) ?? 0) >= WIDE_FROM ? SUBJECT_WIDE_CHAR : SUBJECT_CHAR;
+  return w;
+}
+
 /**
  * Pixels the pills of a row may use inside a subject column of `subjectWidth` px. The share rule above holds for a
- * long subject. A short subject (`subjectChars` characters) leaves free room: the pills may use all of it, so a
- * branch name is not cut while there is space.
+ * long subject. A short subject (`subjectText` px, from `subjectTextWidth`) leaves free room: the pills may use all
+ * of it, so a branch name is not cut while there is space.
  */
-export function pillBudget(subjectWidth: number, minSubject: number, subjectChars?: number): number {
+export function pillBudget(subjectWidth: number, minSubject: number, subjectText?: number): number {
   const w = Math.max(0, subjectWidth);
   const keep = Math.max(minSubject, w * SUBJECT_MIN_SHARE);
   const share = Math.max(0, Math.min(w * PILL_SHARE, w - keep));
-  if (subjectChars === undefined) return share;
-  const free = Math.min(w - subjectChars * SUBJECT_CHAR - SUBJECT_GAP, w - SUBJECT_MIN - SUBJECT_GAP);
+  if (subjectText === undefined) return share;
+  const free = Math.min(w - subjectText - SUBJECT_GAP, w - SUBJECT_MIN - SUBJECT_GAP);
   return Math.max(share, free);
 }
 
@@ -60,7 +74,9 @@ export function pillSizes(refs: readonly RefLabel[]): PillSize[] {
     const synced = r.kind === "local" && sorted.some((x) => x.kind === "remote" && (x.name === "origin/" + r.name || x.name.endsWith("/" + r.name)));
     const text = Math.ceil(r.name.length * CHAR);
     if (r.kind === "local" && r.isCurrent) {
-      out.push({ width: Math.min(MAX_SPLIT, HEAD_LABEL + PAD + ICON + text + (synced ? ICON : 0)), min: HEAD_LABEL + MIN_BRANCH });
+      const width = Math.min(MAX_SPLIT, HEAD_LABEL + PAD + ICON + text + (synced ? ICON : 0));
+      // A short branch name ("main", "develop") is never cut: only a long one shrinks, down to HEAD + 48 px.
+      out.push({ width, min: width <= SHORT_SPLIT ? width : HEAD_LABEL + MIN_BRANCH });
     } else if (r.kind === "head") {
       // The plain HEAD pill (detached) never shrinks.
       const w = Math.min(MAX_PILL, PAD + text);
@@ -95,22 +111,26 @@ export function pillSpace(budget: number, mins: readonly number[]): number {
 /**
  * How many pills to show before "+N". All of them when they fit at their natural widths; else as many as fit with the
  * first pill (the HEAD pill, which the CSS shrinks last) at its natural width and the others at their minimum width,
- * with room for the "+N" chip; else the first pill alone; else the same with the first pill at its minimum width. At least one. `mins` defaults
- * to `widths` (pills that do not shrink).
+ * with room for the "+N" chip. A pill also shows whenever its minimum width fits (all pills at minimum width, or the
+ * leading pills at minimum width with the chip). The result is the largest of these, so it never drops as the
+ * budget grows. At least one. `mins` defaults to `widths` (pills that do not shrink).
  */
 export function visiblePills(widths: readonly number[], budget: number, mins: readonly number[] = widths): number {
   const n = widths.length;
   if (n <= 1) return n;
   const sum = (list: readonly number[]) => list.reduce((a, b) => a + b, 0) + GAP * (n - 1);
-  if (sum(widths) <= budget) return n;
+  if (sum(widths) <= budget || sum(mins) <= budget) return n;
+  let best = 1;
   // The first pill keeps its natural width: its branch name is not cut while the others can still give way.
-  for (let k = n; k > 1; k--) {
-    let need = widths[0] + (k < n ? MORE : 0);
+  for (let k = n - 1; k > 1; k--) {
+    let need = widths[0] + MORE;
     for (let i = 1; i < k; i++) need += GAP + mins[i];
-    if (need <= budget) return k;
+    if (need <= budget) {
+      best = k;
+      break;
+    }
   }
-  if (widths[0] + MORE <= budget) return 1;
-  if (sum(mins) <= budget) return n;
+  // Leading pills at their minimum width, with room for the chip.
   let used = 0;
   let k = 0;
   while (k < n - 1) {
@@ -119,5 +139,5 @@ export function visiblePills(widths: readonly number[], budget: number, mins: re
     used = next;
     k++;
   }
-  return Math.max(1, k);
+  return Math.max(best, k);
 }
