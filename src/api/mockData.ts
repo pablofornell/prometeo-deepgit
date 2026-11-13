@@ -178,6 +178,7 @@ function subjectFor(r: () => number, nouns: string[], issue: string | null): str
 
 export interface Scenario {
   name: string;
+  /** 0: an empty repository (no commit yet, `head` is its unborn branch). */
   commits: number;
   /** Checked-out branch (created from main when it is not "main"). */
   head: string;
@@ -270,6 +271,11 @@ export function generateRepo(info: RepoInfo, url: string, sc: Scenario, nowSec: 
     ignored: new Set(),
     version: 0,
   };
+  // a repository that `git init` just made: the branch exists in HEAD only, no commit, nothing on disk
+  if (sc.commits === 0) {
+    repo.head = { branch: sc.head, oid: "" };
+    return repo;
+  }
   const g: Gen = { repo, r: rng(hashStr("repo:" + info.name)), nouns: dom.nouns };
   const { r } = g;
   const total = sc.commits;

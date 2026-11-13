@@ -12,7 +12,7 @@ import { batch, createMemo, createRoot, createSignal } from "solid-js";
 import { createStore, produce, reconcile } from "solid-js/store";
 import * as api from "../api/tauri";
 import { validateProjectName } from "../api/projectName";
-import type { CloneResult, Project, RepoInfo, RepoSummary } from "../api/types";
+import { ERR_NO_REPOSITORY, type CloneResult, type Project, type RepoInfo, type RepoSummary } from "../api/types";
 import { dirtyCount } from "./changesScope";
 import { subscribeRepoChanged } from "./events";
 import { loadPersisted, savePersisted } from "./persist";
@@ -63,11 +63,28 @@ export async function loadWorkspace(): Promise<void> {
   await refreshSummaries();
 }
 
-/** Opens the folder picker (or uses `path`) and adds the folder as a project. Resolves to the project, or null when cancelled. */
+/**
+ * Opens the folder picker (or uses `path`) and adds the folder as a project. Resolves to the project, or null when cancelled.
+ * A folder with no repository is not an error: the user is asked whether to initialize one (`InitRepositoryDialog`), and
+ * Cancel adds nothing. Every "add a project" entry point (Welcome, switcher, sidebar, palette) goes through here.
+ */
 export async function addProject(path?: string): Promise<Project | null> {
   const chosen = path ?? (await (await import("../api/dialog")).pickFolder("Add project folder"));
   if (!chosen) return null;
-  const project = await api.projectAdd(chosen);
+  let project: Project;
+  let initialized: { folder: string; branch: string } | null = null;
+  try {
+    project = await api.projectAdd(chosen);
+  } catch (e) {
+    if (api.toApiError(e).code !== ERR_NO_REPOSITORY) throw e;
+    const info = await api.projectInitInfo(chosen);
+    // loaded here: the dialog and toast modules pull in the UI components, which state modules (and their tests) do not need
+    const { showDialog } = await import("./dialogs");
+    const answer = await showDialog("initRepository", { info });
+    if (!answer) return null;
+    project = answer.project;
+    initialized = { folder: info.name, branch: answer.branch };
+  }
   setWorkspace(
     produce((s) => {
       const i = s.projects.findIndex((p) => p.id === project.id);
@@ -76,6 +93,7 @@ export async function addProject(path?: string): Promise<Project | null> {
     }),
   );
   await setActiveProject(project.id);
+  if (initialized) (await import("../components/ui/Toast")).toast({ kind: "success", title: `Initialized a repository in ${initialized.folder}`, body: `Branch ${initialized.branch}.` });
   return project;
 }
 

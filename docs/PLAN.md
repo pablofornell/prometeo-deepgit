@@ -210,7 +210,16 @@ pub struct ConflictVersions { pub base: Option<Blob>, pub ours: Option<Blob>, pu
   pub labels: ConflictLabels, pub swapped: bool, pub eol: Eol }
 
 // Error sent to the frontend:
-pub struct ApiError { pub message: String, pub detail: Option<String> /* stderr */ }
+pub struct ApiError {
+    pub message: String,
+    pub detail: Option<String>, // stderr
+    pub code: Option<String>,   // machine-readable kind, only for errors the UI handles itself; no key in the JSON when None
+}
+// Codes: ERR_NO_REPOSITORY = "noRepository" (`project_add`: the folder holds no repository, not even in a subfolder).
+// The UI tells such an error by `code`, never by its text. TS: `ApiError.code`, `ERR_NO_REPOSITORY` in `src/api/types.ts`.
+
+// What the "Initialize a Git repository?" dialog shows about a folder (`project_init_info`):
+pub struct InitInfo { pub path: String /* canonical */, pub name: String, pub default_branch: String, pub parent_repo: Option<String> }
 ```
 
 ## 5. Tauri commands (src-tauri/commands.rs)
@@ -223,8 +232,10 @@ with the same name in camelCase (e.g. `logOpen`).
 |---|---|---|
 | `workspace_load` | – | `Workspace` |
 | `workspace_save_ui` | `ui: Value` | `()` |
-| `project_add` | `path: String` | `Project` (repos discovered, depth ≤ 4, skip `node_modules`, `target`, `.git` internals, hidden dirs except the root; a folder that is a repo is still scanned for nested repos). The name is the folder name; when another project has that name already (compared as in `project_rename`), it gets a number: `api (2)`, `api (3)`. The same folder again returns the project it already is |
-| `project_remove` | `projectId` | `()` |
+| `project_add` | `path: String` | `Project` (repos discovered, depth ≤ 4, skip `node_modules`, `target`, `.git` internals, hidden dirs except the root; a folder that is a repo is still scanned for nested repos). The name is the folder name; when another project has that name already (compared as in `project_rename`), it gets a number: `api (2)`, `api (3)`. The same folder again returns the project it already is. A folder with no repository fails with `ApiError.code = "noRepository"` (message `No Git repository found in <path>`): the UI answers with `project_init_info` and the initialize dialog, not with an error |
+| `project_init_info` | `path: String` | `InitInfo`: the canonical path, the folder name, `defaultBranch` (`git config --global init.defaultBranch`, `main` when it is not set or empty) and `parentRepo` (root of the repository that contains the folder, from `git rev-parse --show-toplevel`; null when none). Errors: `Cannot open <path>: ...`, `<path> is not a folder` |
+| `project_init` | `path: String`, `branch: String` | `Project`. Runs `git init --initial-branch=<branch>` in a folder that holds no repository, then adds the folder like `project_add` (it becomes active when it is the first project). The branch is trimmed; errors: `Enter a branch name.`, `Invalid branch name "<x>": it cannot start with '-'.` (also control characters), `This is not a valid branch name.` (`git check-ref-format --branch`, and `@`, `HEAD`), `<path> holds a Git repository already.` (the folder or a subfolder is a repo), plus git's own first error line. Nothing is created when a check fails. Code: `gitcore::init` |
+| `project_remove` | `projectId` | `()` (unknown id: `unknown project`). The files on disk are never touched. When it was the active project the backend activates the next one in file order; the UI then activates the next one in the name-sorted list (`project_set_active`) |
 | `project_rescan` | `projectId` | `Project` |
 | `project_set_active` | `projectId` | `()` |
 | `project_rename` | `projectId`, `name: String` | `Project` (updated; saves the workspace atomically). The name is trimmed. Errors: `The project name cannot be empty.`, `The project name is too long: 80 characters at most.` (characters, not bytes), `The project name cannot contain control characters (tab, new line).`, `Another project is already called "<name>".` (other projects, trimmed, Unicode NFC and a simple case fold: `name_key` / `nameKey`), `unknown project`. The id never changes (it comes from the path), and `project_rescan` keeps the name. The mock and the UI use the same rules (`src/api/projectName.ts`). |

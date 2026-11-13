@@ -10,7 +10,7 @@
  * `DialogRegistry`, then register a component for it.
  */
 import type { Component } from "solid-js";
-import type { AuthPrompt, MergeOpts, ResetMode } from "../api/types";
+import type { AuthPrompt, InitInfo, MergeOpts, Project, ResetMode } from "../api/types";
 import type { AuthDialogResult } from "./authQueue";
 import { ConfirmDialog, type ConfirmProps, type ConfirmResult, type DialogComponentProps, openDialog } from "../components/ui";
 
@@ -175,6 +175,18 @@ export interface MergeFileResult {
   resolved: boolean;
 }
 
+export interface InitRepositoryProps {
+  /** What `projectInitInfo` said about the folder that has no repository. */
+  info: InitInfo;
+}
+/** The dialog runs `git init` itself (`api.projectInit`) and closes with what it made. */
+export interface InitRepositoryResult {
+  /** The folder, added as a project. */
+  project: Project;
+  /** The initial branch the user chose. */
+  branch: string;
+}
+
 /** Props and result of every dialog name. */
 export interface DialogRegistry {
   newBranch: { props: NewBranchProps; result: NewBranchResult };
@@ -193,6 +205,7 @@ export interface DialogRegistry {
   conflicts: { props: ConflictsProps; result: ConflictsResult };
   mergeFile: { props: MergeFileProps; result: MergeFileResult };
   renameProject: { props: RenameProjectProps; result: RenameProjectResult };
+  initRepository: { props: InitRepositoryProps; result: InitRepositoryResult };
 }
 
 export type DialogName = keyof DialogRegistry;

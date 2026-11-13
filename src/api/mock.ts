@@ -15,12 +15,14 @@ import {
 import { buildFileDiff, fileText, toFileChange } from "./mockDiff";
 import { CHANGED_ON_DISK, fileKey, filePathError, isFolder, listFiles, readText, searchFiles, versionOf } from "./mockFiles";
 import { uniqueProjectName, validateProjectName } from "./projectName";
+import { validateRefName } from "../features/dialogs/refname";
 import { entryOf, genericConflicts, currentOids, hasStage, isTextConflict, sideStages, versionsOf, type MockConflict } from "./mockConflicts";
 import type {
   CloneOpts, CloneProgress, CloneResult, CloneTarget, CommitDetails, CommitRow, ConflictEntry, ConflictLabels, ConflictVersions, ConsoleEntry, DiffSpec,
   FileChange, FileDiff, GraphRow, LocalBranch, LogQuery, LogSessionInfo, MergeMode, MergeOpts, OpResult, Project, RefLabel, Refs, RepoChanged, RepoInfo,
   RepoSummary, ResetMode, Workspace, WorkingTree,
 } from "./types";
+import { ERR_NO_REPOSITORY, type InitInfo } from "./types";
 
 type Args = Record<string, unknown>;
 
@@ -35,6 +37,11 @@ const strs = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is st
 /** The rejection shape of a failed command (same as the Rust `ApiError`). */
 function fail(message: string, detail?: string): never {
   throw detail ? { message, detail } : { message };
+}
+
+/** `fail` for the errors the UI tells by `code` (`ERR_NO_REPOSITORY`). */
+function failCode(code: string, message: string): never {
+  throw { message, code };
 }
 
 // ---------------------------------------------------------------- event bus
@@ -116,6 +123,16 @@ function buildInitialProjects(): Workspace["projects"] {
   for (const r of ws.projects.flatMap((p) => p.repos)) registerRepo(r, scenarios.get(r.id) as Scenario);
   return ws.projects;
 }
+
+/** `git config --global init.defaultBranch` of the mock machine. */
+const MOCK_DEFAULT_BRANCH = "main";
+/** Folders that `project_init` made repositories. */
+const initializedFolders = new Set<string>();
+/**
+ * The mock has no file system: a folder named `empty`, `no-repo*` or `*-docs` (try "IRIS-docs") holds no repository
+ * until `project_init` runs on it. Every other path has repositories.
+ */
+const isPlainFolder = (path: string): boolean => !initializedFolders.has(path) && /(^|\/)(empty|no-repo[^/]*|[^/]*-docs)$/i.test(path);
 
 const workspace: Workspace = { projects: buildInitialProjects(), activeProjectId: "p-payments", ui: {} };
 
@@ -625,11 +642,36 @@ const handlers: Record<string, Handler> = {
     const name = path.split("/").pop() || "project";
     const existing = workspace.projects.find((p) => p.path === path);
     if (existing) return structuredClone(existing);
+    if (isPlainFolder(path)) failCode(ERR_NO_REPOSITORY, `No Git repository found in ${str(a.path)}`);
     const defs: [string, string][] = [[path, name], [`${path}/api`, "api"], [`${path}/web`, "web"]];
     const project: Project = { id: "p-" + hex40(path).slice(0, 8), name: uniqueProjectName(name, workspace.projects), path, repos: [] };
     for (const [p, n] of defs) project.repos.push({ id: repoId(p), name: n, path: p });
     workspace.projects.push(project);
     for (const info of project.repos) registerRepo(info, genericScenario(info.name));
+    workspace.activeProjectId = project.id;
+    return structuredClone(project);
+  },
+  project_init_info: (a) => {
+    const path = str(a.path).replace(/\/+$/, "");
+    if (!path) fail("Cannot open : No such file or directory (os error 2)");
+    // like `git rev-parse --show-toplevel`: the repository that contains the folder, when there is one
+    const parent = [...metas.values()].map((m) => m.info.path).filter((p) => path.startsWith(p + "/")).sort((x, y) => y.length - x.length)[0];
+    return { path, name: path.split("/").pop() || path, defaultBranch: MOCK_DEFAULT_BRANCH, parentRepo: parent ?? null } satisfies InitInfo;
+  },
+  project_init: (a, c) => {
+    const path = str(a.path).replace(/\/+$/, "");
+    const branch = stringArg(a, "branch", "project_init").trim();
+    // the same order of checks as `init_repository` in gitcore
+    if (!branch) fail("Enter a branch name.");
+    if (branch.startsWith("-")) fail(`Invalid branch name ${JSON.stringify(branch)}: it cannot start with '-'.`);
+    if (!isPlainFolder(path)) fail(`${str(a.path)} holds a Git repository already.`);
+    if (validateRefName(branch) !== null) fail("This is not a valid branch name.");
+    initializedFolders.add(path);
+    const info: RepoInfo = { id: repoId(path), name: path.split("/").pop() || "project", path };
+    registerRepo(info, { name: info.name, commits: 0, head: branch });
+    c.git(null, ["init", `--initial-branch=${branch}`], { stdout: `Initialized empty Git repository in ${path}/.git/\n` });
+    const project: Project = { id: "p-" + hex40(path).slice(0, 8), name: uniqueProjectName(info.name, workspace.projects), path, repos: [info] };
+    workspace.projects.push(project);
     workspace.activeProjectId = project.id;
     return structuredClone(project);
   },
@@ -863,7 +905,7 @@ const handlers: Record<string, Handler> = {
     if (signOff) message = withTrailer(message, SIGNOFF);
     const [subject, ...rest] = message.split("\n");
     const pending = pendingMerges.get(repo);
-    const parents = pending ? [repo.head.oid, pending.oid] : amend && head ? head.parents : [repo.head.oid];
+    const parents = pending ? [repo.head.oid, pending.oid] : amend && head ? head.parents : repo.head.oid ? [repo.head.oid] : [];
     const n = wtStatusCounts(repo);
     const commit = makeCommit(repo, parents, subject, rest.join("\n").trim());
     advanceHead(repo, commit.oid);

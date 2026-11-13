@@ -133,11 +133,13 @@ impl From<GitError> for ApiError {
                     } else {
                         Some(stderr)
                     },
+                    code: None,
                 }
             }
             other => ApiError {
                 message: other.to_string(),
                 detail: None,
+                code: None,
             },
         }
     }

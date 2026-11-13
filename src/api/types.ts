@@ -515,4 +515,21 @@ export interface ApiErrorShape {
   message: string;
   /** stderr of the failed git command. */
   detail?: string;
+  /** Kind of the errors the UI handles itself (`ERR_NO_REPOSITORY`); absent for the rest. */
+  code?: string;
+}
+
+/** `ApiError.code` of `project_add` when the folder holds no Git repository, not even in a subfolder. */
+export const ERR_NO_REPOSITORY = "noRepository";
+
+/** What the "Initialize a Git repository?" dialog shows about a folder (`project_init_info`). */
+export interface InitInfo {
+  /** Canonical absolute path of the folder. */
+  path: string;
+  /** The folder name. */
+  name: string;
+  /** `git config --global init.defaultBranch`, or `main` when it is not set. */
+  defaultBranch: string;
+  /** Root of the repository that contains the folder (the new repository would be nested), or null. */
+  parentRepo: string | null;
 }
